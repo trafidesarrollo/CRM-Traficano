@@ -1,0 +1,377 @@
+Prompt optimizado para Replit
+Objetivo
+
+Construir una aplicación web CRM comercial integral para una empresa industrial B2B, con foco inicial en automatizar la gestión de mails comerciales.
+
+La app debe integrar:
+
+CRM de clientes, contactos y vendedores
+carga masiva por CSV
+conexión con Gmail
+clasificación automática de mails
+detección de pedidos de cotización
+extracción de medidas y productos con IA
+generación de borradores de respuesta
+seguimiento automático comercial
+trazabilidad total de actividades de vendedores
+Prioridad actual
+
+La app debe estar preparada para múltiples tipos de mail, pero la primera automatización real a desarrollar debe ser:
+
+Prioridad 1
+
+Pedido de cotización
+
+La app debe identificarlo, procesarlo, extraer datos, crear oportunidad y ayudar a responder y seguir ese pedido.
+
+Prioridad 2
+
+Reclamo
+
+Por ahora solo clasificarlo, separarlo y derivarlo a un flujo distinto. No automatizar respuesta compleja en esta fase.
+
+Prioridad 3
+
+Pregunta / consulta
+
+Por ahora solo clasificarla, separarla y permitir responderla después con otra lógica.
+
+Requisito clave de entrada de mails
+
+Cada vez que entra un mail, el sistema debe analizarlo y clasificarlo primero en una de estas categorías:
+
+Pedido de cotización
+Reclamo
+Pregunta / consulta
+Seguimiento de cotización
+Proveedor
+Interno
+Publicidad / spam
+Otros
+
+Esta clasificación debe hacerse con:
+
+IA
+score de confianza
+posibilidad de corrección manual
+registro de la corrección para mejora futura
+Regla de negocio clave
+
+En esta primera etapa, el sistema debe automatizar principalmente el flujo de Pedido de Cotización.
+
+Los demás tipos de mail deben:
+
+clasificarse,
+separarse,
+etiquetarse,
+asignarse a una cola o estado,
+pero no recibir todavía la misma automatización profunda.
+Flujo principal deseado
+Cuando entra un mail
+sincronizar desde Gmail
+guardar el mail y su hilo
+clasificar el tipo de mail
+mostrar score de confianza
+permitir corrección manual
+Si es Pedido de Cotización:
+extraer medidas, productos, normas, cantidades y datos del cliente con IA
+cruzar las medidas contra la base precargada de medidas/productos
+mostrar coincidencias exactas y aproximadas
+crear una oportunidad comercial automáticamente
+asignar vendedor
+generar borrador de respuesta
+programar seguimiento automático
+medir tiempos y estados
+Si es Reclamo:
+crear caso o ticket
+marcar prioridad
+asignar responsable
+no responder automáticamente en esta fase
+Si es Pregunta / Consulta:
+clasificarla
+asignarla a bandeja de consultas
+permitir respuesta posterior
+no automatizarla profundamente todavía
+Qué debe tener la aplicación
+1. Usuarios internos
+
+Login con usuario y contraseña.
+
+Roles:
+
+Admin
+Gerente comercial
+Vendedor
+Operador
+
+Registrar auditoría de todo:
+
+accesos
+cambios
+respuestas
+clasificaciones
+seguimientos
+correcciones manuales
+2. CRM
+
+Entidades mínimas:
+
+clientes
+contactos
+vendedores
+oportunidades
+actividades
+reclamos
+mails
+hilos de mails
+
+Registrar:
+
+llamadas
+visitas
+mails
+tareas
+justificaciones
+observaciones
+
+Cada vendedor debe tener historial completo.
+
+3. Importación masiva por CSV
+
+Permitir subir por CSV:
+
+clientes
+contactos
+vendedores
+productos
+medidas
+listas de precios
+estados de pedidos
+actividades históricas
+
+Cada importación debe tener:
+
+preview
+validación
+mapeo de columnas
+log
+errores descargables
+opción insertar/actualizar
+4. Gmail
+
+Conectar Gmail mediante OAuth 2.0 y Gmail API.
+
+La app debe poder:
+
+conectar una o varias cuentas
+verificar conexión
+sincronizar mails
+leer hilos
+leer adjuntos
+identificar remitente, asunto, cuerpo, fecha y thread
+procesar etiquetas o bandejas elegidas
+
+No usar usuario y contraseña directa para Gmail como método principal.
+
+5. IA para clasificación y extracción
+
+Debe existir un módulo de IA que haga dos tareas distintas:
+
+A. Clasificación del mail
+
+Determinar si el mail es:
+
+pedido de cotización
+reclamo
+pregunta / consulta
+seguimiento
+proveedor
+interno
+spam
+otros
+B. Extracción de datos
+
+Especialmente para pedidos de cotización, detectar:
+
+empresa
+contacto
+medidas
+productos
+cantidades
+normas
+urgencia
+prioridad
+datos faltantes
+6. Prompt editable
+
+Debe existir una pantalla de configuración donde se pueda:
+
+crear prompt
+editar prompt
+guardar versiones
+activar una versión
+probar con ejemplos
+comparar resultados
+guardar salida estructurada en JSON
+
+Esto se usará especialmente para mejorar la detección de medidas y clasificación de mails.
+
+7. Vendedor virtual
+
+La app debe poder actuar como asistente comercial.
+
+En esta primera etapa:
+
+Solo automatizar fuerte el flujo de pedido de cotización.
+
+Debe poder:
+
+confirmar recepción
+pedir datos faltantes
+generar borrador de respuesta
+dejar seguimiento programado
+recontactar al cliente si no responde
+Modos de operación:
+Modo asistido: genera borrador y humano aprueba
+Modo automático limitado: solo mensajes simples y seguros
+No automatizar todavía:
+respuestas complejas a reclamos
+respuestas técnicas difíciles
+compromisos de precio
+stock
+certificados
+condiciones legales
+8. Seguimiento automático
+
+Configurable por reglas.
+
+Ejemplo:
+
+primer seguimiento a las 24 hs
+segundo seguimiento a las 72 hs
+tercero a los 7 días
+cierre a los 14 días sin respuesta
+
+Debe poder definirse por:
+
+tipo de mail
+tipo de cliente
+prioridad
+vendedor
+categoría
+
+En esta fase, usarlo principalmente para pedidos de cotización.
+
+9. Dashboards y métricas
+Por vendedor
+llamadas
+visitas
+mails enviados
+mails respondidos
+oportunidades creadas
+cotizaciones seguidas
+conversión
+tiempo de respuesta
+justificaciones
+Por sistema
+mails procesados
+mails clasificados por tipo
+cantidad de pedidos de cotización detectados
+reclamos detectados
+consultas detectadas
+precisión de clasificación
+cantidad de correcciones humanas
+cantidad de medidas detectadas correctamente
+cantidad de seguimientos ejecutados
+Reglas de negocio
+no inventar precios
+no inventar stock
+no inventar medidas
+no comprometer entregas automáticamente
+guardar toda corrección humana
+evitar duplicados
+mantener historial completo
+separar estrictamente pedido de cotización, reclamo y pregunta
+Requerimientos técnicos sugeridos
+Frontend: React / Next.js
+Backend: Node.js o Python
+Base de datos: PostgreSQL
+Gmail: Gmail API + OAuth 2.0
+Auth interna: usuario/contraseña con roles
+Logs de auditoría
+soporte para archivos CSV y adjuntos
+MVP obligatorio
+
+Construir primero estas funciones:
+
+login con roles
+CRUD de clientes
+CRUD de vendedores
+importación CSV de clientes, medidas y precios
+conexión Gmail con OAuth
+test de conexión Gmail
+sincronización de mails
+clasificación automática de mails
+separación por tipo:
+pedido de cotización
+reclamo
+pregunta / consulta
+automatización inicial solo para pedido de cotización
+extracción de medidas con IA
+cruce con base de medidas/productos
+corrección manual
+creación automática de oportunidad
+borrador de respuesta
+seguimiento automático simple
+panel de métricas básicas
+auditoría
+Orden de desarrollo
+Fase 1
+auth
+usuarios
+clientes
+vendedores
+importación CSV
+productos / medidas
+listas de precios
+Fase 2
+Gmail OAuth
+sincronización de mails
+clasificación de mails
+separación en:
+pedido de cotización
+reclamo
+pregunta / consulta
+Fase 3
+automatización del flujo de pedido de cotización
+IA para detectar medidas
+prompt editable
+cruce con base
+oportunidad automática
+borrador de respuesta
+Fase 4
+seguimiento automático
+dashboards
+auditoría avanzada
+futuros flujos para reclamos y preguntas
+Resultado esperado
+
+No quiero un demo vacío.
+Quiero una base funcional, escalable y mantenible.
+
+El sistema debe quedar listo para evolucionar después con flujos distintos para:
+
+reclamos
+preguntas
+seguimiento postventa
+cotización automática
+integración con ERP
+Recomendación
+
+Recomiendo pasarle este prompt y además pedirle estas 3 cosas al principio:
+
+que diseñe primero la base de datos
+que proponga la arquitectura por módulos
+que construya primero un MVP funcional del flujo “pedido de cotización”
+
+Porque ese es el flujo que más retorno te puede dar primero.
