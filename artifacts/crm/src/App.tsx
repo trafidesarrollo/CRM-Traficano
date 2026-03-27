@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ReactNode, useEffect } from "react";
+import { AppLayout } from "@/components/layout";
 
 // Pages
 import Login from "@/pages/login";
@@ -18,13 +19,14 @@ import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
-// Minimal stubs for non-core pages to ensure completeness without hitting output limits
 const PlaceholderPage = ({ title }: { title: string }) => {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold">{title}</h1>
-      <p className="text-muted-foreground mt-2">Módulo en construcción.</p>
-    </div>
+    <AppLayout>
+      <div className="p-8">
+        <h1 className="text-3xl font-bold">{title}</h1>
+        <p className="text-muted-foreground mt-2">Módulo en construcción.</p>
+      </div>
+    </AppLayout>
   );
 };
 
@@ -38,7 +40,11 @@ function ProtectedRoute({ component: Component }: { component: any }) {
     }
   }, [user, isLoading, setLocation]);
 
-  if (isLoading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
+  if (isLoading) return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+  );
   if (!user) return null;
 
   return <Component />;
@@ -50,37 +56,20 @@ function Router() {
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/login" component={Login} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
-      
+
       <Route path="/emails" component={() => <ProtectedRoute component={Emails} />} />
       <Route path="/emails/:id" component={() => <ProtectedRoute component={EmailDetail} />} />
-      
+
       <Route path="/opportunities" component={() => <ProtectedRoute component={Opportunities} />} />
       <Route path="/clients" component={() => <ProtectedRoute component={Clients} />} />
       <Route path="/imports" component={() => <ProtectedRoute component={Imports} />} />
       <Route path="/gmail" component={() => <ProtectedRoute component={Gmail} />} />
-      
-      {/* Stubs for remaining routes to ensure full coverage implied by sidebar */}
-      <Route path="/contacts" component={() => <ProtectedRoute component={() => {
-        import("@/components/layout").then(m => m.AppLayout);
-        const { AppLayout } = require("@/components/layout");
-        return <AppLayout><PlaceholderPage title="Contactos" /></AppLayout>;
-      }} />} />
-      <Route path="/salespeople" component={() => <ProtectedRoute component={() => {
-        const { AppLayout } = require("@/components/layout");
-        return <AppLayout><PlaceholderPage title="Vendedores" /></AppLayout>;
-      }} />} />
-      <Route path="/products" component={() => <ProtectedRoute component={() => {
-        const { AppLayout } = require("@/components/layout");
-        return <AppLayout><PlaceholderPage title="Productos" /></AppLayout>;
-      }} />} />
-      <Route path="/prompts" component={() => <ProtectedRoute component={() => {
-        const { AppLayout } = require("@/components/layout");
-        return <AppLayout><PlaceholderPage title="Prompts IA" /></AppLayout>;
-      }} />} />
-      <Route path="/users" component={() => <ProtectedRoute component={() => {
-        const { AppLayout } = require("@/components/layout");
-        return <AppLayout><PlaceholderPage title="Gestión de Usuarios" /></AppLayout>;
-      }} />} />
+
+      <Route path="/contacts" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Contactos" />} />} />
+      <Route path="/salespeople" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Vendedores" />} />} />
+      <Route path="/products" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Productos" />} />} />
+      <Route path="/prompts" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Prompts IA" />} />} />
+      <Route path="/users" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Gestión de Usuarios" />} />} />
 
       <Route component={NotFound} />
     </Switch>
