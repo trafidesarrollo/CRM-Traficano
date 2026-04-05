@@ -2,7 +2,7 @@
 
 ## Overview
 
-Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gestión de correos comerciales con clasificación IA, detección de pedidos de cotización y seguimiento de oportunidades.
+Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gestión de correos comerciales con clasificación IA, detección de pedidos de cotización y seguimiento de oportunidades. Incluye Plan Comercial de Especialización con roles funcionales Hunter/Farmer/Admin Ventas.
 
 ## Stack
 
@@ -10,7 +10,7 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
-- **Frontend**: React + Vite + shadcn/ui + Tailwind CSS
+- **Frontend**: React + Vite + shadcn/ui + Tailwind CSS + @dnd-kit (Kanban)
 - **Backend**: Express 5
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod, drizzle-zod
@@ -29,6 +29,8 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 │           ├── lib/audit.ts       # Audit logging utility
 │           ├── lib/ai.ts          # OpenAI integration
 │           ├── lib/gmail.ts       # Gmail sync logic
+│           ├── lib/measurement-normalizer.ts  # Industrial measurement normalization
+│           ├── lib/followup-engine.ts  # Follow-up automation engine
 │           └── routes/            # All API routes
 ├── lib/
 │   ├── api-spec/         # OpenAPI spec + Orval codegen
@@ -37,16 +39,34 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 │   └── db/               # Drizzle ORM schema + DB connection
 ```
 
-## Security Architecture (Phase A)
+## Commercial Plan (Hunter/Farmer/Admin Ventas)
+
+### Functional Roles
+- **Hunter**: Generates leads (calls/visits). Cannot quote. Goals: 100 calls/week, 20 meetings/month.
+- **Farmer**: Receives leads from Hunter, closes sales. Must respond to leads in <2h. Tracks close rate.
+- **Admin Ventas**: Processes quotations within 24h. Tracks turnaround time and on-time rate.
+
+### Flow
+Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin quotes (<24h) → Farmer closes.
+
+### Opportunity Statuses
+- `new` → "Lead Nuevo" (SLA: 4h to assign farmer)
+- `quote_requested` → "Cotización Solicitada" (SLA: 24h to quote)
+- `quoted` → "Cotización Enviada" (SLA: 72h for client response)
+- `negotiating` → "En Negociación"
+- `won` → "Cerrado Ganado"
+- `lost` → "Cerrado Perdido"
+- `closed` → "Cerrado"
+
+## Security Architecture
 
 ### Authentication
 - Session-based auth with `requireAuth` middleware on all routes except `/auth/*` and `/health`
 - `SESSION_SECRET` is required in production (no insecure defaults)
-- Sessions stored server-side with httpOnly cookies
 
 ### Role-Based Authorization
 - **admin**: Full access to all resources
-- **gerente**: Commercial operations + Gmail + prompts + audit
+- **gerente**: Commercial operations + Gmail + prompts + audit + goals
 - **vendedor**: Clients, emails, opportunities, activities (own scope)
 - **operador**: Data entry, imports, corrections
 
@@ -54,47 +74,51 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 - `/api/users/*` → admin only
 - `/api/prompts/*` → admin, gerente
 - `/api/audit/*` → admin, gerente
-- `/api/gmail/connect`, `/api/gmail/disconnect` → admin, gerente
+- `/api/goals/*` → all authenticated (write: admin, gerente)
 - `/api/imports/*` → admin, gerente, operador
 - All other routes → any authenticated user
 
-### Audit Logging
-- All logins/logouts/failed attempts logged
-- User CRUD operations with old/new values
-- Gmail connect/disconnect/sync events
-- Email classification/processing events
-- Import operations
+## Database Schema (17 tables)
 
-## Database Schema
-
-- `users` - Internal users with roles (admin, gerente, vendedor, operador)
+- `users` - Internal users with roles
 - `clients` - Client companies
 - `contacts` - Client contacts
-- `salespeople` - Salespeople linked to users
+- `salespeople` - Salespeople with functionalRole (hunter/farmer/admin_ventas)
 - `products` - Products/measurements catalog
 - `emails` - Email records with AI classification
-- `opportunities` - Commercial opportunities auto-created from quote requests
+- `opportunities` - With hunterId, farmerId, stageEnteredAt, quote_requested status
 - `activities` - Activity log (calls, visits, emails, tasks)
-- `gmail_connections` - Gmail OAuth connections per user
+- `gmail_connections` - Gmail OAuth connections
 - `prompts` - Editable AI prompts with versioning
-- `audit_logs` - System audit trail (with old_value, new_value, origin fields)
-- `import_logs` - CSV import history and results
-- `extractions` - AI-extracted product requirements from emails with match scores
-- `product_equivalences` - Product aliases for improved technical matching
-- `followup_rules` - Configurable follow-up rules with triggers and delays
-- `followup_templates` - Email templates with dynamic variables for follow-ups
-- `scheduled_followups` - Scheduled follow-up tasks with status tracking
+- `audit_logs` - System audit trail
+- `import_logs` - CSV import history
+- `extractions` - AI-extracted product requirements
+- `product_equivalences` - Product aliases
+- `followup_rules` - Follow-up automation rules
+- `followup_templates` - Email templates for follow-ups
+- `scheduled_followups` - Scheduled follow-up tasks
+- `goals` - Sales performance goals per vendedor
 
-## Email Categories
+## Frontend Pages
 
-- `quote_request` → "Pedido de Cotización" (main automation target)
-- `complaint` → "Reclamo"
-- `inquiry` → "Consulta"
-- `follow_up` → "Seguimiento"
-- `supplier` → "Proveedor"
-- `internal` → "Interno"
-- `spam` → "Spam/Publicidad"
-- `other` → "Otro"
+- `/dashboard` - Dashboard with metrics + commercial plan panels (Hunter/Farmer/Admin) + pipeline funnel
+- `/emails` - Email management with AI classification
+- `/emails/:id` - Email detail + reply
+- `/opportunities` - List + Kanban views with SLA badges, drag-and-drop
+- `/clients` - Client management
+- `/contacts` - Contact management
+- `/salespeople` - Salespeople with functional role badges, "Ver panel" sheet
+- `/products` - Product catalog
+- `/imports` - CSV import with preview/mapping
+- `/followups` - Follow-up automation dashboard
+- `/goals` - Sales goals management (admin/gerente only)
+- `/gmail` - Gmail OAuth integration
+- `/prompts` - AI prompt management
+- `/users` - User management (admin only)
+
+## Quick Activity FAB
+
+Floating action button (bottom-right) on all pages. Allows quick logging of calls/visits/tasks with optional lead generation. Creates activity + optionally creates opportunity with farmer assignment.
 
 ## Default Users (seed)
 
@@ -104,8 +128,8 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 
 ## Environment Variables Required
 
-- `DATABASE_URL` - PostgreSQL connection string (auto-provided by Replit)
-- `SESSION_SECRET` - Session encryption secret (required in production, auto-generated in dev)
+- `DATABASE_URL` - PostgreSQL connection string
+- `SESSION_SECRET` - Session encryption secret
 - `OPENAI_API_KEY` - For AI email classification and extraction
 - `GMAIL_CLIENT_ID` - For Gmail OAuth integration
 - `GMAIL_CLIENT_SECRET` - For Gmail OAuth integration
@@ -115,23 +139,16 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 
 - `POST /api/auth/login` - Login
 - `GET /api/auth/me` - Current user
-- `GET /api/emails` - List emails (filter by category, status)
-- `POST /api/emails/:id/process` - AI process quote request email
-- `POST /api/emails/:id/reply-draft` - Generate AI reply draft
-- `POST /api/emails/:id/classify` - Manual classification
-- `GET /api/gmail/connect` - Get Gmail OAuth URL
-- `POST /api/gmail/sync` - Sync emails from Gmail
 - `GET /api/dashboard/metrics` - Dashboard metrics
+- `GET /api/dashboard/commercial-plan` - Hunter/Farmer/Admin metrics + pipeline funnel
+- `GET/POST/PATCH/DELETE /api/goals` - Goals CRUD
+- `GET/POST/PATCH /api/opportunities` - With hunterId/farmerId/stageEnteredAt
+- `GET/POST /api/activities` - Activity logging
+- `GET/POST/PATCH/DELETE /api/salespeople` - With functionalRole
 - `POST /api/imports/upload` - CSV upload with preview
 - `POST /api/imports/execute` - Execute CSV import
-- `GET /api/imports/template/:type` - Download CSV template
-- `GET /api/imports/logs` - Import history
-- `POST /api/extractions/extract/:emailId` - AI extract product requirements from email
-- `POST /api/extractions/normalize` - Normalize measurements
-- `POST /api/extractions/match` - Match measurement to products
-- `PATCH /api/extractions/:id/accept` - Accept extraction match
-- `PATCH /api/extractions/:id/correct` - Correct with right product (auto-learns)
-- `GET /api/audit` - Audit logs (admin/gerente only)
+- `POST /api/extractions/extract/:emailId` - AI extract products
+- `GET /api/audit` - Audit logs
 
 ## Development Commands
 

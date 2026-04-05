@@ -19,6 +19,7 @@ import Gmail from "@/pages/gmail/index";
 import Prompts from "@/pages/prompts/index";
 import UsersPage from "@/pages/users/index";
 import Followups from "@/pages/followups/index";
+import GoalsPage from "@/pages/goals/index";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -61,6 +62,7 @@ function Router() {
       <Route path="/imports" component={() => <ProtectedRoute component={Imports} />} />
       <Route path="/gmail" component={() => <ProtectedRoute component={Gmail} />} />
       <Route path="/followups" component={() => <ProtectedRoute component={Followups} />} />
+      <Route path="/goals" component={() => <ProtectedRoute component={GoalsPage} />} />
       <Route path="/prompts" component={() => <ProtectedRoute component={Prompts} />} />
       <Route path="/users" component={() => <ProtectedRoute component={UsersPage} />} />
 

@@ -1,0 +1,275 @@
+Contexto del proyecto
+─────────────────────
+Este CRM B2B ya tiene implementado (NO tocar, ya funciona):
+- Auth con roles (admin, gerente, vendedor, operador) + middleware requireAuth/requireRole
+- CRUD completo: clientes, contactos, vendedores, productos, usuarios
+- Gmail OAuth real + sincronización + envío de replies
+- Clasificación IA de emails + extracción de medidas + matching técnico
+- Motor de seguimientos automáticos (followup_rules, followup_templates, scheduled_followups)
+- Importación CSV con preview, mapeo y validación
+- Auditoría completa
+- Todas las páginas del sidebar funcionando
+
+Stack: React + Vite + shadcn/ui + Tailwind (frontend) /
+Express 5 + PostgreSQL + Drizzle ORM + Zod (backend)
+Monorepo pnpm. Schemas en lib/db/src/schema/.
+
+─────────────────────────────────────────────────────────────────────
+OBJETIVO DE ESTE SPRINT
+─────────────────────────────────────────────────────────────────────
+Implementar el "Plan Comercial Opción 1 – Especialización" sobre el
+código existente. Este plan divide el equipo en 3 roles funcionales
+con métricas y flujos propios:
+
+  Hunter  → genera leads (llama / visita). NO cotiza.
+  Farmer  → recibe leads del Hunter y cierra ventas.
+  Admin ventas → procesa cotizaciones en < 24 h.
+
+  Flujo: Hunter genera lead → asigna a Farmer → Farmer pide cotización
+         → Admin cotiza (< 24 h) → Farmer cierra.
+
+  Metas a trackear:
+  • Hunter: 20 llamadas/día (100/semana); 5 reuniones/semana (20/mes)
+  • Farmer: responder lead en < 2 h; % de cierre; seguimientos activos
+  • Admin: cotizaciones entregadas en < 24 h; volumen mensual
+
+─────────────────────────────────────────────────────────────────────
+CAMBIOS REQUERIDOS — EN ORDEN DE IMPLEMENTACIÓN
+─────────────────────────────────────────────────────────────────────
+
+── 1. MIGRACIÓN DE BASE DE DATOS ──────────────────────────────────
+
+a) En lib/db/src/schema/salespeople.ts, agregar campo:
+   functionalRole: text("functional_role", {
+     enum: ["hunter", "farmer", "admin_ventas"]
+   })
+   El campo es nullable para no romper registros existentes.
+
+b) En lib/db/src/schema/opportunities.ts, agregar:
+   hunterId: integer("hunter_id")   -- vendedor Hunter que originó el lead
+   farmerId: integer("farmer_id")   -- vendedor Farmer asignado
+   stageEnteredAt: timestamp("stage_entered_at", { withTimezone: true })
+     .notNull().defaultNow()         -- cuándo entró al estado actual
+
+   Los estados existentes ("new","quoted","negotiating","won","lost","closed")
+   se renombran semánticamente en el frontend así (SIN cambiar los valores
+   en BD para no romper nada):
+     "new"          → "Lead Nuevo"
+     "quoted"       → "Cotización Enviada"
+     "negotiating"  → "En Negociación"
+     "won"          → "Cerrado Ganado"
+     "lost"         → "Cerrado Perdido"
+     "closed"       → "Cerrado"
+   Agregar estado nuevo en el enum de BD:
+     "quote_requested" → "Cotización Solicitada"
+
+c) Nueva tabla lib/db/src/schema/goals.ts:
+   goalsTable con campos: id, salespersonId, period ("weekly"|"monthly"),
+   metricType ("calls"|"meetings"|"quotes"|"close_rate"),
+   targetValue (numeric), startDate (date), endDate (date),
+   createdAt, updatedAt.
+   Solo admin/gerente puede escribir. Todos pueden leer.
+
+d) Correr `pnpm --filter @workspace/db run push` para aplicar la migración.
+
+── 2. BACKEND — NUEVOS ENDPOINTS ──────────────────────────────────
+
+a) PATCH /api/salespeople/:id → ya existe, extenderlo para aceptar
+   y guardar functionalRole en el body.
+
+b) PATCH /api/opportunities/:id → ya existe, extenderlo para aceptar
+   hunterId, farmerId, y al cambiar status también actualizar
+   stageEnteredAt = now().
+
+c) GET /api/dashboard/commercial-plan
+   Nuevo endpoint en artifacts/api-server/src/routes/dashboard.ts.
+   Debe devolver un objeto con estas secciones calculadas desde BD:
+
+   hunterMetrics: array por cada salesperson con functionalRole="hunter":
+     { salespersonId, name,
+       callsThisWeek: count activities WHERE type="call" AND salespersonId=X
+         AND completedAt >= inicio de semana actual,
+       callsWeekTarget: meta de goals (default 100 si no hay meta cargada),
+       meetingsThisMonth: count activities WHERE type="visit" AND ... >= inicio de mes,
+       meetingsMonthTarget: meta de goals (default 20),
+       leadsGeneratedThisMonth: count opportunities WHERE hunterId=X
+         AND createdAt >= inicio de mes }
+
+   farmerMetrics: array por cada salesperson con functionalRole="farmer":
+     { salespersonId, name,
+       leadsAwaitingResponse: count opportunities WHERE farmerId=X
+         AND status="new" AND stageEnteredAt < now() - interval 2 hours,
+       avgResponseTimeHours: avg(stageEnteredAt - createdAt) en horas
+         para oportunidades asignadas a este farmer,
+       activeOpportunities: count WHERE farmerId=X AND status NOT IN (won,lost,closed),
+       closeRate: count(won) / count(won+lost) * 100 para este farmer,
+       staleOpportunities: count opportunities WHERE farmerId=X
+         AND status NOT IN (won,lost,closed)
+         AND id NOT IN (SELECT opportunityId FROM activities
+           WHERE completedAt >= now() - interval 3 days
+           AND opportunityId IS NOT NULL) }
+
+   adminMetrics: array por cada salesperson con functionalRole="admin_ventas":
+     { salespersonId, name,
+       pendingQuotes: count opportunities WHERE status="quote_requested",
+       avgQuoteTurnaroundHours: avg time between status change to
+         "quote_requested" y status change to "quoted" (aproximar con
+         updatedAt si no hay log de transición),
+       quotesOnTimeRate: % de cambios a "quoted" que ocurrieron dentro
+         de 24 h desde "quote_requested",
+       quotesThisMonth: count opportunities WHERE status IN (quoted,negotiating,won)
+         AND updatedAt >= inicio de mes }
+
+   pipelineFunnel:
+     { leadsNew, quoteRequested, quoted, negotiating, won, lost }
+     counts de opportunities por status
+
+d) GET /api/goals → lista metas (filtrable por salespersonId, period)
+   POST /api/goals → crear meta (requireRole: admin, gerente)
+   PATCH /api/goals/:id → editar meta (requireRole: admin, gerente)
+   DELETE /api/goals/:id → eliminar (requireRole: admin, gerente)
+   Crear archivo artifacts/api-server/src/routes/goals.ts y registrarlo
+   en routes/index.ts.
+
+e) REGLA DE NEGOCIO en PATCH /api/opportunities/:id:
+   Si el salesperson autenticado tiene functionalRole="hunter" e intenta
+   cambiar status a "quoted" o "quote_requested", responder 403 con
+   mensaje: "Los Hunters no pueden cotizar. Solicitá la cotización al Admin."
+
+── 3. FRONTEND — PÁGINA VENDEDORES (extender la existente) ────────
+
+El archivo artifacts/crm/src/pages/salespeople/index.tsx ya existe con
+CRUD básico. Extenderlo:
+
+a) En el formulario de creación/edición de vendedor, agregar campo
+   "Rol funcional" con un Select:
+   opciones: "Sin asignar" (null), "Hunter", "Farmer", "Admin ventas"
+   Mostrar badge de color en la tabla:
+   Hunter = azul, Farmer = verde, Admin ventas = naranja.
+
+b) Agregar columna "Actividad esta semana" en la tabla de vendedores:
+   muestra el conteo de activities de esa persona en los últimos 7 días.
+   Hacer una query al endpoint GET /api/activities?salespersonId=X&since=<fecha>.
+
+c) En la fila de cada vendedor, agregar botón "Ver panel" que abre un
+   Sheet (panel lateral, ya está el componente ui/sheet.tsx) con:
+   - Métricas personales tomadas del endpoint /api/dashboard/commercial-plan
+     filtradas para ese vendedor (barras de progreso con shadcn Progress)
+   - Lista de actividades recientes (últimas 10)
+   - Lista de oportunidades activas asignadas (como hunter o farmer)
+
+── 4. FRONTEND — PÁGINA OPORTUNIDADES (extender la existente) ──────
+
+El archivo artifacts/crm/src/pages/opportunities/index.tsx ya existe.
+Extenderlo con dos vistas alternables (botón toggle Lista / Kanban):
+
+a) Vista Lista (la existente): agregar columnas Hunter, Farmer y un badge
+   de semáforo SLA en cada fila:
+   🟢 verde  = dentro del tiempo esperado para ese estado
+   🟡 amarillo = >80% del límite consumido
+   🔴 rojo   = SLA vencido
+   Tiempos límite por estado:
+   "new" → asignar farmer:       4 h desde stageEnteredAt
+   "quote_requested" → quoted:  24 h desde stageEnteredAt
+   "quoted" → respuesta cliente: 72 h desde stageEnteredAt
+
+b) Vista Kanban: 6 columnas en orden:
+   Lead Nuevo | Cotización Solicitada | Cotización Enviada |
+   En Negociación | Cerrado Ganado | Cerrado Perdido
+   Cada card muestra: título, cliente, Farmer asignado, badge SLA, valor estimado.
+   Hacer drag-and-drop con la librería @dnd-kit/core (ya popular con shadcn).
+   Al soltar una card en otra columna, llamar PATCH /api/opportunities/:id
+   con el nuevo status.
+
+c) En el modal/formulario de crear/editar oportunidad, agregar dos campos:
+   - "Hunter origen" → Select de vendedores con functionalRole="hunter"
+   - "Farmer asignado" → Select de vendedores con functionalRole="farmer"
+   Validar en frontend: no puede ser el mismo vendedor en ambos campos.
+
+── 5. FRONTEND — DASHBOARD (extender el existente) ────────────────
+
+El archivo artifacts/crm/src/pages/dashboard.tsx ya existe.
+Agregar una nueva sección "Plan Comercial" debajo de las métricas
+actuales. Consumir GET /api/dashboard/commercial-plan.
+
+a) Panel Hunters (si hay hunters en el sistema):
+   Por cada hunter, mostrar una card con:
+   - Barra de progreso: Llamadas semana (X / 100)
+   - Barra de progreso: Reuniones mes (X / 20)
+   - Número: Leads generados este mes
+   Usar el componente Progress de shadcn (ui/progress.tsx).
+
+b) Panel Farmers:
+   Por cada farmer, mostrar una card con:
+   - Número con semáforo: Leads sin respuesta > 2 h
+     (verde=0, amarillo=1-2, rojo=3+)
+   - Tiempo promedio de primera respuesta en horas
+   - % de cierre (gauge simple con texto)
+   - Número en rojo si tiene oportunidades sin actividad en 3+ días
+
+c) Panel Admin Ventas:
+   - Cotizaciones pendientes (número grande)
+   - % cotizadas en < 24 h (barra de progreso, meta: 100%)
+   - Tiempo promedio de cotización en horas
+
+d) Embudo de conversión (funnel simple con divs de ancho decreciente
+   o usar Recharts BarChart horizontal ya disponible en ui/chart.tsx):
+   Leads → Cotizaciones → Negociando → Cerrado Ganado
+
+── 6. FRONTEND — BOTÓN FLOTANTE DE ACTIVIDAD RÁPIDA ──────────────
+
+Agregar en artifacts/crm/src/components/layout.tsx un botón flotante
+(fixed, bottom-right, z-50) con ícono "+" o un teléfono.
+Al hacer click, abre un Dialog (ui/dialog.tsx) con formulario mínimo:
+
+Campos:
+- Tipo: Select → Llamada / Visita / Reunión / Tarea
+- Empresa/Cliente: búsqueda sobre /api/clients (Combobox con Command)
+- Resultado: Select → Contactado / No contactado / Reunión agendada /
+  Cotización solicitada / Cerrado
+- ¿Generó un lead?: Switch sí/no
+  Si sí → mostrar campo "Asignar a Farmer" (Select de farmers)
+  Al guardar: crear activity + crear opportunity en status="new"
+  con hunterId = salesperson del usuario logueado
+- Observaciones: Textarea
+
+Al guardar: POST /api/activities. Si generó lead: POST /api/opportunities.
+Mostrar toast de confirmación.
+
+── 7. FRONTEND — PÁGINA METAS (nueva, simple) ─────────────────────
+
+Crear artifacts/crm/src/pages/goals/index.tsx.
+Agregar ruta "/goals" en App.tsx con ícono Target en el sidebar
+(solo visible para admin y gerente).
+
+Vista:
+- Tabla de metas actuales (vendedor, período, tipo, meta, progreso actual)
+- Progreso actual calculado desde /api/dashboard/commercial-plan
+- Botón "Nueva meta" (Dialog) con campos: vendedor, período (semana/mes),
+  tipo de métrica, valor objetivo, rango de fechas
+- Solo admin/gerente puede crear/editar/eliminar
+
+─────────────────────────────────────────────────────────────────────
+LO QUE NO TOCAR EN ESTE SPRINT
+─────────────────────────────────────────────────────────────────────
+- No modificar la lógica de emails, Gmail ni clasificación IA
+- No modificar el motor de seguimientos automáticos (followups)
+- No modificar el sistema de extracción de medidas (extractions)
+- No cambiar el sistema de autenticación ni los roles de sistema
+- No modificar el flujo de importación CSV
+
+─────────────────────────────────────────────────────────────────────
+RESULTADO ESPERADO
+─────────────────────────────────────────────────────────────────────
+Al terminar, el gerente comercial (Mariano) puede:
+
+1. Ver en el dashboard cuántas llamadas hizo cada Hunter esta semana
+   vs la meta de 100, con barra de progreso.
+2. Ver qué leads están sin respuesta del Farmer hace más de 2 horas,
+   con semáforo rojo.
+3. Ver qué cotizaciones superaron las 24 h sin enviarse.
+4. Navegar el pipeline completo en Kanban, arrastrar oportunidades
+   entre etapas y ver el semáforo SLA en cada card.
+5. Registrar una llamada o visita en 30 segundos desde cualquier
+   pantalla con el botón flotante, y marcar si generó un lead.
+6. Configurar metas mensuales/semanales por vendedor.

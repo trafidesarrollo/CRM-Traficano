@@ -12,3 +12,4 @@ export * from "./audit_logs";
 export * from "./import_logs";
 export * from "./extractions";
 export * from "./followups";
+export * from "./goals";

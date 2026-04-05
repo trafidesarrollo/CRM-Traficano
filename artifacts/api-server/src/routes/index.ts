@@ -16,6 +16,7 @@ import importsRouter from "./imports.js";
 import extractionsRouter from "./extractions.js";
 import followupsRouter from "./followups.js";
 import auditRouter from "./audit.js";
+import goalsRouter from "./goals.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -38,6 +39,8 @@ router.use(gmailRouter);
 router.use(importsRouter);
 router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);
+
+router.use("/goals", goalsRouter);
 
 router.use("/users", requireRole("admin"), usersRouter);
 router.use("/prompts", requireRole("admin", "gerente"), promptsRouter);

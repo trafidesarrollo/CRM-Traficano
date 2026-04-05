@@ -9,6 +9,7 @@ export const salespeopleTable = pgTable("salespeople", {
   email: text("email").notNull(),
   phone: text("phone"),
   territory: text("territory"),
+  functionalRole: text("functional_role", { enum: ["hunter", "farmer", "admin_ventas"] }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
