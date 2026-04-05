@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "z72G5occjryde5OiPzxcR"
+uri = "file://crm-comercial.zip"
+type = "unspecified"
+title = "CRM Comercial - Código fuente"
