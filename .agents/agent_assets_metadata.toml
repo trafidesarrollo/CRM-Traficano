@@ -6,3 +6,9 @@ id = "z72G5occjryde5OiPzxcR"
 uri = "file://crm-comercial.zip"
 type = "unspecified"
 title = "CRM Comercial - Código fuente"
+
+[[outputs]]
+id = "CzayiMx6los_JDu96Pm_A"
+uri = "file://crm-comercial-completo.zip"
+type = "unspecified"
+title = "CRM Comercial B2B - Código Completo (Fases A-F)"
