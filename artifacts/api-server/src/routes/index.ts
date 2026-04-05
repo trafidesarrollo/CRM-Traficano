@@ -13,22 +13,30 @@ import activitiesRouter from "./activities.js";
 import dashboardRouter from "./dashboard.js";
 import promptsRouter from "./prompts.js";
 import importsRouter from "./imports.js";
+import auditRouter from "./audit.js";
+import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
-router.use(usersRouter);
+
+router.use(requireAuth);
+
+router.use(dashboardRouter);
+router.use(emailsRouter);
+router.use(opportunitiesRouter);
 router.use(clientsRouter);
 router.use(contactsRouter);
 router.use(salespeopleRouter);
 router.use(productsRouter);
-router.use(emailsRouter);
-router.use(gmailRouter);
-router.use(opportunitiesRouter);
 router.use(activitiesRouter);
-router.use(dashboardRouter);
-router.use(promptsRouter);
+
+router.use(gmailRouter);
 router.use(importsRouter);
+
+router.use("/users", requireRole("admin"), usersRouter);
+router.use("/prompts", requireRole("admin", "gerente"), promptsRouter);
+router.use("/audit", requireRole("admin", "gerente"), auditRouter);
 
 export default router;

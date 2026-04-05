@@ -2,10 +2,11 @@ import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { auditAction } from "../lib/audit.js";
 
 const router: IRouter = Router();
 
-router.get("/users", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const users = await db.select({
       id: usersTable.id,
@@ -23,7 +24,7 @@ router.get("/users", async (req, res) => {
   }
 });
 
-router.post("/users", async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const { username, email, password, fullName, role } = req.body;
     if (!username || !email || !password || !fullName || !role) {
@@ -33,6 +34,9 @@ router.post("/users", async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const [user] = await db.insert(usersTable).values({ username, email, passwordHash, fullName, role }).returning();
     const { passwordHash: _, ...safeUser } = user;
+
+    await auditAction(req, "crear_usuario", "user", user.id, { username, role });
+
     res.status(201).json(safeUser);
   } catch (err) {
     req.log.error(err);
@@ -40,7 +44,7 @@ router.post("/users", async (req, res) => {
   }
 });
 
-router.get("/users/:id", async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const users = await db.select({
@@ -63,23 +67,30 @@ router.get("/users/:id", async (req, res) => {
   }
 });
 
-router.patch("/users/:id", async (req, res) => {
+router.patch("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { email, fullName, role, isActive, password } = req.body;
-    const updates: any = {};
-    if (email !== undefined) updates.email = email;
-    if (fullName !== undefined) updates.fullName = fullName;
-    if (role !== undefined) updates.role = role;
-    if (isActive !== undefined) updates.isActive = isActive;
-    if (password) updates.passwordHash = await bcrypt.hash(password, 10);
 
-    const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
-    if (!updated) {
+    const existing = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+    if (!existing[0]) {
       res.status(404).json({ error: "Usuario no encontrado" });
       return;
     }
+
+    const updates: any = {};
+    const changes: Record<string, any> = {};
+    if (email !== undefined) { updates.email = email; changes.email = { old: existing[0].email, new: email }; }
+    if (fullName !== undefined) { updates.fullName = fullName; changes.fullName = { old: existing[0].fullName, new: fullName }; }
+    if (role !== undefined) { updates.role = role; changes.role = { old: existing[0].role, new: role }; }
+    if (isActive !== undefined) { updates.isActive = isActive; changes.isActive = { old: existing[0].isActive, new: isActive }; }
+    if (password) { updates.passwordHash = await bcrypt.hash(password, 10); changes.password = "cambiada"; }
+
+    const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     const { passwordHash: _, ...safeUser } = updated;
+
+    await auditAction(req, "modificar_usuario", "user", id, changes);
+
     res.json(safeUser);
   } catch (err) {
     req.log.error(err);
@@ -87,10 +98,16 @@ router.patch("/users/:id", async (req, res) => {
   }
 });
 
-router.delete("/users/:id", async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const currentUserId = (req as any).userId;
+    if (id === currentUserId) {
+      res.status(400).json({ error: "No puede eliminar su propio usuario" });
+      return;
+    }
     await db.delete(usersTable).where(eq(usersTable.id, id));
+    await auditAction(req, "eliminar_usuario", "user", id);
     res.json({ message: "Usuario eliminado" });
   } catch (err) {
     req.log.error(err);

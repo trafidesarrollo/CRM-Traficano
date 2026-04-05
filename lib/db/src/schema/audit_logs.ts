@@ -9,7 +9,10 @@ export const auditLogsTable = pgTable("audit_logs", {
   entityType: text("entity_type").notNull(),
   entityId: integer("entity_id"),
   details: jsonb("details"),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
   ipAddress: text("ip_address"),
+  origin: text("origin"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

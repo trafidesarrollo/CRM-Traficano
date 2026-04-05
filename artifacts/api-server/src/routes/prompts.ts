@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db, promptsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { auditAction } from "../lib/audit.js";
 
 const router: IRouter = Router();
 
-router.get("/prompts", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const data = await db.select().from(promptsTable).orderBy(promptsTable.createdAt);
     res.json(data);
@@ -14,7 +15,7 @@ router.get("/prompts", async (req, res) => {
   }
 });
 
-router.post("/prompts", async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const { name, type, content, notes } = req.body;
     const existing = await db.select().from(promptsTable)
@@ -22,6 +23,9 @@ router.post("/prompts", async (req, res) => {
       .orderBy(promptsTable.version);
     const version = existing.length > 0 ? existing[existing.length - 1].version + 1 : 1;
     const [prompt] = await db.insert(promptsTable).values({ name, type, content, notes, version, isActive: false }).returning();
+
+    await auditAction(req, "crear_prompt", "prompt", prompt.id, { name, type, version });
+
     res.status(201).json(prompt);
   } catch (err) {
     req.log.error(err);
@@ -29,7 +33,7 @@ router.post("/prompts", async (req, res) => {
   }
 });
 
-router.patch("/prompts/:id", async (req, res) => {
+router.patch("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [updated] = await db.update(promptsTable).set(req.body).where(eq(promptsTable.id, id)).returning();
@@ -37,6 +41,9 @@ router.patch("/prompts/:id", async (req, res) => {
       res.status(404).json({ error: "Prompt no encontrado" });
       return;
     }
+
+    await auditAction(req, "modificar_prompt", "prompt", id);
+
     res.json(updated);
   } catch (err) {
     req.log.error(err);
@@ -44,7 +51,7 @@ router.patch("/prompts/:id", async (req, res) => {
   }
 });
 
-router.post("/prompts/:id/activate", async (req, res) => {
+router.post("/:id/activate", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const prompts = await db.select().from(promptsTable).where(eq(promptsTable.id, id)).limit(1);
@@ -62,6 +69,8 @@ router.post("/prompts/:id/activate", async (req, res) => {
       .where(eq(promptsTable.id, id))
       .returning();
 
+    await auditAction(req, "activar_prompt", "prompt", id, { name: prompts[0].name, type: prompts[0].type });
+
     res.json(activated);
   } catch (err) {
     req.log.error(err);
@@ -69,7 +78,7 @@ router.post("/prompts/:id/activate", async (req, res) => {
   }
 });
 
-router.post("/prompts/:id/test", async (req, res) => {
+router.post("/:id/test", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { sampleText } = req.body;

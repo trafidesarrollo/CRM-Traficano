@@ -1,0 +1,684 @@
+Copiá y pegá esto en Replit. Está escrito para **corregir sobre la base actual**, no para rehacer todo.
+
+---
+
+# Instrucciones para corregir y endurecer la app actual
+
+Quiero que trabajes **sobre el código existente** de esta aplicación CRM comercial.
+**No quiero rehacer todo desde cero.**
+Quiero una **refactorización correctiva y evolutiva** para transformar la base actual en una aplicación realmente usable y segura.
+
+## Objetivo de esta etapa
+
+Corregir los problemas estructurales detectados en:
+
+1. seguridad y permisos
+2. Gmail real
+3. importación CSV real
+4. extracción y matching técnico de medidas
+5. motor de seguimiento automático
+6. auditoría
+7. deduplicación y consistencia operativa
+
+La prioridad es dejar una **base robusta, operable y escalable**.
+
+---
+
+# Reglas generales de trabajo
+
+## Regla 1
+
+**No romper lo que ya funciona** salvo que sea inseguro o incorrecto.
+
+## Regla 2
+
+Antes de modificar, revisar la arquitectura actual y proponer cambios mínimos necesarios.
+
+## Regla 3
+
+No dejar mocks o simulaciones donde el sistema deba operar realmente.
+
+## Regla 4
+
+Eliminar hardcodeos peligrosos, defaults inseguros y shortcuts de desarrollo.
+
+## Regla 5
+
+Todo cambio importante debe quedar documentado en el código y en un archivo `CHANGELOG.md`.
+
+## Regla 6
+
+Agregar datos de prueba y caminos de prueba para validar cada módulo.
+
+---
+
+# PRIORIDAD 1 — Seguridad y permisos
+
+## Problemas a corregir
+
+* eliminar cualquier fallback inseguro como `userId = 1`
+* eliminar secrets default inseguros
+* revisar todas las rutas backend
+* implementar control real de autenticación y autorización
+
+## Quiero que implementes
+
+### 1. Middleware de autenticación
+
+Crear middleware `requireAuth` que:
+
+* valide sesión o token
+* rechace acceso no autenticado
+* adjunte usuario autenticado al request
+
+### 2. Middleware de autorización por rol
+
+Crear middleware `requireRole` o equivalente para roles:
+
+* admin
+* gerente_comercial
+* vendedor
+* operador
+
+Aplicarlo a rutas sensibles:
+
+* configuración IA
+* Gmail connections
+* importaciones
+* usuarios
+* auditoría
+* cambios masivos
+* prompts
+* seguimiento automático
+
+### 3. Política de acceso por entidad
+
+Definir acceso por rol:
+
+* admin: acceso total
+* gerente: acceso a toda la operación comercial
+* vendedor: solo sus clientes, oportunidades, actividades y mails asignados
+* operador: carga y corrección, pero no configuración crítica
+
+### 4. Secretos
+
+* obligar a usar variables de entorno seguras
+* si falta una variable crítica, la app debe fallar con error claro
+* no usar `SESSION_SECRET` default inseguro
+* no hardcodear credenciales ni tokens
+
+### 5. Seguridad de tokens Gmail
+
+* revisar almacenamiento de tokens
+* guardar refresh token y access token de forma segura
+* minimizar exposición en logs
+* no mostrar tokens en frontend ni respuestas API
+
+### 6. Logs de seguridad
+
+Registrar:
+
+* logins
+* logouts
+* intentos fallidos
+* cambios de permisos
+* conexiones/desconexiones Gmail
+
+---
+
+# PRIORIDAD 2 — Gmail real y operable
+
+## Problemas a corregir
+
+* hoy la sincronización está limitada y simplificada
+* el envío de respuestas no es real
+* no hay manejo serio de threads
+* no hay manejo serio de refresh token ni expiración
+* no hay soporte útil para adjuntos
+
+## Quiero que implementes
+
+### 1. Conexión Gmail con OAuth 2.0 real
+
+* revisar flujo OAuth actual
+* asegurar almacenamiento correcto de refresh token
+* soportar reconexión de cuenta
+* mostrar estado de conexión:
+
+  * conectada
+  * vencida
+  * error
+  * reconectar requerida
+
+### 2. Refresh token y expiración
+
+Implementar renovación automática de access token usando refresh token antes de sincronizar o enviar mails.
+
+### 3. Sincronización seria
+
+Mejorar el módulo de sync para:
+
+* no limitarse a `is:unread`
+* permitir sincronización incremental
+* soportar paginación
+* guardar `messageId`, `threadId`, `historyId`, fecha, labels, remitente, destinatarios, asunto, cuerpo
+* detectar duplicados por `messageId`
+* permitir sincronización manual y automática
+
+### 4. Manejo de threads
+
+* guardar hilos correctamente
+* asociar mensajes a thread
+* detectar si un mail pertenece a una oportunidad existente
+* mantener contexto de conversación
+
+### 5. Envío real de respuestas
+
+El endpoint de respuesta debe:
+
+* enviar realmente por Gmail API
+* guardar el mail enviado
+* asociarlo al thread
+* registrar resultado real
+* marcar errores de envío si ocurren
+
+No quiero simulación ni solo cambio de estado en DB.
+
+### 6. Adjuntos
+
+Implementar soporte inicial para:
+
+* detectar si un mail tiene adjuntos
+* guardar metadata de adjuntos
+* permitir descargar/ver adjuntos
+* preparar estructura para extracción futura desde PDF/Excel/imagen
+
+### 7. Detección de cliente/contacto
+
+Al sincronizar un mail:
+
+* intentar vincular remitente con cliente/contacto existente
+* si no existe, dejarlo como “sin vincular”
+* permitir vinculación manual posterior
+
+---
+
+# PRIORIDAD 3 — Importación CSV real
+
+## Problemas a corregir
+
+La app hoy no tiene importación CSV real. Necesito carga masiva verdadera por archivo.
+
+## Quiero que implementes
+
+### 1. Upload real de archivo CSV
+
+Permitir subir archivo desde frontend.
+
+### 2. Parsing real
+
+Soportar:
+
+* CSV con coma
+* CSV con punto y coma
+* UTF-8
+* encabezados variables
+
+### 3. Preview antes de importar
+
+Mostrar:
+
+* columnas detectadas
+* primeras filas
+* cantidad de registros
+* posibles errores
+
+### 4. Mapping de columnas
+
+Permitir mapear columnas del archivo a campos internos.
+
+### 5. Validaciones
+
+Validar:
+
+* campos obligatorios
+* tipos de dato
+* duplicados
+* formatos erróneos
+* referencias inexistentes
+
+### 6. Modo de importación
+
+Permitir:
+
+* insertar nuevos
+* actualizar existentes
+* modo mixto insert/update
+
+### 7. Log de importación
+
+Guardar:
+
+* quién importó
+* cuándo
+* archivo
+* tipo de entidad
+* cantidad válidos
+* cantidad inválidos
+* errores
+
+### 8. Export de errores
+
+Permitir descargar CSV con filas rechazadas y motivo de error.
+
+### 9. Entidades mínimas a soportar ahora
+
+* clientes
+* contactos
+* vendedores
+* productos/medidas
+* listas de precios
+* estados de oportunidades/pedidos
+* actividades
+
+---
+
+# PRIORIDAD 4 — Matching técnico de medidas y productos
+
+## Problemas a corregir
+
+Hoy no alcanza con un `ILIKE %medida%`.
+Necesito algo usable para entorno industrial B2B.
+
+## Quiero que implementes
+
+### 1. Pipeline de extracción separado
+
+Separar claramente:
+
+* clasificación de mail
+* extracción de datos
+* matching contra catálogo
+
+No mezclar todo en un solo paso.
+
+### 2. Normalización técnica
+
+Implementar una capa de normalización para medidas:
+
+* pulgadas
+* mm
+* formatos mixtos
+* diámetros
+* espesores
+* longitudes
+* normas
+* abreviaturas comunes
+* símbolos variantes
+
+### 3. Matching por niveles
+
+Cuando la IA detecta una medida o descripción, el sistema debe devolver:
+
+* exact_match
+* approximate_match
+* no_match
+
+Con score de confianza.
+
+### 4. Resultado estructurado
+
+Guardar por extracción:
+
+* texto original detectado
+* medida normalizada
+* norma detectada
+* cantidad detectada
+* familia sugerida
+* producto sugerido
+* tipo de match
+* score de confianza
+* usuario que corrigió
+* versión de prompt usada
+
+### 5. Revisión manual
+
+Permitir al usuario:
+
+* aceptar
+* corregir
+* rechazar
+* vincular manualmente a producto/código interno
+
+### 6. Prompt editable bien integrado
+
+La pantalla de prompts debe permitir:
+
+* editar prompt
+* versionar
+* activar/desactivar
+* probar con ejemplos
+* ver JSON devuelto
+* comparar con resultado esperado
+
+### 7. Base de equivalencias
+
+Crear soporte para equivalencias técnicas o aliases de medida/producto.
+Ejemplo:
+
+* misma medida expresada de distintas maneras
+* distintas abreviaturas de norma
+* unidades alternativas
+
+---
+
+# PRIORIDAD 5 — Motor real de seguimiento automático
+
+## Problemas a corregir
+
+Hoy no existe un follow-up engine real.
+
+## Quiero que implementes
+
+### 1. Modelo de datos
+
+Crear tablas o estructuras equivalentes para:
+
+* `followup_rules`
+* `followup_events`
+* `followup_templates`
+* `followup_runs`
+
+### 2. Reglas configurables
+
+Cada regla debe poder definir:
+
+* tipo de mail o tipo de oportunidad
+* prioridad
+* delay inicial
+* delay siguiente
+* máximo de seguimientos
+* condición de cierre
+* plantilla a usar
+* si requiere aprobación humana o no
+
+### 3. Scheduler / job runner
+
+Implementar proceso que:
+
+* detecte seguimientos pendientes
+* genere evento
+* envíe o prepare borrador
+* pause si el cliente respondió
+* cierre si corresponde
+
+### 4. Reglas mínimas del MVP
+
+Soportar esta secuencia:
+
+* seguimiento a 24h
+* seguimiento a 72h
+* seguimiento a 7 días
+* cierre a 14 días sin respuesta
+
+### 5. Condiciones de pausa/cancelación
+
+Si el cliente responde:
+
+* pausar seguimiento pendiente
+* actualizar estado de oportunidad
+* registrar evento
+
+### 6. Seguimiento solo para RFQ en esta etapa
+
+No aplicar automatización profunda todavía a reclamos o preguntas.
+Solo clasificarlos y separarlos.
+
+---
+
+# PRIORIDAD 6 — Auditoría completa
+
+## Problemas a corregir
+
+La auditoría actual es débil.
+
+## Quiero que implementes trazabilidad real para:
+
+* login/logout
+* cambios de usuarios y roles
+* importaciones CSV
+* conexión/desconexión Gmail
+* sincronizaciones Gmail
+* clasificación automática
+* reclasificación manual
+* extracción IA
+* corrección humana
+* creación/modificación/cierre de oportunidades
+* actividades comerciales
+* generación/aprobación/envío de respuestas
+* cambios de prompts
+* eventos de seguimiento
+
+## Requisitos del audit log
+
+Guardar:
+
+* usuario
+* fecha/hora
+* entidad afectada
+* tipo de acción
+* valor anterior si aplica
+* valor nuevo si aplica
+* origen
+* observaciones técnicas
+
+---
+
+# PRIORIDAD 7 — Deduplicación y consistencia operativa
+
+## Quiero que implementes
+
+### 1. Duplicados de mails
+
+No duplicar mails si ya existe `messageId`.
+
+### 2. Duplicados de oportunidades
+
+Intentar evitar oportunidades duplicadas cuando:
+
+* mismo cliente
+* mismo thread
+* mismo mail base
+* misma extracción similar en ventana cercana
+
+### 3. Duplicados de contactos/clientes
+
+Al importar o sincronizar:
+
+* detectar coincidencias por email
+* detectar coincidencias por código interno
+* sugerir merge o vinculación
+
+### 4. Consistencia entre mail y oportunidad
+
+Cada oportunidad generada desde mail debe quedar vinculada a:
+
+* mail origen
+* thread
+* cliente/contacto
+* vendedor asignado
+* extracción usada
+
+---
+
+# Frontend y UX a corregir
+
+## Quiero mejorar estas pantallas
+
+1. Dashboard
+2. Mails
+3. Oportunidades
+4. Importaciones CSV
+5. Configuración Gmail
+6. Configuración IA / prompts
+7. Auditoría
+8. Seguimientos
+
+## Requisitos
+
+* no dejar placeholders vacíos
+* mostrar estados reales
+* mostrar errores reales
+* mostrar score/confianza
+* permitir corrección manual donde haga falta
+* diseño simple, empresarial, claro
+
+---
+
+# Orden exacto de trabajo que quiero
+
+## Fase A — Endurecimiento base
+
+1. auth y roles
+2. secrets
+3. protección de rutas
+4. auditoría mínima
+5. deduplicación básica
+
+## Fase B — Gmail real
+
+1. OAuth robusto
+2. refresh token
+3. sync con paginación
+4. envío real
+5. threads
+6. adjuntos metadata
+
+## Fase C — CSV real
+
+1. upload
+2. parser
+3. preview
+4. mapping
+5. import logs
+6. export errores
+
+## Fase D — Matching técnico
+
+1. normalización
+2. extracción estructurada
+3. matching exact/approx/no_match
+4. corrección manual
+5. prompts versionados
+
+## Fase E — Follow-up engine
+
+1. reglas
+2. templates
+3. scheduler
+4. pausa/cierre
+5. panel de seguimiento
+
+## Fase F — UX final de operación
+
+1. dashboards útiles
+2. mails + oportunidad + actividad integrados
+3. auditoría visible
+4. revisión manual cómoda
+
+---
+
+# Entregables que quiero en esta corrección
+
+## 1. Código corregido
+
+Sin rehacer desde cero salvo lo estrictamente necesario.
+
+## 2. Base de datos actualizada
+
+Con migraciones claras.
+
+## 3. CHANGELOG
+
+Archivo `CHANGELOG.md` detallando:
+
+* qué corregiste
+* qué agregaste
+* qué eliminaste
+* qué quedó pendiente
+
+## 4. README técnico
+
+Explicar:
+
+* cómo correr el proyecto
+* variables de entorno requeridas
+* cómo conectar Gmail
+* cómo importar CSV
+* cómo probar follow-ups
+* cómo probar clasificación y extracción
+
+## 5. Datos de prueba
+
+Agregar seed razonable para probar:
+
+* usuarios
+* clientes
+* productos
+* medidas
+* reglas de seguimiento
+* prompts
+
+## 6. Lista de pendientes
+
+Archivo `TODO_NEXT.md` con lo que falte para una siguiente etapa.
+
+---
+
+# Restricciones importantes
+
+* no usar usuario/contraseña simple para Gmail
+* no dejar endpoints sin protección
+* no dejar simulaciones donde debería haber envío real
+* no usar matching ingenuo tipo solo `ILIKE`
+* no dejar CSV falso en JSON disfrazado
+* no inventar precios, stock o confirmaciones comerciales
+* no activar autoenvío peligroso para reclamos o respuestas técnicas
+
+---
+
+# Criterio de éxito
+
+Consideraré esta etapa bien resuelta si al final la app puede:
+
+1. autenticar usuarios con roles correctamente
+2. conectar Gmail de forma robusta
+3. sincronizar y enviar mails de verdad
+4. clasificar mails en:
+
+   * pedido de cotización
+   * reclamo
+   * pregunta / consulta
+5. procesar en serio el flujo de RFQ
+6. importar CSV reales
+7. extraer y cruzar medidas con un matching mucho mejor
+8. programar seguimientos automáticos básicos
+9. auditar las acciones clave
+10. evitar duplicados evidentes
+
+---
+
+# Pedido final
+
+No me des solo una explicación.
+Quiero que hagas estas correcciones en el código actual, de forma ordenada, con commits lógicos internos o módulos claramente separados, y dejando la aplicación lista para seguir creciendo.
+
+---
+
+## Recomendación de uso
+
+Pasáselo así y después agregale una instrucción aparte:
+
+**“Primero mostrame el plan técnico de implementación por fases sobre el código actual, y después ejecutá la Fase A completa antes de avanzar.”**
+
+Eso te evita que Replit toque todo junto y rompa más de lo que arregla.

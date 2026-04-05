@@ -1,9 +1,13 @@
 import { Router, type IRouter } from "express";
 import { db, clientsTable, productsTable, contactsTable } from "@workspace/db";
+import { requireRole } from "../middleware/auth.js";
+import { auditAction } from "../lib/audit.js";
 
 const router: IRouter = Router();
 
-router.post("/imports/clients", async (req, res) => {
+const importAuth = requireRole("admin", "gerente", "operador");
+
+router.post("/imports/clients", importAuth, async (req, res) => {
   try {
     const { data, mode } = req.body;
     if (!Array.isArray(data)) {
@@ -49,6 +53,10 @@ router.post("/imports/clients", async (req, res) => {
       }
     }
 
+    await auditAction(req, "importar_clientes", "import", undefined, {
+      total: data.length, inserted, updated, errors,
+    });
+
     res.json({ total: data.length, inserted, updated, errors, errorDetails });
   } catch (err) {
     req.log.error(err);
@@ -56,7 +64,7 @@ router.post("/imports/clients", async (req, res) => {
   }
 });
 
-router.post("/imports/products", async (req, res) => {
+router.post("/imports/products", importAuth, async (req, res) => {
   try {
     const { data, mode } = req.body;
     if (!Array.isArray(data)) {
@@ -97,6 +105,10 @@ router.post("/imports/products", async (req, res) => {
       }
     }
 
+    await auditAction(req, "importar_productos", "import", undefined, {
+      total: data.length, inserted, updated, errors,
+    });
+
     res.json({ total: data.length, inserted, updated, errors, errorDetails });
   } catch (err) {
     req.log.error(err);
@@ -104,7 +116,7 @@ router.post("/imports/products", async (req, res) => {
   }
 });
 
-router.post("/imports/contacts", async (req, res) => {
+router.post("/imports/contacts", importAuth, async (req, res) => {
   try {
     const { data, mode } = req.body;
     if (!Array.isArray(data)) {
@@ -140,6 +152,10 @@ router.post("/imports/contacts", async (req, res) => {
         errorDetails.push({ row, error: rowErr.message });
       }
     }
+
+    await auditAction(req, "importar_contactos", "import", undefined, {
+      total: data.length, inserted, updated: 0, errors,
+    });
 
     res.json({ total: data.length, inserted, updated: 0, errors, errorDetails });
   } catch (err) {

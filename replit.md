@@ -24,12 +24,46 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 ├── artifacts/
 │   ├── crm/              # React frontend (previewPath: /)
 │   └── api-server/       # Express API server (path: /api)
+│       └── src/
+│           ├── middleware/auth.ts  # requireAuth, requireRole, requireMinRole
+│           ├── lib/audit.ts       # Audit logging utility
+│           ├── lib/ai.ts          # OpenAI integration
+│           ├── lib/gmail.ts       # Gmail sync logic
+│           └── routes/            # All API routes
 ├── lib/
 │   ├── api-spec/         # OpenAPI spec + Orval codegen
 │   ├── api-client-react/ # Generated React Query hooks
 │   ├── api-zod/          # Generated Zod schemas
 │   └── db/               # Drizzle ORM schema + DB connection
 ```
+
+## Security Architecture (Phase A)
+
+### Authentication
+- Session-based auth with `requireAuth` middleware on all routes except `/auth/*` and `/health`
+- `SESSION_SECRET` is required in production (no insecure defaults)
+- Sessions stored server-side with httpOnly cookies
+
+### Role-Based Authorization
+- **admin**: Full access to all resources
+- **gerente**: Commercial operations + Gmail + prompts + audit
+- **vendedor**: Clients, emails, opportunities, activities (own scope)
+- **operador**: Data entry, imports, corrections
+
+### Route Protection
+- `/api/users/*` → admin only
+- `/api/prompts/*` → admin, gerente
+- `/api/audit/*` → admin, gerente
+- `/api/gmail/connect`, `/api/gmail/disconnect` → admin, gerente
+- `/api/imports/*` → admin, gerente, operador
+- All other routes → any authenticated user
+
+### Audit Logging
+- All logins/logouts/failed attempts logged
+- User CRUD operations with old/new values
+- Gmail connect/disconnect/sync events
+- Email classification/processing events
+- Import operations
 
 ## Database Schema
 
@@ -43,7 +77,7 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 - `activities` - Activity log (calls, visits, emails, tasks)
 - `gmail_connections` - Gmail OAuth connections per user
 - `prompts` - Editable AI prompts with versioning
-- `audit_logs` - System audit trail
+- `audit_logs` - System audit trail (with old_value, new_value, origin fields)
 
 ## Email Categories
 
@@ -65,7 +99,7 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 ## Environment Variables Required
 
 - `DATABASE_URL` - PostgreSQL connection string (auto-provided by Replit)
-- `SESSION_SECRET` - Session encryption secret (defaults to dev value)
+- `SESSION_SECRET` - Session encryption secret (required in production, auto-generated in dev)
 - `OPENAI_API_KEY` - For AI email classification and extraction
 - `GMAIL_CLIENT_ID` - For Gmail OAuth integration
 - `GMAIL_CLIENT_SECRET` - For Gmail OAuth integration
@@ -83,6 +117,7 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti�
 - `POST /api/gmail/sync` - Sync emails from Gmail
 - `GET /api/dashboard/metrics` - Dashboard metrics
 - `POST /api/imports/clients` - Bulk CSV import
+- `GET /api/audit` - Audit logs (admin/gerente only)
 
 ## Development Commands
 

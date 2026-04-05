@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, emailsTable, opportunitiesTable, productsTable, activitiesTable } from "@workspace/db";
 import { eq, and, sql, ilike } from "drizzle-orm";
+import { auditAction } from "../lib/audit.js";
 
 const router: IRouter = Router();
 
@@ -51,14 +52,23 @@ router.post("/emails/:id/classify", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { category, notes } = req.body;
+
+    const existing = await db.select().from(emailsTable).where(eq(emailsTable.id, id)).limit(1);
+    if (!existing[0]) {
+      res.status(404).json({ error: "Email no encontrado" });
+      return;
+    }
+
     const [updated] = await db.update(emailsTable)
       .set({ category, categoryConfirmed: true, notes })
       .where(eq(emailsTable.id, id))
       .returning();
-    if (!updated) {
-      res.status(404).json({ error: "Email no encontrado" });
-      return;
-    }
+
+    await auditAction(req, "reclasificar_email", "email", id, {
+      oldCategory: existing[0].category,
+      newCategory: category,
+    });
+
     res.json(updated);
   } catch (err) {
     req.log.error(err);
@@ -78,7 +88,6 @@ router.post("/emails/:id/process", async (req, res) => {
 
     await db.update(emailsTable).set({ status: "processing" }).where(eq(emailsTable.id, id));
 
-    // Use AI to extract data from the email
     let extractedData: any = {};
     let matchedProducts: any[] = [];
 
@@ -99,7 +108,6 @@ router.post("/emails/:id/process", async (req, res) => {
       };
     }
 
-    // Find matching products if measurements were extracted
     if (extractedData.measurements && extractedData.measurements.length > 0) {
       for (const measurement of extractedData.measurements) {
         const products = await db.select().from(productsTable)
@@ -109,7 +117,6 @@ router.post("/emails/:id/process", async (req, res) => {
       }
     }
 
-    // Create opportunity automatically
     const [opportunity] = await db.insert(opportunitiesTable).values({
       title: `Cotización - ${email.fromName || email.fromEmail} - ${email.subject}`,
       emailId: id,
@@ -119,20 +126,23 @@ router.post("/emails/:id/process", async (req, res) => {
       extractedProducts: extractedData,
     }).returning();
 
-    // Update email
     await db.update(emailsTable).set({
       status: "processed",
       opportunityId: opportunity.id,
       extractedData,
     }).where(eq(emailsTable.id, id));
 
-    // Log activity
     await db.insert(activitiesTable).values({
       type: "email",
       title: `Email procesado: ${email.subject}`,
       description: `Oportunidad creada automáticamente`,
       emailId: id,
       opportunityId: opportunity.id,
+    });
+
+    await auditAction(req, "procesar_email", "email", id, {
+      opportunityId: opportunity.id,
+      matchedProducts: matchedProducts.length,
     });
 
     const [updatedEmail] = await db.select().from(emailsTable).where(eq(emailsTable.id, id)).limit(1);
@@ -191,6 +201,8 @@ router.post("/emails/:id/send-reply", async (req, res) => {
       description: body.substring(0, 200),
       emailId: id,
     });
+
+    await auditAction(req, "enviar_respuesta", "email", id, { subject });
 
     res.json({ message: "Respuesta registrada" });
   } catch (err) {
