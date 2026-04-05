@@ -199,23 +199,27 @@ router.post("/imports/execute", importAuth, upload.single("file"), async (req, r
     for (let i = 0; i < mappedRows.length; i++) {
       const row = mappedRows[i];
       try {
+        let result: "inserted" | "updated" | "skipped";
         switch (entityType) {
           case "clients":
-            await importClient(row, mode);
+            result = await importClient(row, mode);
             break;
           case "contacts":
-            await importContact(row, mode);
+            result = await importContact(row, mode);
             break;
           case "products":
-            await importProduct(row, mode);
+            result = await importProduct(row, mode);
             break;
           case "salespeople":
-            await importSalesperson(row, mode);
+            result = await importSalesperson(row, mode);
             break;
+          default:
+            result = "skipped";
         }
 
-        if (mode === "upsert") updated++;
-        else inserted++;
+        if (result === "inserted") inserted++;
+        else if (result === "updated") updated++;
+        else skipped++;
       } catch (rowErr: any) {
         errors++;
         errorDetails.push({ row: i + 2, data: row, error: rowErr.message });
@@ -336,7 +340,7 @@ router.get("/imports/template/:entityType", importAuth, (req, res) => {
   res.send("\uFEFF" + headers.join(",") + "\n");
 });
 
-async function importClient(row: Record<string, string>, mode: string) {
+async function importClient(row: Record<string, string>, mode: string): Promise<"inserted" | "updated" | "skipped"> {
   if (!row.companyName) throw new Error("companyName es requerido");
 
   const data = {
@@ -353,20 +357,29 @@ async function importClient(row: Record<string, string>, mode: string) {
   };
 
   if (mode === "upsert" && data.taxId) {
-    await db.insert(clientsTable).values(data).onConflictDoUpdate({
-      target: clientsTable.taxId,
-      set: data,
-    });
+    const existing = await db.select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.taxId, data.taxId)).limit(1);
+    if (existing.length > 0) {
+      await db.update(clientsTable).set({ ...data, updatedAt: new Date() }).where(eq(clientsTable.id, existing[0].id));
+      return "updated";
+    }
+    await db.insert(clientsTable).values(data);
+    return "inserted";
+  } else if (mode === "update") {
+    if (!data.taxId) throw new Error("taxId requerido para modo update");
+    const [updated] = await db.update(clientsTable).set({ ...data, updatedAt: new Date() }).where(eq(clientsTable.taxId, data.taxId)).returning({ id: clientsTable.id });
+    if (!updated) return "skipped";
+    return "updated";
   } else {
     await db.insert(clientsTable).values(data);
+    return "inserted";
   }
 }
 
-async function importContact(row: Record<string, string>, mode: string) {
+async function importContact(row: Record<string, string>, mode: string): Promise<"inserted" | "updated" | "skipped"> {
   if (!row.firstName) throw new Error("firstName es requerido");
   if (!row.clientId) throw new Error("clientId es requerido");
 
-  await db.insert(contactsTable).values({
+  const data = {
     clientId: parseInt(row.clientId),
     firstName: row.firstName,
     lastName: row.lastName || "",
@@ -375,13 +388,26 @@ async function importContact(row: Record<string, string>, mode: string) {
     position: row.position || undefined,
     isPrimary: row.isPrimary === "true" || row.isPrimary === "1" || row.isPrimary === "si",
     notes: row.notes || undefined,
-  });
+  };
+
+  if ((mode === "upsert" || mode === "update") && data.email) {
+    const existing = await db.select({ id: contactsTable.id }).from(contactsTable).where(eq(contactsTable.email, data.email)).limit(1);
+    if (existing.length > 0) {
+      await db.update(contactsTable).set(data).where(eq(contactsTable.id, existing[0].id));
+      return "updated";
+    } else if (mode === "update") {
+      return "skipped";
+    }
+  }
+
+  await db.insert(contactsTable).values(data);
+  return "inserted";
 }
 
-async function importProduct(row: Record<string, string>, mode: string) {
+async function importProduct(row: Record<string, string>, mode: string): Promise<"inserted" | "updated" | "skipped"> {
   if (!row.name) throw new Error("name es requerido");
 
-  await db.insert(productsTable).values({
+  const data = {
     name: row.name,
     code: row.code || undefined,
     description: row.description || undefined,
@@ -392,21 +418,47 @@ async function importProduct(row: Record<string, string>, mode: string) {
     price: row.price ? parseFloat(row.price) : undefined,
     currency: row.currency || "ARS",
     isActive: true,
-  } as any);
+  } as any;
+
+  if ((mode === "upsert" || mode === "update") && data.code) {
+    const existing = await db.select({ id: productsTable.id }).from(productsTable).where(eq(productsTable.code, data.code)).limit(1);
+    if (existing.length > 0) {
+      await db.update(productsTable).set({ ...data, updatedAt: new Date() }).where(eq(productsTable.id, existing[0].id));
+      return "updated";
+    } else if (mode === "update") {
+      return "skipped";
+    }
+  }
+
+  await db.insert(productsTable).values(data);
+  return "inserted";
 }
 
-async function importSalesperson(row: Record<string, string>, mode: string) {
+async function importSalesperson(row: Record<string, string>, mode: string): Promise<"inserted" | "updated" | "skipped"> {
   if (!row.name) throw new Error("name es requerido");
   if (!row.email) throw new Error("email es requerido");
 
-  await db.insert(salespeopleTable).values({
+  const data = {
     name: row.name,
     email: row.email,
     phone: row.phone || undefined,
     territory: row.territory || undefined,
     userId: row.userId ? parseInt(row.userId) : undefined,
     isActive: true,
-  });
+  };
+
+  if ((mode === "upsert" || mode === "update") && data.email) {
+    const existing = await db.select({ id: salespeopleTable.id }).from(salespeopleTable).where(eq(salespeopleTable.email, data.email)).limit(1);
+    if (existing.length > 0) {
+      await db.update(salespeopleTable).set(data).where(eq(salespeopleTable.id, existing[0].id));
+      return "updated";
+    } else if (mode === "update") {
+      return "skipped";
+    }
+  }
+
+  await db.insert(salespeopleTable).values(data);
+  return "inserted";
 }
 
 export default router;

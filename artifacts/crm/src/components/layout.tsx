@@ -14,7 +14,8 @@ import {
   Bot, 
   Settings,
   LogOut,
-  Menu
+  Menu,
+  Timer
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/salespeople", label: "Vendedores", icon: UserSquare },
   { href: "/products", label: "Productos", icon: Package },
   { href: "/imports", label: "Importar CSV", icon: UploadCloud },
+  { href: "/followups", label: "Seguimientos", icon: Timer },
   { href: "/gmail", label: "Gmail Sync", icon: Mail },
   { href: "/prompts", label: "Prompts IA", icon: Bot },
   { href: "/users", label: "Usuarios", icon: Settings, adminOnly: true },

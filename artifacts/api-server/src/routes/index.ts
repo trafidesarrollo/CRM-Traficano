@@ -14,6 +14,7 @@ import dashboardRouter from "./dashboard.js";
 import promptsRouter from "./prompts.js";
 import importsRouter from "./imports.js";
 import extractionsRouter from "./extractions.js";
+import followupsRouter from "./followups.js";
 import auditRouter from "./audit.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
@@ -36,6 +37,7 @@ router.use(activitiesRouter);
 router.use(gmailRouter);
 router.use(importsRouter);
 router.use("/extractions", extractionsRouter);
+router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 
 router.use("/users", requireRole("admin"), usersRouter);
 router.use("/prompts", requireRole("admin", "gerente"), promptsRouter);

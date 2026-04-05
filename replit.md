@@ -81,6 +81,9 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti√
 - `import_logs` - CSV import history and results
 - `extractions` - AI-extracted product requirements from emails with match scores
 - `product_equivalences` - Product aliases for improved technical matching
+- `followup_rules` - Configurable follow-up rules with triggers and delays
+- `followup_templates` - Email templates with dynamic variables for follow-ups
+- `scheduled_followups` - Scheduled follow-up tasks with status tracking
 
 ## Email Categories
 

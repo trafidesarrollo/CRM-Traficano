@@ -96,6 +96,32 @@
 - Nueva tabla `extractions` (14 campos: emailId, originalText, normalizedMeasurement, detectedStandard, detectedQuantity, suggestedProductId, matchType, matchScore, status, correctedProductId, rawAiOutput, etc.)
 - Nueva tabla `product_equivalences` (productId, alias, aliasType)
 
-### Pendiente para siguientes fases
-- Fase E: Motor de seguimiento (reglas, templates, scheduler)
-- Fase F: UX final (dashboards, páginas funcionales completas)
+---
+
+## Fase E — Motor de Seguimiento (2026-04-05)
+
+### Agregado
+- **Tabla `followup_rules`**: Reglas configurables con evento disparador (quote_sent, quote_request_received, opportunity_created, no_response, email_sent), delay en días, máximo de intentos, template asociado, prioridad.
+- **Tabla `followup_templates`**: Plantillas de email con variables dinámicas ({{contacto}}, {{empresa}}, {{producto}}, {{fecha_cotizacion}}, {{vendedor}}). Categorías: quote_followup, general_followup, thank_you, reminder, reactivation.
+- **Tabla `scheduled_followups`**: Seguimientos programados con fecha, estado (pending/sent/skipped/failed/cancelled), número de intento, razón de omisión, cuerpo generado.
+- **Motor de procesamiento**: Verifica condiciones antes de enviar (oportunidad ganada/perdida, cliente respondió), genera contenido desde template con variables reales, programa siguiente intento automáticamente.
+- **Seed data**: 5 templates predeterminados (3 de seguimiento de cotización, 1 agradecimiento, 1 reactivación) y 4 reglas (post-cotización, agradecimiento automático, oportunidad nueva, reactivación).
+- **Endpoints**: GET/POST/PATCH/DELETE rules, GET/POST/PATCH/DELETE templates, GET scheduled, PATCH cancel/reschedule, POST trigger, POST process, GET stats, POST preview.
+- **Ruta protegida**: `/api/followups/*` accesible desde vendedor hacia arriba.
+
+---
+
+## Fase F — UX Final (2026-04-05)
+
+### Agregado
+- **Página Contactos**: CRUD completo con búsqueda, tarjetas con email/teléfono/cargo, diálogo de creación.
+- **Página Vendedores**: CRUD completo con avatares, estado activo/inactivo, vinculación a usuario.
+- **Página Productos**: CRUD completo con catálogo industrial (código, categoría, dimensiones, norma, precio, moneda), búsqueda por todos los campos.
+- **Página Usuarios**: CRUD completo con roles visuales (iconos y colores por rol), selector de rol, creación con contraseña.
+- **Página Prompts IA**: Visualización agrupada por tipo, activación de versiones, creación con editor de texto monoespaciado.
+- **Página Seguimientos**: Dashboard con estadísticas (pendientes, enviados, vencidos hoy, esta semana), lista filtrable por estado con tabs, reglas activas, botones de procesamiento y cancelación.
+- **Página Importación CSV mejorada**: Flujo de 3 pasos (upload→preview→result), selector de entidad y modo, mapeo de columnas visual con select, vista previa de datos, resumen de resultados con detalle de errores, historial, descarga de plantillas.
+- **Navegación**: Agregado "Seguimientos" al sidebar con icono Timer. Eliminados todos los placeholders.
+
+### Eliminado
+- Todas las páginas placeholder reemplazadas por páginas funcionales completas.

@@ -3,32 +3,25 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import { ReactNode, useEffect } from "react";
-import { AppLayout } from "@/components/layout";
+import { useEffect } from "react";
 
-// Pages
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Emails from "@/pages/emails/index";
 import EmailDetail from "@/pages/emails/detail";
 import Opportunities from "@/pages/opportunities/index";
 import Clients from "@/pages/clients/index";
+import Contacts from "@/pages/contacts/index";
+import Salespeople from "@/pages/salespeople/index";
+import Products from "@/pages/products/index";
 import Imports from "@/pages/imports/index";
 import Gmail from "@/pages/gmail/index";
+import Prompts from "@/pages/prompts/index";
+import UsersPage from "@/pages/users/index";
+import Followups from "@/pages/followups/index";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
-
-const PlaceholderPage = ({ title }: { title: string }) => {
-  return (
-    <AppLayout>
-      <div className="p-8">
-        <h1 className="text-3xl font-bold">{title}</h1>
-        <p className="text-muted-foreground mt-2">Módulo en construcción.</p>
-      </div>
-    </AppLayout>
-  );
-};
 
 function ProtectedRoute({ component: Component }: { component: any }) {
   const { user, isLoading } = useAuth();
@@ -62,14 +55,14 @@ function Router() {
 
       <Route path="/opportunities" component={() => <ProtectedRoute component={Opportunities} />} />
       <Route path="/clients" component={() => <ProtectedRoute component={Clients} />} />
+      <Route path="/contacts" component={() => <ProtectedRoute component={Contacts} />} />
+      <Route path="/salespeople" component={() => <ProtectedRoute component={Salespeople} />} />
+      <Route path="/products" component={() => <ProtectedRoute component={Products} />} />
       <Route path="/imports" component={() => <ProtectedRoute component={Imports} />} />
       <Route path="/gmail" component={() => <ProtectedRoute component={Gmail} />} />
-
-      <Route path="/contacts" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Contactos" />} />} />
-      <Route path="/salespeople" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Vendedores" />} />} />
-      <Route path="/products" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Productos" />} />} />
-      <Route path="/prompts" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Prompts IA" />} />} />
-      <Route path="/users" component={() => <ProtectedRoute component={() => <PlaceholderPage title="Gestión de Usuarios" />} />} />
+      <Route path="/followups" component={() => <ProtectedRoute component={Followups} />} />
+      <Route path="/prompts" component={() => <ProtectedRoute component={Prompts} />} />
+      <Route path="/users" component={() => <ProtectedRoute component={UsersPage} />} />
 
       <Route component={NotFound} />
     </Switch>
