@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, gmailConnectionsTable, emailsTable } from "@workspace/db";
+import { db, gmailConnectionsTable, emailsTable, activitiesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireRole } from "../middleware/auth.js";
 import { auditAction } from "../lib/audit.js";
@@ -9,6 +9,42 @@ const router: IRouter = Router();
 const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || "";
 const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || "";
 const GMAIL_REDIRECT_URI = process.env.GMAIL_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost"}/api/gmail/callback`;
+
+async function refreshAccessToken(connection: any): Promise<string> {
+  if (!connection.refreshToken) {
+    throw new Error("No hay refresh token. Reconecte Gmail.");
+  }
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: GMAIL_CLIENT_ID,
+      client_secret: GMAIL_CLIENT_SECRET,
+      refresh_token: connection.refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const tokens = await response.json() as any;
+  if (!tokens.access_token) {
+    throw new Error("No se pudo renovar el token de Gmail. Reconecte la cuenta.");
+  }
+
+  await db.update(gmailConnectionsTable).set({
+    accessToken: tokens.access_token,
+    tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined,
+  }).where(eq(gmailConnectionsTable.id, connection.id));
+
+  return tokens.access_token;
+}
+
+async function getValidAccessToken(connection: any): Promise<string> {
+  if (connection.tokenExpiry && new Date(connection.tokenExpiry) < new Date()) {
+    return refreshAccessToken(connection);
+  }
+  return connection.accessToken;
+}
 
 router.get("/gmail/connect", requireRole("admin", "gerente"), (req, res) => {
   if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
@@ -31,7 +67,7 @@ router.get("/gmail/callback", async (req, res) => {
     }
 
     if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
-      res.status(400).json({ error: "Gmail no configurado. Configure GMAIL_CLIENT_ID y GMAIL_CLIENT_SECRET." });
+      res.status(400).json({ error: "Gmail no configurado." });
       return;
     }
 
@@ -73,6 +109,8 @@ router.get("/gmail/callback", async (req, res) => {
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token || existing[0].refreshToken,
         tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined,
+        syncStatus: "idle",
+        syncError: null,
       }).where(eq(gmailConnectionsTable.userId, userId));
     } else {
       await db.insert(gmailConnectionsTable).values({
@@ -105,9 +143,13 @@ router.get("/gmail/status", async (req, res) => {
       return;
     }
 
-    let status = "conectada";
+    let status = connections[0].syncStatus === "error" ? "error" : "conectada";
     if (connections[0].tokenExpiry && new Date(connections[0].tokenExpiry) < new Date()) {
-      status = "token_vencido";
+      if (connections[0].refreshToken) {
+        status = "token_vencido_renovable";
+      } else {
+        status = "reconectar_requerida";
+      }
     }
 
     res.json({
@@ -115,41 +157,13 @@ router.get("/gmail/status", async (req, res) => {
       email: connections[0].email,
       lastSyncAt: connections[0].lastSyncAt,
       status,
+      syncError: connections[0].syncError,
     });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al obtener estado de Gmail" });
   }
 });
-
-async function refreshAccessToken(connection: any): Promise<string> {
-  if (!connection.refreshToken) {
-    throw new Error("No hay refresh token. Reconecte Gmail.");
-  }
-
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: GMAIL_CLIENT_ID,
-      client_secret: GMAIL_CLIENT_SECRET,
-      refresh_token: connection.refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-
-  const tokens = await response.json() as any;
-  if (!tokens.access_token) {
-    throw new Error("No se pudo renovar el token de Gmail. Reconecte la cuenta.");
-  }
-
-  await db.update(gmailConnectionsTable).set({
-    accessToken: tokens.access_token,
-    tokenExpiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined,
-  }).where(eq(gmailConnectionsTable.id, connection.id));
-
-  return tokens.access_token;
-}
 
 router.post("/gmail/sync", async (req, res) => {
   try {
@@ -160,55 +174,212 @@ router.post("/gmail/sync", async (req, res) => {
       return;
     }
 
-    let accessToken = connections[0].accessToken;
-    if (connections[0].tokenExpiry && new Date(connections[0].tokenExpiry) < new Date()) {
+    await db.update(gmailConnectionsTable)
+      .set({ syncStatus: "syncing", syncError: null })
+      .where(eq(gmailConnectionsTable.id, connections[0].id));
+
+    let accessToken: string;
+    try {
+      accessToken = await getValidAccessToken(connections[0]);
+    } catch (refreshErr: any) {
+      await db.update(gmailConnectionsTable)
+        .set({ syncStatus: "error", syncError: refreshErr.message })
+        .where(eq(gmailConnectionsTable.id, connections[0].id));
+      res.status(401).json({ error: refreshErr.message, needsReconnect: true });
+      return;
+    }
+
+    const maxResults = parseInt(req.body.maxResults as string) || 50;
+    const query = (req.body.query as string) || "";
+
+    try {
+      const { syncGmailMessages } = await import("../lib/gmail.js");
+      const result = await syncGmailMessages(accessToken, connections[0].email, userId, {
+        maxResults,
+        query,
+        pageToken: req.body.pageToken,
+      });
+
+      const updateData: any = {
+        lastSyncAt: new Date(),
+        syncStatus: "idle",
+        syncError: null,
+      };
+      if (result.historyId) {
+        updateData.lastHistoryId = result.historyId;
+      }
+
+      await db.update(gmailConnectionsTable)
+        .set(updateData)
+        .where(eq(gmailConnectionsTable.id, connections[0].id));
+
+      await auditAction(req, "gmail_sync", "gmail_connection", undefined, {
+        synced: result.synced,
+        classified: result.classified,
+        errors: result.errors,
+        skipped: result.skipped,
+      });
+
+      res.json({
+        synced: result.synced,
+        classified: result.classified,
+        errors: result.errors,
+        skipped: result.skipped,
+        nextPageToken: result.nextPageToken,
+        message: `Sincronización completada: ${result.synced} nuevos emails, ${result.skipped} ya existentes`,
+      });
+    } catch (syncErr: any) {
+      req.log.error(syncErr, "Gmail sync failed");
+
+      if (syncErr.message?.includes("401") || syncErr.message?.includes("403")) {
+        try {
+          accessToken = await refreshAccessToken(connections[0]);
+          const { syncGmailMessages } = await import("../lib/gmail.js");
+          const result = await syncGmailMessages(accessToken, connections[0].email, userId, { maxResults, query });
+
+          await db.update(gmailConnectionsTable)
+            .set({ lastSyncAt: new Date(), syncStatus: "idle", syncError: null })
+            .where(eq(gmailConnectionsTable.id, connections[0].id));
+
+          res.json({
+            synced: result.synced,
+            classified: result.classified,
+            errors: result.errors,
+            skipped: result.skipped,
+            message: `Sincronización completada (token renovado): ${result.synced} nuevos emails`,
+          });
+          return;
+        } catch (retryErr: any) {
+          await db.update(gmailConnectionsTable)
+            .set({ syncStatus: "error", syncError: "Token vencido. Reconecte Gmail." })
+            .where(eq(gmailConnectionsTable.id, connections[0].id));
+          res.status(401).json({ error: "Token de Gmail vencido. Reconecte la cuenta.", needsReconnect: true });
+          return;
+        }
+      }
+
+      await db.update(gmailConnectionsTable)
+        .set({ syncStatus: "error", syncError: syncErr.message })
+        .where(eq(gmailConnectionsTable.id, connections[0].id));
+      res.status(500).json({ error: `Error de sincronización: ${syncErr.message}` });
+    }
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al sincronizar Gmail" });
+  }
+});
+
+router.post("/emails/:id/send-reply", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { subject, body, bodyHtml } = req.body;
+    const userId = (req as any).userId;
+
+    const emails = await db.select().from(emailsTable).where(eq(emailsTable.id, id)).limit(1);
+    const email = emails[0];
+    if (!email) {
+      res.status(404).json({ error: "Email no encontrado" });
+      return;
+    }
+
+    const connections = await db.select().from(gmailConnectionsTable).where(eq(gmailConnectionsTable.userId, userId)).limit(1);
+
+    if (connections[0]) {
       try {
-        accessToken = await refreshAccessToken(connections[0]);
-      } catch (refreshErr: any) {
-        res.status(401).json({ error: refreshErr.message, needsReconnect: true });
+        let accessToken = await getValidAccessToken(connections[0]);
+
+        const { sendGmailReply } = await import("../lib/gmail.js");
+        const result = await sendGmailReply(
+          accessToken,
+          email.fromEmail,
+          subject || `Re: ${email.subject}`,
+          body,
+          bodyHtml || body.replace(/\n/g, "<br>"),
+          email.gmailThreadId || undefined,
+        );
+
+        await db.insert(emailsTable).values({
+          gmailMessageId: result.messageId,
+          gmailThreadId: result.threadId,
+          subject: subject || `Re: ${email.subject}`,
+          fromEmail: connections[0].email,
+          fromName: (req as any).userFullName || undefined,
+          toEmail: email.fromEmail,
+          body,
+          bodyHtml: bodyHtml || body.replace(/\n/g, "<br>"),
+          direction: "outbound",
+          receivedAt: new Date(),
+          status: "replied",
+          clientId: email.clientId,
+          contactId: email.contactId,
+          opportunityId: email.opportunityId,
+        });
+
+        await db.update(emailsTable).set({ status: "replied" }).where(eq(emailsTable.id, id));
+
+        await db.insert(activitiesTable).values({
+          type: "email",
+          title: `Respuesta enviada por Gmail: ${subject || email.subject}`,
+          description: body.substring(0, 200),
+          emailId: id,
+          opportunityId: email.opportunityId || undefined,
+        });
+
+        await auditAction(req, "enviar_respuesta_gmail", "email", id, {
+          to: email.fromEmail,
+          gmailMessageId: result.messageId,
+          threadId: result.threadId,
+        });
+
+        res.json({
+          message: "Respuesta enviada por Gmail",
+          sent: true,
+          gmailMessageId: result.messageId,
+          threadId: result.threadId,
+        });
+        return;
+      } catch (sendErr: any) {
+        req.log.error(sendErr, "Gmail send failed");
+        res.status(500).json({
+          error: `Error al enviar por Gmail: ${sendErr.message}`,
+          sent: false,
+        });
         return;
       }
     }
 
-    let synced = 0;
-    let classified = 0;
-    let errors = 0;
-
-    try {
-      const { syncGmailMessages } = await import("../lib/gmail.js");
-      const result = await syncGmailMessages(accessToken, connections[0].email, userId);
-      synced = result.synced;
-      classified = result.classified;
-      errors = result.errors;
-
-      await db.update(gmailConnectionsTable)
-        .set({ lastSyncAt: new Date() })
-        .where(eq(gmailConnectionsTable.userId, userId));
-
-      await auditAction(req, "gmail_sync", "gmail_connection", undefined, { synced, classified, errors });
-    } catch (syncErr: any) {
-      req.log.warn(syncErr, "Gmail sync failed");
-      if (syncErr.message?.includes("401")) {
-        try {
-          accessToken = await refreshAccessToken(connections[0]);
-          const { syncGmailMessages } = await import("../lib/gmail.js");
-          const result = await syncGmailMessages(accessToken, connections[0].email, userId);
-          synced = result.synced;
-          classified = result.classified;
-          errors = result.errors;
-        } catch (retryErr) {
-          res.status(401).json({ error: "Token de Gmail vencido. Reconecte la cuenta.", needsReconnect: true });
-          return;
-        }
-      } else {
-        errors = 1;
-      }
-    }
-
-    res.json({ synced, classified, errors, message: `Sincronización completada: ${synced} emails` });
+    res.status(400).json({
+      error: "No hay cuenta Gmail conectada. Conecte Gmail para enviar respuestas reales.",
+      sent: false,
+    });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Error al sincronizar Gmail" });
+    res.status(500).json({ error: "Error al enviar respuesta" });
+  }
+});
+
+router.get("/gmail/attachment/:messageId/:attachmentId", async (req, res) => {
+  try {
+    const userId = (req as any).userId;
+    const { messageId, attachmentId } = req.params;
+
+    const connections = await db.select().from(gmailConnectionsTable).where(eq(gmailConnectionsTable.userId, userId)).limit(1);
+    if (!connections[0]) {
+      res.status(400).json({ error: "Gmail no conectado" });
+      return;
+    }
+
+    const accessToken = await getValidAccessToken(connections[0]);
+    const { getGmailAttachment } = await import("../lib/gmail.js");
+    const attachment = await getGmailAttachment(accessToken, messageId, attachmentId);
+
+    const buffer = Buffer.from(attachment.data.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+    res.set("Content-Length", String(buffer.length));
+    res.set("Content-Disposition", "attachment");
+    res.send(buffer);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al descargar adjunto" });
   }
 });
 

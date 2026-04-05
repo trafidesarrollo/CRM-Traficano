@@ -29,9 +29,73 @@
 ### Esquema de base de datos
 - `audit_logs`: Agregados campos `old_value`, `new_value`, `origin` para trazabilidad completa.
 
+---
+
+## Fase B — Gmail Real y Operable (2026-04-05)
+
+### Agregado
+- **Sincronización con paginación**: Ya no se limita a `is:unread`. Soporta hasta 50 mensajes por lote, con `pageToken` para continuar. Acepta filtros de búsqueda personalizados (`query`).
+- **Parsing recursivo de partes MIME**: Extrae cuerpo de emails con estructuras multipart anidadas (text/plain, text/html, multipart/alternative, etc.).
+- **Detección de adjuntos**: Detecta archivos adjuntos, guarda metadata (nombre, tipo MIME, tamaño, attachmentId) en campo `attachments` de la tabla `emails`.
+- **Descarga de adjuntos**: Nuevo endpoint `GET /api/gmail/attachment/:messageId/:attachmentId` para descargar adjuntos via Gmail API.
+- **Envío real por Gmail API**: `POST /api/emails/:id/send-reply` ahora envía realmente por Gmail API con formato MIME correcto (text/plain + text/html). Soporta threading (In-Reply-To, References).
+- **Registro de emails enviados**: Los emails enviados se guardan en la tabla `emails` con `direction: "outbound"` y se vinculan al thread, cliente y oportunidad del email original.
+- **Vinculación automática de cliente/contacto**: Al sincronizar, intenta vincular el remitente con un contacto existente (por email) o un cliente (por dominio del website).
+- **Dirección de email** (`direction`): Nuevo campo que distingue `inbound` / `outbound`.
+- **CC del email**: Se guarda el campo CC.
+- **Labels de Gmail**: Se guardan las etiquetas del mensaje.
+- **Estado de sincronización**: La conexión Gmail muestra estados: `idle`, `syncing`, `error` con detalle del error.
+- **historyId**: Se guarda el último historyId para preparar sync incremental futura.
+
+### Corregido
+- **Deduplicación por messageId**: Constraint `UNIQUE` en `gmail_message_id` (parcial, solo no-null). Imposible duplicar un email ya sincronizado.
+- **Refresh token robusto**: Si el access token vence durante la sync, se renueva automáticamente y se reintenta. Si falla, se marca la conexión como `error`.
+- **Token vencido detectable**: El endpoint `/gmail/status` ahora reporta si el token venció pero es renovable, o si se necesita reconectar.
+
+### Esquema de base de datos
+- `emails`: Agregados campos `direction`, `cc_email`, `contact_id`, `attachments`, `gmail_labels`, `has_attachments`, `gmail_history_id`. Constraint unique parcial en `gmail_message_id`.
+- `gmail_connections`: Agregados campos `last_history_id`, `sync_status`, `sync_error`.
+
+---
+
+## Fase C — Importación CSV Real (2026-04-05)
+
+### Agregado
+- **Upload real de archivo CSV**: Endpoint `POST /api/imports/upload` acepta archivo CSV vía multipart/form-data. Soporta archivos hasta 10MB.
+- **Parser CSV robusto**: Detecta automáticamente delimitador (coma, punto y coma, tab). Soporta UTF-8 con BOM, campos entre comillas, comillas escapadas.
+- **Preview antes de importar**: Devuelve headers detectados, primeras 10 filas, total de registros, y mapeo de columnas sugerido.
+- **Auto-mapping de columnas**: Reconoce nombres en español e inglés (empresa→companyName, cuit→taxId, telefono→phone, etc.) con aliases configurables.
+- **Mapping manual**: El frontend puede enviar un mapping personalizado de columnas del CSV a campos del sistema.
+- **Validación**: Verifica campos obligatorios, tipos de dato, y genera detalle de errores por fila.
+- **Modos de importación**: `insert` (solo nuevos), `update`, `upsert` (insert o update por clave única como taxId).
+- **Tabla `import_logs`**: Registra cada importación con: usuario, fecha, archivo, tipo de entidad, cantidades, errores, estado.
+- **Export de errores**: Endpoint `GET /api/imports/logs/:id/errors` descarga CSV con filas rechazadas y motivo de error.
+- **Plantillas CSV**: Endpoint `GET /api/imports/template/:entityType` descarga plantilla CSV con headers correctos.
+- **Historial de importaciones**: Endpoint `GET /api/imports/logs` listado paginado de importaciones pasadas.
+- **Entidades soportadas**: clientes, contactos, productos, vendedores.
+
+### Esquema de base de datos
+- Nueva tabla `import_logs` con campos: userId, entityType, fileName, totalRows, insertedRows, updatedRows, errorRows, skippedRows, mode, status, columnMapping, errorDetails, summary, completedAt.
+- Índice único parcial en `clients.tax_id` para soportar upsert por CUIT.
+
+---
+
+## Fase D — Matching Técnico (2026-04-05)
+
+### Agregado
+- **Normalizador de medidas**: Módulo `measurement-normalizer.ts` que convierte entre pulgadas (fracciones y decimales), DN, mm, cm, m, ft, kg, ton. Incluye tablas NPS→OD, DN→OD, fracciones, y conversiones de unidades industriales.
+- **Normas técnicas**: Reconoce y normaliza ASTM A53/A106/A312/A519, API 5L/5CT, ASME B16.x, DIN, IRAM, SAE, SCH 40/80/160, etc. con aliases múltiples.
+- **Extracción AI de requerimientos**: Endpoint `POST /api/extractions/extract/:emailId` que usa GPT-4o-mini para extraer todos los productos/materiales mencionados en un email con sus especificaciones técnicas.
+- **Matching multinivel**: Busca productos en BD por familia, luego calcula score por coincidencia de dimensión (exacta/aproximada/cercana) y norma. Puntaje máximo 100, con tipos exact/approximate/no_match.
+- **Tabla `extractions`**: Almacena cada item extraído con medida normalizada, norma, cantidad, producto sugerido, score de match, y estado (pending/accepted/corrected/rejected).
+- **Tabla `product_equivalences`**: Almacena aliases alternativos para productos (medida, norma, nombre, código). Se alimenta automáticamente al corregir un match.
+- **Feedback loop**: Endpoint `PATCH /api/extractions/:id/correct` registra corrección humana y crea equivalencia automática para mejorar matches futuros.
+- **Endpoints**: normalize, match, extract, accept, correct, reject, equivalences CRUD.
+
+### Esquema de base de datos
+- Nueva tabla `extractions` (14 campos: emailId, originalText, normalizedMeasurement, detectedStandard, detectedQuantity, suggestedProductId, matchType, matchScore, status, correctedProductId, rawAiOutput, etc.)
+- Nueva tabla `product_equivalences` (productId, alias, aliasType)
+
 ### Pendiente para siguientes fases
-- Fase B: Gmail real (OAuth robusto, envío real, threads, adjuntos)
-- Fase C: CSV real (upload de archivo, preview, mapping de columnas)
-- Fase D: Matching técnico (normalización de medidas, matching multinivel)
 - Fase E: Motor de seguimiento (reglas, templates, scheduler)
 - Fase F: UX final (dashboards, páginas funcionales completas)

@@ -9,3 +9,5 @@ export * from "./activities";
 export * from "./gmail_connections";
 export * from "./prompts";
 export * from "./audit_logs";
+export * from "./import_logs";
+export * from "./extractions";

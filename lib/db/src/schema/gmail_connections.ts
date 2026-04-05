@@ -10,6 +10,9 @@ export const gmailConnectionsTable = pgTable("gmail_connections", {
   refreshToken: text("refresh_token"),
   tokenExpiry: timestamp("token_expiry", { withTimezone: true }),
   lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastHistoryId: text("last_history_id"),
+  syncStatus: text("sync_status", { enum: ["idle", "syncing", "error"] }).notNull().default("idle"),
+  syncError: text("sync_error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -78,6 +78,9 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti√
 - `gmail_connections` - Gmail OAuth connections per user
 - `prompts` - Editable AI prompts with versioning
 - `audit_logs` - System audit trail (with old_value, new_value, origin fields)
+- `import_logs` - CSV import history and results
+- `extractions` - AI-extracted product requirements from emails with match scores
+- `product_equivalences` - Product aliases for improved technical matching
 
 ## Email Categories
 
@@ -116,7 +119,15 @@ Sistema CRM comercial integral para empresa industrial B2B. Automatiza la gesti√
 - `GET /api/gmail/connect` - Get Gmail OAuth URL
 - `POST /api/gmail/sync` - Sync emails from Gmail
 - `GET /api/dashboard/metrics` - Dashboard metrics
-- `POST /api/imports/clients` - Bulk CSV import
+- `POST /api/imports/upload` - CSV upload with preview
+- `POST /api/imports/execute` - Execute CSV import
+- `GET /api/imports/template/:type` - Download CSV template
+- `GET /api/imports/logs` - Import history
+- `POST /api/extractions/extract/:emailId` - AI extract product requirements from email
+- `POST /api/extractions/normalize` - Normalize measurements
+- `POST /api/extractions/match` - Match measurement to products
+- `PATCH /api/extractions/:id/accept` - Accept extraction match
+- `PATCH /api/extractions/:id/correct` - Correct with right product (auto-learns)
 - `GET /api/audit` - Audit logs (admin/gerente only)
 
 ## Development Commands

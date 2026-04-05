@@ -188,27 +188,4 @@ router.post("/emails/:id/reply-draft", async (req, res) => {
   }
 });
 
-router.post("/emails/:id/send-reply", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const { subject, body } = req.body;
-
-    await db.update(emailsTable).set({ status: "replied" }).where(eq(emailsTable.id, id));
-
-    await db.insert(activitiesTable).values({
-      type: "email",
-      title: `Respuesta enviada: ${subject}`,
-      description: body.substring(0, 200),
-      emailId: id,
-    });
-
-    await auditAction(req, "enviar_respuesta", "email", id, { subject });
-
-    res.json({ message: "Respuesta registrada" });
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Error al enviar respuesta" });
-  }
-});
-
 export default router;
