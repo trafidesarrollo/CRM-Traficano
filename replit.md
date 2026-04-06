@@ -71,6 +71,7 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - **operador**: Data entry, imports, corrections
 
 ### Route Protection
+- `/api/settings/*` → admin only (in-app credential management)
 - `/api/users/*` → admin only
 - `/api/prompts/*` → admin, gerente
 - `/api/audit/*` → admin, gerente
@@ -78,7 +79,7 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `/api/imports/*` → admin, gerente, operador
 - All other routes → any authenticated user
 
-## Database Schema (17 tables)
+## Database Schema (18 tables)
 
 - `users` - Internal users with roles
 - `clients` - Client companies
@@ -98,6 +99,7 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `followup_templates` - Email templates for follow-ups
 - `scheduled_followups` - Scheduled follow-up tasks
 - `goals` - Sales performance goals per vendedor
+- `settings` - Key-value app configuration store (credentials, API keys)
 
 ## Frontend Pages
 
@@ -112,7 +114,7 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `/imports` - CSV import with preview/mapping
 - `/followups` - Follow-up automation dashboard
 - `/goals` - Sales goals management (admin/gerente only)
-- `/gmail` - Gmail OAuth integration
+- `/gmail` - Gmail OAuth integration + in-app credential configuration (admin only)
 - `/prompts` - AI prompt management
 - `/users` - User management (admin only)
 
@@ -130,10 +132,10 @@ Floating action button (bottom-right) on all pages. Allows quick logging of call
 
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Session encryption secret
-- `OPENAI_API_KEY` - For AI email classification and extraction
-- `GMAIL_CLIENT_ID` - For Gmail OAuth integration
-- `GMAIL_CLIENT_SECRET` - For Gmail OAuth integration
-- `GMAIL_REDIRECT_URI` - Gmail OAuth callback URL
+- `OPENAI_API_KEY` - For AI email classification and extraction (can also be set via in-app Settings)
+- `GMAIL_CLIENT_ID` - For Gmail OAuth integration (can also be set via in-app Settings)
+- `GMAIL_CLIENT_SECRET` - For Gmail OAuth integration (can also be set via in-app Settings)
+- `GMAIL_REDIRECT_URI` - Gmail OAuth callback URL (can also be set via in-app Settings)
 
 ## Key API Endpoints
 
@@ -149,6 +151,7 @@ Floating action button (bottom-right) on all pages. Allows quick logging of call
 - `POST /api/imports/execute` - Execute CSV import
 - `POST /api/extractions/extract/:emailId` - AI extract products
 - `GET /api/audit` - Audit logs
+- `GET/POST/DELETE /api/settings` - In-app credential management (admin only)
 
 ## Development Commands
 

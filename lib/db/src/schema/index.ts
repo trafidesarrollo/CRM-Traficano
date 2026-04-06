@@ -13,3 +13,4 @@ export * from "./import_logs";
 export * from "./extractions";
 export * from "./followups";
 export * from "./goals";
+export * from "./settings";

@@ -6,21 +6,26 @@ import { auditAction } from "../lib/audit.js";
 
 const router: IRouter = Router();
 
-const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || "";
-const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET || "";
-const GMAIL_REDIRECT_URI = process.env.GMAIL_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost"}/api/gmail/callback`;
+function getGmailConfig() {
+  return {
+    clientId: process.env.GMAIL_CLIENT_ID || "",
+    clientSecret: process.env.GMAIL_CLIENT_SECRET || "",
+    redirectUri: process.env.GMAIL_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost"}/api/gmail/callback`,
+  };
+}
 
 async function refreshAccessToken(connection: any): Promise<string> {
   if (!connection.refreshToken) {
     throw new Error("No hay refresh token. Reconecte Gmail.");
   }
 
+  const config = getGmailConfig();
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: GMAIL_CLIENT_ID,
-      client_secret: GMAIL_CLIENT_SECRET,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
       refresh_token: connection.refreshToken,
       grant_type: "refresh_token",
     }),
@@ -47,14 +52,15 @@ async function getValidAccessToken(connection: any): Promise<string> {
 }
 
 router.get("/gmail/connect", requireRole("admin", "gerente"), (req, res) => {
-  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
-    res.status(400).json({ error: "Gmail no configurado. Configure GMAIL_CLIENT_ID y GMAIL_CLIENT_SECRET." });
+  const config = getGmailConfig();
+  if (!config.clientId || !config.clientSecret) {
+    res.status(400).json({ error: "Gmail no configurado. Configure GMAIL_CLIENT_ID y GMAIL_CLIENT_SECRET en Configuración." });
     return;
   }
 
   const scope = encodeURIComponent("https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email");
   const userId = (req as any).userId;
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GMAIL_CLIENT_ID}&redirect_uri=${encodeURIComponent(GMAIL_REDIRECT_URI)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${userId}`;
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${userId}`;
   res.json({ authUrl });
 });
 
@@ -66,7 +72,8 @@ router.get("/gmail/callback", async (req, res) => {
       return;
     }
 
-    if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
+    const config = getGmailConfig();
+    if (!config.clientId || !config.clientSecret) {
       res.status(400).json({ error: "Gmail no configurado." });
       return;
     }
@@ -82,9 +89,9 @@ router.get("/gmail/callback", async (req, res) => {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code: code as string,
-        client_id: GMAIL_CLIENT_ID,
-        client_secret: GMAIL_CLIENT_SECRET,
-        redirect_uri: GMAIL_REDIRECT_URI,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        redirect_uri: config.redirectUri,
         grant_type: "authorization_code",
       }),
     });
