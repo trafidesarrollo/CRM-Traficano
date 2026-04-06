@@ -11,24 +11,33 @@ async function handleAnuraWebhook(req: Request, res: Response) {
     source: "anura",
     receivedAt,
     event: body.event,
-    phone: body.phone,
-    externalCallId: body.external_call_id,
+    phone: body.phone || body.callerid,
+    externalCallId: body.external_call_id || body.raw_call_id || body.id,
     bodyKeys: Object.keys(body),
   }, "Anura webhook received");
+
+  const phone = body.phone || body.callerid || null;
+  const toNumber = body.to_number || body.callednumber || null;
+  const externalCallId = body.external_call_id || body.raw_call_id || body.id || null;
+  const agentId = body.agent_id || body.raw_agent_id || body.agentid || null;
+  const duration = body.duration_seconds || body.duration;
+  const recordingUrl = body.recording_mp3_url || body.audio_file_mp3 || null;
+  const occurredAt = body.occurred_at || body.timestamp || null;
+  const rawPayload = body.raw_payload || body;
 
   try {
     await db.insert(anuraWebhooksTable).values({
       event: body.event || null,
-      externalCallId: body.external_call_id || null,
-      phone: body.phone || null,
-      toNumber: body.to_number || null,
+      externalCallId,
+      phone,
+      toNumber,
       direction: body.direction || null,
       status: body.status || null,
-      durationSeconds: body.duration_seconds ? parseInt(body.duration_seconds) : null,
-      agentId: body.agent_id || null,
-      recordingUrl: body.recording_mp3_url || null,
-      occurredAt: body.occurred_at || null,
-      rawPayload: body,
+      durationSeconds: duration ? parseInt(String(duration)) : null,
+      agentId,
+      recordingUrl,
+      occurredAt,
+      rawPayload,
     });
   } catch (err) {
     req.log.error(err, "Error saving Anura webhook to DB");
