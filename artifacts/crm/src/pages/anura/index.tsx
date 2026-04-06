@@ -8,8 +8,9 @@ import {
   Phone, RefreshCw, Clock, Play, PhoneIncoming, PhoneOutgoing,
   PhoneMissed, CheckCircle, XCircle, User, Users, Save
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format, isToday, isYesterday, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -48,11 +49,19 @@ function formatDuration(seconds: number | null): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-function timeAgo(date: string | null) {
-  if (!date) return "-";
-  try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true, locale: es });
-  } catch { return "-"; }
+function getCallDate(wh: AnuraWebhook): Date {
+  const raw = wh.occurredAt || wh.receivedAt;
+  try { return new Date(raw); } catch { return new Date(wh.receivedAt); }
+}
+
+function formatDateLabel(d: Date): string {
+  if (isToday(d)) return "Hoy";
+  if (isYesterday(d)) return "Ayer";
+  return format(d, "EEEE d 'de' MMMM, yyyy", { locale: es });
+}
+
+function formatTime(d: Date): string {
+  return format(d, "HH:mm", { locale: es });
 }
 
 export default function AnuraPage() {
@@ -84,6 +93,26 @@ export default function AnuraPage() {
   }, [fetchWebhooks]);
 
   const selected = webhooks.find(w => w.id === selectedId);
+
+  const groupedByDate = useMemo(() => {
+    const sorted = [...webhooks].sort((a, b) => {
+      const da = getCallDate(a).getTime();
+      const db = getCallDate(b).getTime();
+      return db - da;
+    });
+    const groups: { label: string; dateKey: string; items: AnuraWebhook[] }[] = [];
+    for (const wh of sorted) {
+      const d = getCallDate(wh);
+      const dateKey = format(d, "yyyy-MM-dd");
+      const last = groups[groups.length - 1];
+      if (last && last.dateKey === dateKey) {
+        last.items.push(wh);
+      } else {
+        groups.push({ label: formatDateLabel(d), dateKey, items: [wh] });
+      }
+    }
+    return groups;
+  }, [webhooks]);
 
   const handleAssign = async (field: string, value: any) => {
     if (!selected) return;
@@ -149,59 +178,74 @@ export default function AnuraPage() {
                   <p className="text-xs mt-1">Cuando Anura envíe una llamada, aparece acá.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-border/20">
-                  {webhooks.map(wh => {
-                    const isSelected = selectedId === wh.id;
-                    const statusInfo = STATUS_BADGE[wh.status || ""] || {
-                      label: wh.status || wh.event || "Webhook",
-                      color: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-                    };
-                    const DirectionIcon = wh.direction === "inbound" ? PhoneIncoming : PhoneOutgoing;
+                <div>
+                  {groupedByDate.map(group => (
+                    <div key={group.dateKey}>
+                      <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm px-3 py-2 border-b border-border/30">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          {group.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({group.items.length} {group.items.length === 1 ? "llamada" : "llamadas"})
+                        </span>
+                      </div>
+                      <div className="divide-y divide-border/20">
+                        {group.items.map(wh => {
+                          const isSelected = selectedId === wh.id;
+                          const statusInfo = STATUS_BADGE[wh.status || ""] || {
+                            label: wh.status || wh.event || "Webhook",
+                            color: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+                          };
+                          const DirectionIcon = wh.direction === "inbound" ? PhoneIncoming : PhoneOutgoing;
+                          const callDate = getCallDate(wh);
 
-                    return (
-                      <button
-                        key={wh.id}
-                        onClick={() => setSelectedId(wh.id)}
-                        className={`w-full text-left p-3 transition-colors hover:bg-white/5 ${
-                          isSelected ? "bg-white/10 border-l-2 border-l-primary" : ""
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${wh.direction === "inbound" ? "bg-green-500/10" : "bg-blue-500/10"}`}>
-                            <DirectionIcon className={`w-4 h-4 ${wh.direction === "inbound" ? "text-green-400" : "text-blue-400"}`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm font-medium font-mono">{wh.phone || "Sin número"}</span>
-                              <span className="text-[10px] text-muted-foreground shrink-0">
-                                {timeAgo(wh.receivedAt)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusInfo.color}`}>
-                                {statusInfo.label}
-                              </Badge>
-                              {wh.durationSeconds && wh.durationSeconds > 0 && (
-                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                                  <Clock className="w-3 h-3" /> {formatDuration(wh.durationSeconds)}
-                                </span>
-                              )}
-                              {wh.salespersonId && (
-                                <span className="text-[10px] text-blue-400 flex items-center gap-0.5">
-                                  <User className="w-3 h-3" /> {getSpName(wh.salespersonId)}
-                                </span>
-                              )}
-                              {wh.clientId && (
-                                <span className="text-[10px] text-green-400 flex items-center gap-0.5">
-                                  <Users className="w-3 h-3" /> {getClientName(wh.clientId)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                          return (
+                            <button
+                              key={wh.id}
+                              onClick={() => setSelectedId(wh.id)}
+                              className={`w-full text-left p-3 transition-colors hover:bg-white/5 ${
+                                isSelected ? "bg-white/10 border-l-2 border-l-primary" : ""
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${wh.direction === "inbound" ? "bg-green-500/10" : "bg-blue-500/10"}`}>
+                                  <DirectionIcon className={`w-4 h-4 ${wh.direction === "inbound" ? "text-green-400" : "text-blue-400"}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-medium font-mono">{wh.phone || "Sin número"}</span>
+                                    <span className="text-xs font-mono text-muted-foreground shrink-0">
+                                      {formatTime(callDate)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusInfo.color}`}>
+                                      {statusInfo.label}
+                                    </Badge>
+                                    {wh.durationSeconds && wh.durationSeconds > 0 && (
+                                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                        <Clock className="w-3 h-3" /> {formatDuration(wh.durationSeconds)}
+                                      </span>
+                                    )}
+                                    {wh.salespersonId && (
+                                      <span className="text-[10px] text-blue-400 flex items-center gap-0.5">
+                                        <User className="w-3 h-3" /> {getSpName(wh.salespersonId)}
+                                      </span>
+                                    )}
+                                    {wh.clientId && (
+                                      <span className="text-[10px] text-green-400 flex items-center gap-0.5">
+                                        <Users className="w-3 h-3" /> {getClientName(wh.clientId)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </ScrollArea>
