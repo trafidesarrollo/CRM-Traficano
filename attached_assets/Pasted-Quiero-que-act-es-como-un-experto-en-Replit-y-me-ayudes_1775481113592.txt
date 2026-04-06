@@ -1,0 +1,114 @@
+Quiero que actúes como un **experto en Replit** y me ayudes a integrar **Anura** dentro de **este proyecto actual**, sin inventar otro stack ni darme ejemplos genéricos de Express o Node desde cero.
+
+## Muy importante
+
+* Estoy **haciendo este proyecto en Replit**
+* No quiero ejemplos aislados de `app.post(...)`
+* No quiero que me armes un proyecto nuevo
+* No quiero teoría genérica
+* Quiero que trabajes **sobre la estructura real actual de este proyecto**
+* Quiero que detectes cómo se manejan las rutas/endpoints en este proyecto y que agregues una ruta simple para Anura
+
+## Objetivo
+
+Necesito que mi proyecto acepte requests de Anura usando esta ruta exacta:
+
+```text
+/anura
+```
+
+Quiero que me ayudes a dejarlo listo para que después yo pueda poner esa ruta en Anura.
+
+## Lo que necesito que hagas
+
+### 1. Analizá la estructura real del proyecto
+
+Primero revisá:
+
+* cómo está armado este proyecto en Replit
+* qué archivos controlan las rutas o endpoints
+* si hay backend, server functions, API routes, workflows, deployment config, etc.
+* cuál es el lugar correcto para agregar una ruta pública
+
+No inventes Express si este proyecto no usa eso.
+No supongas Node puro si la estructura es otra.
+Primero inspeccioná el proyecto actual.
+
+### 2. Detectá la URL/ruta correcta
+
+Quiero una ruta pública simple para Anura:
+
+```text
+/anura
+```
+
+Pero antes de implementarla, revisá si en este proyecto:
+
+* las rutas públicas viven bajo `/api/...`
+* o si realmente puede existir `/anura`
+* o si Replit / el framework actual obliga a otra convención
+
+Si `/anura` directo no es posible por la estructura actual, decime la alternativa mínima más cercana, pero primero intentá respetar `/anura`.
+
+### 3. Implementá la ruta dentro del proyecto actual
+
+Quiero que agregues una ruta de webhook pública para Anura que:
+
+* acepte `POST`
+* reciba `application/json`
+* deje logs claros para debug
+* responda `200`
+* no dependa de login ni sesión
+* no rompa el resto del proyecto
+
+### 4. Adaptalo específicamente a Replit
+
+Quiero que verifiques:
+
+* cómo exponer la app correctamente en Replit
+* si necesito Deployment para tener una URL estable
+* cuál va a ser la URL final completa
+* cómo evitar usar una URL temporal/inestable
+* si hace falta tocar configuración de Replit
+
+### 5. Decime exactamente qué poner en Anura
+
+Una vez detectada e implementada la ruta, decime exactamente:
+
+* Host
+* Ruta
+* Puerto
+* Método
+* Content-Type
+* Si requiere auth o no
+
+Yo quiero poder copiar eso directo a Anura.
+
+### 6. Probalo dentro del proyecto
+
+Quiero que hagas una prueba real desde el entorno actual y confirmes:
+
+* qué endpoint quedó disponible
+* qué respuesta devuelve
+* si el body JSON entra bien
+* qué logs debería ver
+
+## Forma de responder
+
+Quiero que trabajes en este orden:
+
+1. analizar la estructura actual del proyecto
+2. identificar dónde se agregan rutas en este proyecto
+3. implementar la ruta pública para Anura
+4. decirme la URL/ruta exacta que tengo que poner en Anura
+5. decirme si necesito Deployment en Replit para que sea estable
+6. mostrarme cómo probarlo
+
+## Repetición importante
+
+No quiero ejemplos genéricos de Express.
+No quiero otro proyecto.
+No quiero teoría abstracta.
+Quiero que trabajes como si estuvieras adentro de este proyecto de Replit y me digas exactamente cómo agregar la ruta para Anura.
+
+Empezá ahora por inspeccionar la estructura actual del proyecto y detectá cómo se manejan las rutas aquí.

@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 
 const router: IRouter = Router();
 
-router.post("/integrations/anura/webhook", async (req: Request, res: Response) => {
+function handleAnuraWebhook(req: Request, res: Response) {
   const receivedAt = new Date().toISOString();
 
   req.log.info({
@@ -21,7 +21,10 @@ router.post("/integrations/anura/webhook", async (req: Request, res: Response) =
     receivedAt,
     message: "Webhook recibido correctamente",
   });
-});
+}
+
+router.post("/anura", handleAnuraWebhook);
+router.post("/integrations/anura/webhook", handleAnuraWebhook);
 
 router.get("/integrations/anura/health", (_req: Request, res: Response) => {
   res.status(200).json({
