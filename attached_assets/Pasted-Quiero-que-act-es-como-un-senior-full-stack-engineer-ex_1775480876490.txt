@@ -1,0 +1,181 @@
+Quiero que actúes como un **senior full-stack engineer experto en Replit Deployments, Node/Express, webhooks e integraciones externas**.
+
+No quiero una explicación genérica de Express desde cero.
+Quiero que me ayudes a **integrar Anura dentro de mi proyecto actual en Replit**, respetando la estructura existente.
+
+## Contexto
+
+Estoy usando **Replit** para correr mi CRM / backend.
+Necesito que **Anura** pueda hacer llamadas HTTP hacia mi app.
+
+En Anura estoy configurando una petición tipo:
+
+* Protocolo: HTTPS
+* Método: POST
+* Tipo de contenido: application/json
+* Ruta: actualmente de prueba, luego puede ser una ruta real de integración
+* Puerto: 443
+
+## Lo que necesito
+
+Quiero que revises y adaptes **mi proyecto actual de Replit** para que pueda recibir correctamente esos requests de Anura.
+
+### Importante
+
+* **No quiero que me armes un server nuevo aislado** si ya tengo uno en el proyecto.
+* **No quiero ejemplos genéricos fuera de contexto**.
+* Quiero que trabajes **sobre mi estructura real existente**.
+* Si mi proyecto ya tiene backend, rutas, server, Vite, Express o cualquier otra estructura, quiero que te adaptes a eso.
+* Si hace falta asumir nombres de archivos, primero detectá cuáles existen y trabajá sobre esos.
+
+---
+
+# Objetivo
+
+Quiero que mi app en Replit pueda:
+
+1. exponer una URL pública válida para Anura
+2. recibir requests POST de Anura
+3. parsear JSON correctamente
+4. responder 200 rápido
+5. dejar logs claros para debug
+6. quedar lista para evolucionar a una integración real
+
+---
+
+# Lo que quiero que hagas
+
+## 1. Primero detectá la estructura actual del proyecto
+
+Quiero que identifiques:
+
+* cuál es el archivo principal del backend
+* cómo levanta el servidor actualmente
+* si usa Express, Vite, server combinado, rutas separadas, etc.
+* dónde conviene agregar una integración tipo webhook sin romper nada
+
+No inventes una estructura nueva si ya existe una.
+
+---
+
+## 2. Decime exactamente qué archivos hay que tocar
+
+Quiero que me indiques:
+
+* archivo principal a modificar
+* si conviene crear un router nuevo para Anura
+* si hay que tocar configuración de Replit o deployment
+* si hay que agregar variables de entorno o no
+
+---
+
+## 3. Implementá una ruta real para Anura dentro del proyecto actual
+
+Quiero una ruta de prueba y luego una ruta más prolija, por ejemplo algo del estilo:
+
+* `/api/integrations/anura/test`
+* o la mejor alternativa según la estructura actual
+
+La ruta debe:
+
+* aceptar POST
+* aceptar application/json
+* loguear headers y body
+* responder 200 con JSON
+* manejar errores de forma prolija
+
+---
+
+## 4. Adaptalo específicamente para Replit
+
+Quiero que verifiques y ajustes:
+
+* uso correcto de `process.env.PORT`
+* escucha en `0.0.0.0` si aplica a mi proyecto
+* compatibilidad con Replit Deployments
+* que no dependa de localhost
+* que funcione con una URL pública estable del deployment
+
+No me expliques Replit en abstracto: adaptalo a mi caso.
+
+---
+
+## 5. Decime exactamente qué tengo que poner en Anura
+
+Una vez implementado, quiero que me digas exactamente:
+
+* qué host poner
+* qué ruta poner
+* qué puerto usar
+* qué método usar
+* qué content type usar
+* si conviene autorización o no en esta primera prueba
+
+---
+
+## 6. Agregá una forma simple de probarlo
+
+Quiero que me dejes:
+
+* endpoint de healthcheck si hace falta
+* ejemplo con curl para testear desde afuera
+* qué logs debería ver si Anura pega bien
+
+---
+
+## 7. Si detectás un problema estructural, corregilo
+
+Por ejemplo:
+
+* si la app actual no expone bien el backend
+* si la URL de Replit que uso no sirve para webhooks
+* si necesito deployment real y no preview
+* si Vite está interceptando rutas
+* si falta middleware JSON
+* si hay un proxy o router mal armado
+
+Quiero que lo señales y propongas la mejor solución concreta.
+
+---
+
+# Forma de responder
+
+Quiero que trabajes en este orden:
+
+### Paso 1
+
+Analizá la estructura actual del proyecto y detectá dónde integrar Anura
+
+### Paso 2
+
+Mostrame los archivos exactos a tocar
+
+### Paso 3
+
+Dame el código adaptado a esos archivos reales
+
+### Paso 4
+
+Decime cómo desplegarlo correctamente en Replit
+
+### Paso 5
+
+Decime cómo configurarlo en Anura
+
+### Paso 6
+
+Dame una checklist final de prueba
+
+---
+
+# Muy importante
+
+No quiero una respuesta genérica del tipo “creá un servidor Express con app.post(...)”.
+
+Quiero que trabajes **como si estuvieras adentro de mi proyecto actual en Replit** y que la integración quede bien hecha sobre esa base.
+
+Si necesitás revisar archivos primero, hacelo.
+Si encontrás una mejor ruta o estructura que `/test`, proponela.
+Priorizá una solución realista, prolija y lista para producción.
+
+Empezá ahora por el **análisis de la estructura actual del proyecto** y después seguí con la implementación.

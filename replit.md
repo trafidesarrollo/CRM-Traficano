@@ -160,6 +160,8 @@ Floating action button (bottom-right) on all pages. Allows quick logging of call
 - `GET /api/conversations/:id` - Conversation detail with messages and events
 - `PATCH /api/conversations/:id` - Update status/priority/assignment
 - `GET /api/conversations/metrics/summary` - Conversation metrics
+- `POST /api/integrations/anura/webhook` - Anura webhook (no auth required)
+- `GET /api/integrations/anura/health` - Anura healthcheck (no auth required)
 
 ## Development Commands
 

@@ -19,12 +19,14 @@ import auditRouter from "./audit.js";
 import goalsRouter from "./goals.js";
 import settingsRouter from "./settings.js";
 import conversationsRouter from "./conversations.js";
+import integrationsRouter from "./integrations.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(integrationsRouter);
 
 router.use(requireAuth);
 
