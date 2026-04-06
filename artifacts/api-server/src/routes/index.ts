@@ -18,6 +18,7 @@ import followupsRouter from "./followups.js";
 import auditRouter from "./audit.js";
 import goalsRouter from "./goals.js";
 import settingsRouter from "./settings.js";
+import conversationsRouter from "./conversations.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -37,6 +38,7 @@ router.use(productsRouter);
 router.use(activitiesRouter);
 
 router.use(gmailRouter);
+router.use(conversationsRouter);
 router.use(importsRouter);
 router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);

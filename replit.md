@@ -79,10 +79,10 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `/api/imports/*` → admin, gerente, operador
 - All other routes → any authenticated user
 
-## Database Schema (18 tables)
+## Database Schema (22 tables)
 
 - `users` - Internal users with roles
-- `clients` - Client companies
+- `clients` - Client companies (with clientEmails JSON array)
 - `contacts` - Client contacts
 - `salespeople` - Salespeople with functionalRole (hunter/farmer/admin_ventas)
 - `products` - Products/measurements catalog
@@ -100,11 +100,15 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `scheduled_followups` - Scheduled follow-up tasks
 - `goals` - Sales performance goals per vendedor
 - `settings` - Key-value app configuration store (credentials, API keys)
+- `conversations` - Gmail thread conversations (inbox comercial)
+- `conversation_messages` - Individual messages within conversations
+- `conversation_events` - Status/assignment change audit trail for conversations
 
 ## Frontend Pages
 
 - `/dashboard` - Dashboard with metrics + commercial plan panels (Hunter/Farmer/Admin) + pipeline funnel
-- `/emails` - Email management with AI classification
+- `/inbox` - Commercial Inbox with conversation threads (Gmail sync), status tabs, search, message detail
+- `/emails` - Email management with AI classification (legacy)
 - `/emails/:id` - Email detail + reply
 - `/opportunities` - List + Kanban views with SLA badges, drag-and-drop
 - `/clients` - Client management
@@ -152,6 +156,10 @@ Floating action button (bottom-right) on all pages. Allows quick logging of call
 - `POST /api/extractions/extract/:emailId` - AI extract products
 - `GET /api/audit` - Audit logs
 - `GET/POST/DELETE /api/settings` - In-app credential management (admin only)
+- `GET /api/conversations` - List conversations with status/priority/search filters
+- `GET /api/conversations/:id` - Conversation detail with messages and events
+- `PATCH /api/conversations/:id` - Update status/priority/assignment
+- `GET /api/conversations/metrics/summary` - Conversation metrics
 
 ## Development Commands
 

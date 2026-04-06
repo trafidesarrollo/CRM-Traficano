@@ -1,0 +1,829 @@
+Quiero que actúes como un **senior full-stack engineer / software architect** y me ayudes a **implementar la Fase 1 completa** del módulo de **Inbox Comercial / Gestión de Emails** de mi CRM B2B industrial argentino, y dejar preparado el camino para las siguientes fases.
+
+## Contexto del producto
+
+Estoy desarrollando un CRM full-stack para una empresa industrial B2B argentina. El problema real a resolver es que hoy usan una casilla compartida tipo `ventas@empresa.com` y el manejo de emails es desordenado: varios responden, no se sabe quién tomó cada consulta, qué quedó pendiente ni cómo hacer seguimiento comercial.
+
+Quiero que Gmail sea solo el canal de entrada, y que el **CRM sea el lugar real donde se trabaja**.
+
+## Objetivo de Fase 1
+
+Quiero construir la base sólida del módulo de Inbox Comercial.
+
+### Esta fase NO debe intentar hacer todo.
+
+En esta fase quiero enfocarme en:
+
+1. **Modelado de datos correcto**
+2. **Sincronización de emails desde Gmail**
+3. **Agrupación por conversación / thread**
+4. **Persistencia robusta evitando duplicados**
+5. **API mínima para listar conversaciones y ver detalle**
+6. **UI mínima funcional para probar el flujo end-to-end**
+
+---
+
+# Concepto central
+
+La unidad principal NO debe ser el email suelto.
+Debe ser la **conversación comercial**, agrupada por `gmailThreadId`.
+
+## Cada conversación debe representar un thread comercial y tener:
+
+* subject
+* gmailThreadId
+* estado inicial
+* prioridad inicial
+* referencia opcional a cliente/contacto/oportunidad
+* fecha del último mensaje
+* cantidad de mensajes
+* último inbound
+* último outbound
+* snippet o preview
+* flags mínimas para UI
+
+## Cada conversación tendrá múltiples mensajes
+
+Y cada mensaje debe guardar:
+
+* gmailMessageId
+* conversationId
+* direction: inbound / outbound
+* from / to / cc
+* subject
+* bodyText
+* bodyHtml
+* hasAttachments
+* receivedAt
+* metadata útil para sync
+
+---
+
+# Lo que quiero que hagas
+
+## 1) Primero, validá la arquitectura mínima de Fase 1
+
+Trabajá con esta idea base:
+
+### Entidades mínimas de Fase 1
+
+* `conversations`
+* `messages`
+* `conversation_events` (mínima, aunque sea básica)
+
+### Estados mínimos para esta fase
+
+No quiero todavía un flujo super complejo. Para arrancar usá algo simple:
+
+* `nuevo`
+* `sin_asignar`
+* `en_gestion`
+* `esperando_cliente`
+* `resuelto`
+* `archivado`
+
+### Prioridades mínimas para esta fase
+
+* `urgente`
+* `alta`
+* `normal`
+* `baja`
+
+### Regla principal
+
+* un `gmailThreadId` debe mapear a **una sola conversación**
+* un `gmailMessageId` no debe duplicarse nunca
+* al sincronizar, si el thread ya existe, se agregan mensajes a la conversación
+* si no existe, se crea la conversación
+
+Quiero que confirmes si esta arquitectura mínima es correcta para arrancar, y si hay algún ajuste importante, proponelo antes de implementar.
+
+---
+
+## 2) Diseñá e implementá el schema Drizzle de Fase 1
+
+Quiero que propongas el schema de Drizzle para PostgreSQL, con:
+
+* enums
+* tablas
+* relaciones
+* índices
+* unique constraints
+
+### Tablas mínimas a crear
+
+#### conversations
+
+Campos sugeridos:
+
+* id
+* gmailThreadId (unique)
+* subject
+* snippet
+* status
+* priority
+* clientId nullable
+* contactId nullable
+* opportunityId nullable
+* assignedToId nullable
+* lastMessageAt nullable
+* lastInboundAt nullable
+* lastOutboundAt nullable
+* firstResponseAt nullable
+* messageCount default 0
+* unreadCount default 0
+* createdAt
+* updatedAt
+
+#### messages
+
+Campos sugeridos:
+
+* id
+* conversationId FK
+* gmailMessageId (unique)
+* direction enum
+* fromEmail
+* fromName nullable
+* toEmails JSON/text[]
+* ccEmails JSON/text[]
+* subject
+* bodyText
+* bodyHtml
+* hasAttachments boolean
+* receivedAt
+* rawHeaders JSON nullable
+* createdAt
+
+#### conversation_events
+
+Campos sugeridos:
+
+* id
+* conversationId FK
+* userId nullable
+* eventType
+* oldValue nullable
+* newValue nullable
+* metadata JSON nullable
+* createdAt
+
+### Requisitos
+
+* tipado prolijo
+* nombres claros
+* consistencia con el proyecto actual
+* si ya existen tablas como clients / contacts / opportunities / users, usar FKs si es razonable
+* si alguna FK complica demasiado la Fase 1, dejarla nullable pero bien preparada
+
+Quiero que me muestres el código completo del schema Drizzle y cualquier archivo nuevo necesario.
+
+---
+
+## 3) Implementá la lógica de sync de Gmail para Fase 1
+
+Quiero que armes una capa de servicio clara para sincronizar emails y convertirlos a conversaciones.
+
+## Reglas funcionales de sync
+
+Para cada mensaje traído desde Gmail:
+
+1. obtener `threadId`
+2. buscar conversación por `gmailThreadId`
+3. si no existe, crearla
+4. verificar si `gmailMessageId` ya existe
+5. si no existe, insertar el mensaje
+6. actualizar `lastMessageAt`, `lastInboundAt`, `lastOutboundAt`, `snippet`, `messageCount`
+7. si es nueva conversación, crear evento inicial
+8. evitar duplicados siempre
+
+## Quiero que propongas una estructura clara tipo:
+
+* `gmail.service.ts`
+* `conversations.service.ts`
+* `sync-email.service.ts`
+  o una variante mejor si lo ves más limpio
+
+## Importante
+
+* si todavía no está lista toda la integración OAuth real, podés dejar la capa preparada y mockear la parte de fetch desde Gmail si hace falta
+* pero la lógica de persistencia y agrupación debe quedar real y bien hecha
+
+## Necesito
+
+* funciones claras
+* manejo de errores
+* operaciones idempotentes
+* comentarios sólo donde sumen
+
+---
+
+## 4) Implementá la API mínima viable
+
+Quiero una API REST básica pero sólida para probar esta fase.
+
+### Endpoints mínimos
+
+#### GET /api/conversations
+
+Debe permitir:
+
+* listar conversaciones
+* ordenadas por último mensaje desc
+* filtros mínimos opcionales:
+
+  * status
+  * priority
+  * assignedToId
+  * search por subject o email
+
+Debe devolver:
+
+* id
+* subject
+* snippet
+* status
+* priority
+* messageCount
+* lastMessageAt
+* lastInboundAt
+* lastOutboundAt
+* email/contacto principal si se puede calcular
+* flags básicas para la UI
+
+#### GET /api/conversations/:id
+
+Debe devolver:
+
+* datos de la conversación
+* mensajes relacionados ordenados por fecha asc
+* eventos básicos
+
+#### POST /api/gmail/sync
+
+Debe:
+
+* disparar sync manual
+* devolver resumen:
+
+  * conversaciones creadas
+  * mensajes creados
+  * duplicados omitidos
+  * errores
+
+## Quiero que incluyas
+
+* rutas
+* controllers
+* services
+* validaciones mínimas
+* tipos de respuesta
+* manejo de errores consistente con Express 5
+
+---
+
+## 5) Implementá una UI mínima funcional para Fase 1
+
+No quiero todavía diseño final súper pulido.
+Quiero una UI mínima pero útil para testear el flujo.
+
+## Necesito una pantalla tipo Inbox básica con 2 columnas:
+
+### Columna izquierda
+
+Lista de conversaciones:
+
+* subject
+* snippet
+* status
+* priority
+* messageCount
+* lastMessageAt
+
+### Columna derecha
+
+Detalle de la conversación seleccionada:
+
+* subject
+* estado/prioridad
+* lista de mensajes ordenados
+* distinguir inbound vs outbound
+* mostrar from / to / fecha / body
+
+## Requisitos UI
+
+* React + TypeScript
+* usar shadcn/ui si suma
+* layout limpio
+* componentes simples
+* sin sobrecomplicar
+* foco en funcionalidad
+* que quede lista para evolucionar a 3 columnas después
+
+## Quiero que propongas:
+
+* archivos/componentes nuevos
+* hooks de fetch
+* tipos frontend
+* estructura de página
+
+---
+
+## 6) Definí claramente qué queda fuera de Fase 1
+
+Quiero que marques explícitamente como **postergado** para siguientes fases:
+
+* asignación manual avanzada
+* cambio de estado desde UI
+* notas internas
+* follow-ups
+* SLA visual avanzado
+* IA de clasificación
+* vinculación automática a cliente/contacto/oportunidad
+* respuesta de emails desde el CRM
+* automatizaciones
+
+No quiero que te disperses implementando eso ahora.
+
+---
+
+## 7) Quiero que trabajes en modo implementación real
+
+No me des sólo teoría.
+
+Quiero que respondas en este orden:
+
+### Paso A
+
+Validación breve de la arquitectura mínima de Fase 1
+
+### Paso B
+
+Schema Drizzle completo
+
+### Paso C
+
+Servicios backend de sync y conversación
+
+### Paso D
+
+Endpoints / controllers / routes
+
+### Paso E
+
+Frontend mínimo funcional
+
+### Paso F
+
+Checklist para probar end-to-end
+
+### Paso G
+
+Qué hacer en Fase 2 inmediatamente después
+
+---
+
+# Criterios importantes
+
+* No rompas el sistema actual
+* Mantené consistencia con el repo existente
+* Si hay archivos existentes que hay que tocar, indicá exactamente cuáles
+* Si hace falta asumir estructura, hacelo de forma razonable y explícitalo
+* Preferí código claro antes que abstracción excesiva
+* Priorizá algo que funcione end-to-end
+* Si hay una decisión técnica mejor que la que propongo, elegila y justificála
+
+---
+
+# Muy importante
+
+No quiero que me respondas con ideas genéricas.
+Quiero que avances como si estuvieras trabajando dentro del proyecto.
+
+## Empezá ahora con:
+
+1. validación breve de Fase 1
+2. schema Drizzle completo
+3. después seguí con backend y frontend
+
+Si la respuesta es muy larga, dividila por bloques/archivos, pero seguí avanzando sin frenar.
+Quiero que actúes como un **senior full-stack engineer / software architect** y me ayudes a **implementar la Fase 1 completa** del módulo de **Inbox Comercial / Gestión de Emails** de mi CRM B2B industrial argentino, y dejar preparado el camino para las siguientes fases.
+
+## Contexto del producto
+
+Estoy desarrollando un CRM full-stack para una empresa industrial B2B argentina. El problema real a resolver es que hoy usan una casilla compartida tipo `ventas@empresa.com` y el manejo de emails es desordenado: varios responden, no se sabe quién tomó cada consulta, qué quedó pendiente ni cómo hacer seguimiento comercial.
+
+Quiero que Gmail sea solo el canal de entrada, y que el **CRM sea el lugar real donde se trabaja**.
+
+## Stack actual
+
+* Monorepo pnpm con TypeScript
+* Frontend: React + Vite + shadcn/ui + Tailwind CSS
+* Backend: Express 5
+* Base de datos: PostgreSQL + Drizzle ORM
+* Auth: express-session + bcryptjs
+* Roles: admin, gerente, vendedor, operador
+* Integración prevista: Gmail OAuth / Gmail API
+* IA disponible más adelante: OpenAI GPT-4o-mini
+
+## Objetivo de Fase 1
+
+Quiero construir la base sólida del módulo de Inbox Comercial.
+
+### Esta fase NO debe intentar hacer todo.
+
+En esta fase quiero enfocarme en:
+
+1. **Modelado de datos correcto**
+2. **Sincronización de emails desde Gmail**
+3. **Agrupación por conversación / thread**
+4. **Persistencia robusta evitando duplicados**
+5. **API mínima para listar conversaciones y ver detalle**
+6. **UI mínima funcional para probar el flujo end-to-end**
+
+---
+
+# Concepto central
+
+La unidad principal NO debe ser el email suelto.
+Debe ser la **conversación comercial**, agrupada por `gmailThreadId`.
+
+## Cada conversación debe representar un thread comercial y tener:
+
+* subject
+* gmailThreadId
+* estado inicial
+* prioridad inicial
+* referencia opcional a cliente/contacto/oportunidad
+* fecha del último mensaje
+* cantidad de mensajes
+* último inbound
+* último outbound
+* snippet o preview
+* flags mínimas para UI
+
+## Cada conversación tendrá múltiples mensajes
+
+Y cada mensaje debe guardar:
+
+* gmailMessageId
+* conversationId
+* direction: inbound / outbound
+* from / to / cc
+* subject
+* bodyText
+* bodyHtml
+* hasAttachments
+* receivedAt
+* metadata útil para sync
+
+---
+
+# Lo que quiero que hagas
+
+## 1) Primero, validá la arquitectura mínima de Fase 1
+
+Trabajá con esta idea base:
+
+### Entidades mínimas de Fase 1
+
+* `conversations`
+* `messages`
+* `conversation_events` (mínima, aunque sea básica)
+
+### Estados mínimos para esta fase
+
+No quiero todavía un flujo super complejo. Para arrancar usá algo simple:
+
+* `nuevo`
+* `sin_asignar`
+* `en_gestion`
+* `esperando_cliente`
+* `resuelto`
+* `archivado`
+
+### Prioridades mínimas para esta fase
+
+* `urgente`
+* `alta`
+* `normal`
+* `baja`
+
+### Regla principal
+
+* un `gmailThreadId` debe mapear a **una sola conversación**
+* un `gmailMessageId` no debe duplicarse nunca
+* al sincronizar, si el thread ya existe, se agregan mensajes a la conversación
+* si no existe, se crea la conversación
+
+Quiero que confirmes si esta arquitectura mínima es correcta para arrancar, y si hay algún ajuste importante, proponelo antes de implementar.
+
+---
+
+## 2) Diseñá e implementá el schema Drizzle de Fase 1
+
+Quiero que propongas el schema de Drizzle para PostgreSQL, con:
+
+* enums
+* tablas
+* relaciones
+* índices
+* unique constraints
+
+### Tablas mínimas a crear
+
+#### conversations
+
+Campos sugeridos:
+
+* id
+* gmailThreadId (unique)
+* subject
+* snippet
+* status
+* priority
+* clientId nullable
+* contactId nullable
+* opportunityId nullable
+* assignedToId nullable
+* lastMessageAt nullable
+* lastInboundAt nullable
+* lastOutboundAt nullable
+* firstResponseAt nullable
+* messageCount default 0
+* unreadCount default 0
+* createdAt
+* updatedAt
+
+#### messages
+
+Campos sugeridos:
+
+* id
+* conversationId FK
+* gmailMessageId (unique)
+* direction enum
+* fromEmail
+* fromName nullable
+* toEmails JSON/text[]
+* ccEmails JSON/text[]
+* subject
+* bodyText
+* bodyHtml
+* hasAttachments boolean
+* receivedAt
+* rawHeaders JSON nullable
+* createdAt
+
+#### conversation_events
+
+Campos sugeridos:
+
+* id
+* conversationId FK
+* userId nullable
+* eventType
+* oldValue nullable
+* newValue nullable
+* metadata JSON nullable
+* createdAt
+
+### Requisitos
+
+* tipado prolijo
+* nombres claros
+* consistencia con el proyecto actual
+* si ya existen tablas como clients / contacts / opportunities / users, usar FKs si es razonable
+* si alguna FK complica demasiado la Fase 1, dejarla nullable pero bien preparada
+
+Quiero que me muestres el código completo del schema Drizzle y cualquier archivo nuevo necesario.
+
+---
+
+## 3) Implementá la lógica de sync de Gmail para Fase 1
+
+Quiero que armes una capa de servicio clara para sincronizar emails y convertirlos a conversaciones.
+
+## Reglas funcionales de sync
+
+Para cada mensaje traído desde Gmail:
+
+1. obtener `threadId`
+2. buscar conversación por `gmailThreadId`
+3. si no existe, crearla
+4. verificar si `gmailMessageId` ya existe
+5. si no existe, insertar el mensaje
+6. actualizar `lastMessageAt`, `lastInboundAt`, `lastOutboundAt`, `snippet`, `messageCount`
+7. si es nueva conversación, crear evento inicial
+8. evitar duplicados siempre
+
+## Quiero que propongas una estructura clara tipo:
+
+* `gmail.service.ts`
+* `conversations.service.ts`
+* `sync-email.service.ts`
+  o una variante mejor si lo ves más limpio
+
+## Importante
+
+* si todavía no está lista toda la integración OAuth real, podés dejar la capa preparada y mockear la parte de fetch desde Gmail si hace falta
+* pero la lógica de persistencia y agrupación debe quedar real y bien hecha
+
+## Necesito
+
+* funciones claras
+* manejo de errores
+* operaciones idempotentes
+* comentarios sólo donde sumen
+
+---
+
+## 4) Implementá la API mínima viable
+
+Quiero una API REST básica pero sólida para probar esta fase.
+
+### Endpoints mínimos
+
+#### GET /api/conversations
+
+Debe permitir:
+
+* listar conversaciones
+* ordenadas por último mensaje desc
+* filtros mínimos opcionales:
+
+  * status
+  * priority
+  * assignedToId
+  * search por subject o email
+
+Debe devolver:
+
+* id
+* subject
+* snippet
+* status
+* priority
+* messageCount
+* lastMessageAt
+* lastInboundAt
+* lastOutboundAt
+* email/contacto principal si se puede calcular
+* flags básicas para la UI
+
+#### GET /api/conversations/:id
+
+Debe devolver:
+
+* datos de la conversación
+* mensajes relacionados ordenados por fecha asc
+* eventos básicos
+
+#### POST /api/gmail/sync
+
+Debe:
+
+* disparar sync manual
+* devolver resumen:
+
+  * conversaciones creadas
+  * mensajes creados
+  * duplicados omitidos
+  * errores
+
+## Quiero que incluyas
+
+* rutas
+* controllers
+* services
+* validaciones mínimas
+* tipos de respuesta
+* manejo de errores consistente con Express 5
+
+---
+
+## 5) Implementá una UI mínima funcional para Fase 1
+
+No quiero todavía diseño final súper pulido.
+Quiero una UI mínima pero útil para testear el flujo.
+
+## Necesito una pantalla tipo Inbox básica con 2 columnas:
+
+### Columna izquierda
+
+Lista de conversaciones:
+
+* subject
+* snippet
+* status
+* priority
+* messageCount
+* lastMessageAt
+
+### Columna derecha
+
+Detalle de la conversación seleccionada:
+
+* subject
+* estado/prioridad
+* lista de mensajes ordenados
+* distinguir inbound vs outbound
+* mostrar from / to / fecha / body
+
+## Requisitos UI
+
+* React + TypeScript
+* usar shadcn/ui si suma
+* layout limpio
+* componentes simples
+* sin sobrecomplicar
+* foco en funcionalidad
+* que quede lista para evolucionar a 3 columnas después
+
+## Quiero que propongas:
+
+* archivos/componentes nuevos
+* hooks de fetch
+* tipos frontend
+* estructura de página
+
+---
+
+## 6) Definí claramente qué queda fuera de Fase 1
+
+Quiero que marques explícitamente como **postergado** para siguientes fases:
+
+* asignación manual avanzada
+* cambio de estado desde UI
+* notas internas
+* follow-ups
+* SLA visual avanzado
+* IA de clasificación
+* vinculación automática a cliente/contacto/oportunidad
+* respuesta de emails desde el CRM
+* automatizaciones
+
+No quiero que te disperses implementando eso ahora.
+
+---
+
+## 7) Quiero que trabajes en modo implementación real
+
+No me des sólo teoría.
+
+Quiero que respondas en este orden:
+
+### Paso A
+
+Validación breve de la arquitectura mínima de Fase 1
+
+### Paso B
+
+Schema Drizzle completo
+
+### Paso C
+
+Servicios backend de sync y conversación
+
+### Paso D
+
+Endpoints / controllers / routes
+
+### Paso E
+
+Frontend mínimo funcional
+
+### Paso F
+
+Checklist para probar end-to-end
+
+### Paso G
+
+Qué hacer en Fase 2 inmediatamente después
+
+---
+
+# Criterios importantes
+
+* No rompas el sistema actual
+* Mantené consistencia con el repo existente
+* Si hay archivos existentes que hay que tocar, indicá exactamente cuáles
+* Si hace falta asumir estructura, hacelo de forma razonable y explícitalo
+* Preferí código claro antes que abstracción excesiva
+* Priorizá algo que funcione end-to-end
+* Si hay una decisión técnica mejor que la que propongo, elegila y justificála
+
+---
+
+# Muy importante
+
+No quiero que me respondas con ideas genéricas.
+Quiero que avances como si estuvieras trabajando dentro del proyecto.
+
+## Empezá ahora con:
+
+1. validación breve de Fase 1
+2. schema Drizzle completo
+3. después seguí con backend y frontend
+
+Si la respuesta es muy larga, dividila por bloques/archivos, pero seguí avanzando sin frenar.

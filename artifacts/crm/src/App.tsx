@@ -20,6 +20,7 @@ import Prompts from "@/pages/prompts/index";
 import UsersPage from "@/pages/users/index";
 import Followups from "@/pages/followups/index";
 import GoalsPage from "@/pages/goals/index";
+import InboxComercial from "@/pages/inbox/index";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,8 @@ function Router() {
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/login" component={Login} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
+
+      <Route path="/inbox" component={() => <ProtectedRoute component={InboxComercial} />} />
 
       <Route path="/emails" component={() => <ProtectedRoute component={Emails} />} />
       <Route path="/emails/:id" component={() => <ProtectedRoute component={EmailDetail} />} />

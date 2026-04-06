@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { 
   LayoutDashboard, Inbox, Briefcase, Users, Contact2, UserSquare, 
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
-  Target, Plus, PhoneCall
+  Target, Plus, PhoneCall, MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -20,7 +20,8 @@ const API_BASE = import.meta.env.VITE_API_URL || "";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/emails", label: "Emails", icon: Inbox },
+  { href: "/inbox", label: "Inbox Comercial", icon: MessageSquare },
+  { href: "/emails", label: "Emails (legacy)", icon: Inbox },
   { href: "/opportunities", label: "Oportunidades", icon: Briefcase },
   { href: "/clients", label: "Clientes", icon: Users },
   { href: "/contacts", label: "Contactos", icon: Contact2 },

@@ -201,11 +201,20 @@ router.post("/gmail/sync", async (req, res) => {
 
     try {
       const { syncGmailMessages } = await import("../lib/gmail.js");
-      const result = await syncGmailMessages(accessToken, connections[0].email, userId, {
-        maxResults,
-        query,
-        pageToken: req.body.pageToken,
-      });
+      const { syncGmailToConversations } = await import("../lib/conversation-sync.js");
+
+      const [result, convResult] = await Promise.all([
+        syncGmailMessages(accessToken, connections[0].email, userId, {
+          maxResults,
+          query,
+          pageToken: req.body.pageToken,
+        }),
+        syncGmailToConversations(accessToken, connections[0].email, {
+          maxResults,
+          query,
+          pageToken: req.body.pageToken,
+        }),
+      ]);
 
       const updateData: any = {
         lastSyncAt: new Date(),
@@ -225,6 +234,11 @@ router.post("/gmail/sync", async (req, res) => {
         classified: result.classified,
         errors: result.errors,
         skipped: result.skipped,
+        conversations: {
+          created: convResult.conversationsCreated,
+          updated: convResult.conversationsUpdated,
+          messages: convResult.messagesCreated,
+        },
       });
 
       res.json({
@@ -232,8 +246,13 @@ router.post("/gmail/sync", async (req, res) => {
         classified: result.classified,
         errors: result.errors,
         skipped: result.skipped,
+        conversations: {
+          created: convResult.conversationsCreated,
+          updated: convResult.conversationsUpdated,
+          messages: convResult.messagesCreated,
+        },
         nextPageToken: result.nextPageToken,
-        message: `Sincronización completada: ${result.synced} nuevos emails, ${result.skipped} ya existentes`,
+        message: `Sincronización completada: ${result.synced} emails, ${convResult.conversationsCreated} conversaciones nuevas`,
       });
     } catch (syncErr: any) {
       req.log.error(syncErr, "Gmail sync failed");
@@ -242,7 +261,12 @@ router.post("/gmail/sync", async (req, res) => {
         try {
           accessToken = await refreshAccessToken(connections[0]);
           const { syncGmailMessages } = await import("../lib/gmail.js");
-          const result = await syncGmailMessages(accessToken, connections[0].email, userId, { maxResults, query });
+          const { syncGmailToConversations } = await import("../lib/conversation-sync.js");
+
+          const [result, convResult] = await Promise.all([
+            syncGmailMessages(accessToken, connections[0].email, userId, { maxResults, query }),
+            syncGmailToConversations(accessToken, connections[0].email, { maxResults, query }),
+          ]);
 
           await db.update(gmailConnectionsTable)
             .set({ lastSyncAt: new Date(), syncStatus: "idle", syncError: null })
@@ -253,7 +277,12 @@ router.post("/gmail/sync", async (req, res) => {
             classified: result.classified,
             errors: result.errors,
             skipped: result.skipped,
-            message: `Sincronización completada (token renovado): ${result.synced} nuevos emails`,
+            conversations: {
+              created: convResult.conversationsCreated,
+              updated: convResult.conversationsUpdated,
+              messages: convResult.messagesCreated,
+            },
+            message: `Sincronización completada (token renovado): ${result.synced} emails, ${convResult.conversationsCreated} conversaciones`,
           });
           return;
         } catch (retryErr: any) {
