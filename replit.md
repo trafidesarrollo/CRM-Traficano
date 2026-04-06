@@ -79,7 +79,7 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `/api/imports/*` → admin, gerente, operador
 - All other routes → any authenticated user
 
-## Database Schema (22 tables)
+## Database Schema (23 tables)
 
 - `users` - Internal users with roles
 - `clients` - Client companies (with clientEmails JSON array)
@@ -103,6 +103,7 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `conversations` - Gmail thread conversations (inbox comercial)
 - `conversation_messages` - Individual messages within conversations
 - `conversation_events` - Status/assignment change audit trail for conversations
+- `anura_webhooks` - Anura telephony webhook events (calls received/made)
 
 ## Frontend Pages
 
@@ -119,6 +120,7 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `/followups` - Follow-up automation dashboard
 - `/goals` - Sales goals management (admin/gerente only)
 - `/gmail` - Gmail OAuth integration + in-app credential configuration (admin only)
+- `/anura` - Anura telephony webhooks viewer (call list + detail with recording playback)
 - `/prompts` - AI prompt management
 - `/users` - User management (admin only)
 

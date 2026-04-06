@@ -21,6 +21,7 @@ import UsersPage from "@/pages/users/index";
 import Followups from "@/pages/followups/index";
 import GoalsPage from "@/pages/goals/index";
 import InboxComercial from "@/pages/inbox/index";
+import AnuraPage from "@/pages/anura/index";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/products" component={() => <ProtectedRoute component={Products} />} />
       <Route path="/imports" component={() => <ProtectedRoute component={Imports} />} />
       <Route path="/gmail" component={() => <ProtectedRoute component={Gmail} />} />
+      <Route path="/anura" component={() => <ProtectedRoute component={AnuraPage} />} />
       <Route path="/followups" component={() => <ProtectedRoute component={Followups} />} />
       <Route path="/goals" component={() => <ProtectedRoute component={GoalsPage} />} />
       <Route path="/prompts" component={() => <ProtectedRoute component={Prompts} />} />

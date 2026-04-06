@@ -30,6 +30,18 @@ router.use(integrationsRouter);
 
 router.use(requireAuth);
 
+router.get("/integrations/anura/webhooks", async (req, res) => {
+  const { db: database, anuraWebhooksTable } = await import("@workspace/db");
+  const { desc, sql } = await import("drizzle-orm");
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+  const [data, countResult] = await Promise.all([
+    database.select().from(anuraWebhooksTable).orderBy(desc(anuraWebhooksTable.receivedAt)).limit(limit).offset(offset),
+    database.select({ count: sql<number>`count(*)` }).from(anuraWebhooksTable),
+  ]);
+  res.json({ data, total: Number(countResult[0].count) });
+});
+
 router.use(dashboardRouter);
 router.use(emailsRouter);
 router.use(opportunitiesRouter);

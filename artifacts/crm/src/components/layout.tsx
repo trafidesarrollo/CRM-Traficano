@@ -31,6 +31,7 @@ const navItems = [
   { href: "/followups", label: "Seguimientos", icon: Timer },
   { href: "/goals", label: "Metas", icon: Target, roles: ["admin", "gerente"] },
   { href: "/gmail", label: "Gmail Sync", icon: Mail },
+  { href: "/anura", label: "Anura Llamadas", icon: PhoneCall },
   { href: "/prompts", label: "Prompts IA", icon: Bot },
   { href: "/users", label: "Usuarios", icon: Settings, roles: ["admin"] },
 ];
