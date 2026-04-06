@@ -164,6 +164,9 @@ Floating action button (bottom-right) on all pages. Allows quick logging of call
 - `GET /api/conversations/metrics/summary` - Conversation metrics
 - `POST /api/integrations/anura/webhook` - Anura webhook (no auth required)
 - `GET /api/integrations/anura/health` - Anura healthcheck (no auth required)
+- `GET /api/integrations/anura/webhooks` - List Anura call webhooks (auth required)
+- `PATCH /api/integrations/anura/webhooks/:id` - Assign clientId/salespersonId/notes to a call
+- `GET /api/salespeople/:id/profile` - Salesperson profile with calls, activities, stats
 
 ## Development Commands
 

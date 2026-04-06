@@ -3,12 +3,14 @@ import { AppLayout } from "@/components/layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Phone, RefreshCw, Clock, ArrowDownLeft, ArrowUpRight,
-  Play, PhoneIncoming, PhoneOutgoing, PhoneMissed, CheckCircle, XCircle
+  Phone, RefreshCw, Clock, Play, PhoneIncoming, PhoneOutgoing,
+  PhoneMissed, CheckCircle, XCircle, User, Users, Save
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -25,15 +27,18 @@ interface AnuraWebhook {
   recordingUrl: string | null;
   occurredAt: string | null;
   rawPayload: any;
+  clientId: number | null;
+  salespersonId: number | null;
+  notes: string | null;
   receivedAt: string;
 }
 
-const STATUS_BADGE: Record<string, { label: string; color: string; icon: any }> = {
-  answered: { label: "Contestada", color: "bg-green-500/10 text-green-400 border-green-500/20", icon: CheckCircle },
-  missed: { label: "Perdida", color: "bg-red-500/10 text-red-400 border-red-500/20", icon: PhoneMissed },
-  busy: { label: "Ocupado", color: "bg-orange-500/10 text-orange-400 border-orange-500/20", icon: XCircle },
-  no_answer: { label: "Sin respuesta", color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20", icon: PhoneMissed },
-  failed: { label: "Fallida", color: "bg-red-500/10 text-red-400 border-red-500/20", icon: XCircle },
+const STATUS_BADGE: Record<string, { label: string; color: string }> = {
+  answered: { label: "Contestada", color: "bg-green-500/10 text-green-400 border-green-500/20" },
+  missed: { label: "Perdida", color: "bg-red-500/10 text-red-400 border-red-500/20" },
+  busy: { label: "Ocupado", color: "bg-orange-500/10 text-orange-400 border-orange-500/20" },
+  no_answer: { label: "Sin respuesta", color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" },
+  failed: { label: "Fallida", color: "bg-red-500/10 text-red-400 border-red-500/20" },
 };
 
 function formatDuration(seconds: number | null): string {
@@ -47,16 +52,18 @@ function timeAgo(date: string | null) {
   if (!date) return "-";
   try {
     return formatDistanceToNow(new Date(date), { addSuffix: true, locale: es });
-  } catch {
-    return "-";
-  }
+  } catch { return "-"; }
 }
 
 export default function AnuraPage() {
+  const { toast } = useToast();
   const [webhooks, setWebhooks] = useState<AnuraWebhook[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [clients, setClients] = useState<any[]>([]);
+  const [salespeople, setSalespeople] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const fetchWebhooks = useCallback(async () => {
     setLoading(true);
@@ -70,9 +77,45 @@ export default function AnuraPage() {
     } catch {} finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchWebhooks(); }, [fetchWebhooks]);
+  useEffect(() => {
+    fetchWebhooks();
+    fetch(`${API_BASE}/api/clients`, { credentials: "include" }).then(r => r.json()).then(d => setClients(d.data || d || [])).catch(() => {});
+    fetch(`${API_BASE}/api/salespeople`, { credentials: "include" }).then(r => r.json()).then(d => setSalespeople(Array.isArray(d) ? d : d.data || [])).catch(() => {});
+  }, [fetchWebhooks]);
 
   const selected = webhooks.find(w => w.id === selectedId);
+
+  const handleAssign = async (field: string, value: any) => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/integrations/anura/webhooks/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ [field]: value || null }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setWebhooks(prev => prev.map(w => w.id === updated.id ? updated : w));
+        toast({ title: "Asignación guardada" });
+      }
+    } catch {
+      toast({ title: "Error al guardar", variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  const getClientName = (id: number | null) => {
+    if (!id) return null;
+    const c = clients.find((c: any) => c.id === id);
+    return c?.name || c?.companyName || `#${id}`;
+  };
+
+  const getSpName = (id: number | null) => {
+    if (!id) return null;
+    const s = salespeople.find((s: any) => s.id === id);
+    return s?.name || `#${id}`;
+  };
 
   return (
     <AppLayout>
@@ -112,7 +155,6 @@ export default function AnuraPage() {
                     const statusInfo = STATUS_BADGE[wh.status || ""] || {
                       label: wh.status || wh.event || "Webhook",
                       color: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-                      icon: Phone,
                     };
                     const DirectionIcon = wh.direction === "inbound" ? PhoneIncoming : PhoneOutgoing;
 
@@ -135,7 +177,7 @@ export default function AnuraPage() {
                                 {timeAgo(wh.receivedAt)}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusInfo.color}`}>
                                 {statusInfo.label}
                               </Badge>
@@ -144,8 +186,15 @@ export default function AnuraPage() {
                                   <Clock className="w-3 h-3" /> {formatDuration(wh.durationSeconds)}
                                 </span>
                               )}
-                              {wh.event && (
-                                <span className="text-[10px] text-muted-foreground">{wh.event}</span>
+                              {wh.salespersonId && (
+                                <span className="text-[10px] text-blue-400 flex items-center gap-0.5">
+                                  <User className="w-3 h-3" /> {getSpName(wh.salespersonId)}
+                                </span>
+                              )}
+                              {wh.clientId && (
+                                <span className="text-[10px] text-green-400 flex items-center gap-0.5">
+                                  <Users className="w-3 h-3" /> {getClientName(wh.clientId)}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -187,14 +236,52 @@ export default function AnuraPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <InfoField label="Teléfono origen" value={selected.phone} />
                     <InfoField label="Teléfono destino" value={selected.toNumber} />
-                    <InfoField label="Estado" value={
-                      STATUS_BADGE[selected.status || ""]?.label || selected.status
-                    } />
+                    <InfoField label="Estado" value={STATUS_BADGE[selected.status || ""]?.label || selected.status} />
                     <InfoField label="Duración" value={formatDuration(selected.durationSeconds)} />
                     <InfoField label="Evento" value={selected.event} />
                     <InfoField label="ID llamada" value={selected.externalCallId} />
-                    <InfoField label="Agente" value={selected.agentId} />
+                    <InfoField label="Agente Anura" value={selected.agentId} />
                     <InfoField label="Ocurrió" value={selected.occurredAt} />
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-4 border border-border/30 space-y-4">
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <Save className="w-4 h-4" /> Asignar a vendedor y cliente
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Vendedor</p>
+                        <Select
+                          value={selected.salespersonId?.toString() || "none"}
+                          onValueChange={(v) => handleAssign("salespersonId", v === "none" ? null : parseInt(v))}
+                          disabled={saving}
+                        >
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sin asignar</SelectItem>
+                            {salespeople.map((sp: any) => (
+                              <SelectItem key={sp.id} value={sp.id.toString()}>{sp.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Cliente</p>
+                        <Select
+                          value={selected.clientId?.toString() || "none"}
+                          onValueChange={(v) => handleAssign("clientId", v === "none" ? null : parseInt(v))}
+                          disabled={saving}
+                        >
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sin asignar</SelectItem>
+                            {clients.map((c: any) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>{c.name || c.companyName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
 
                   {selected.recordingUrl && (
@@ -205,12 +292,7 @@ export default function AnuraPage() {
                       <audio controls className="w-full" src={selected.recordingUrl}>
                         Tu navegador no soporta audio.
                       </audio>
-                      <a
-                        href={selected.recordingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline mt-2 inline-block"
-                      >
+                      <a href={selected.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-2 inline-block">
                         Abrir MP3 en nueva pestaña
                       </a>
                     </div>

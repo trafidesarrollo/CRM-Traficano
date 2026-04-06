@@ -13,5 +13,8 @@ export const anuraWebhooksTable = pgTable("anura_webhooks", {
   recordingUrl: text("recording_url"),
   occurredAt: text("occurred_at"),
   rawPayload: json("raw_payload").notNull(),
+  clientId: integer("client_id"),
+  salespersonId: integer("salesperson_id"),
+  notes: text("notes"),
   receivedAt: timestamp("received_at").defaultNow().notNull(),
 });

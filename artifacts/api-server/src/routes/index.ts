@@ -42,6 +42,66 @@ router.get("/integrations/anura/webhooks", async (req, res) => {
   res.json({ data, total: Number(countResult[0].count) });
 });
 
+router.patch("/integrations/anura/webhooks/:id", async (req, res) => {
+  const { db: database, anuraWebhooksTable } = await import("@workspace/db");
+  const { eq } = await import("drizzle-orm");
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const { clientId, salespersonId, notes } = req.body;
+  const updates: any = {};
+  if (clientId !== undefined) {
+    if (clientId !== null && (typeof clientId !== "number" || isNaN(clientId))) { res.status(400).json({ error: "clientId debe ser un número o null" }); return; }
+    updates.clientId = clientId || null;
+  }
+  if (salespersonId !== undefined) {
+    if (salespersonId !== null && (typeof salespersonId !== "number" || isNaN(salespersonId))) { res.status(400).json({ error: "salespersonId debe ser un número o null" }); return; }
+    updates.salespersonId = salespersonId || null;
+  }
+  if (notes !== undefined) {
+    if (notes !== null && typeof notes !== "string") { res.status(400).json({ error: "notes debe ser un string o null" }); return; }
+    updates.notes = notes || null;
+  }
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "No se enviaron campos para actualizar" }); return; }
+  const [updated] = await database.update(anuraWebhooksTable).set(updates).where(eq(anuraWebhooksTable.id, id)).returning();
+  if (!updated) { res.status(404).json({ error: "Webhook no encontrado" }); return; }
+  res.json(updated);
+});
+
+router.get("/salespeople/:id/profile", async (req, res) => {
+  const { db: database, salespeopleTable, activitiesTable, anuraWebhooksTable, emailsTable } = await import("@workspace/db");
+  const { eq, desc, sql } = await import("drizzle-orm");
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+
+  const [sp] = await database.select().from(salespeopleTable).where(eq(salespeopleTable.id, id)).limit(1);
+  if (!sp) { res.status(404).json({ error: "Vendedor no encontrado" }); return; }
+
+  const [calls, activities, emailCount, callStats, activityCount] = await Promise.all([
+    database.select().from(anuraWebhooksTable).where(eq(anuraWebhooksTable.salespersonId, id)).orderBy(desc(anuraWebhooksTable.receivedAt)).limit(20),
+    database.select().from(activitiesTable).where(eq(activitiesTable.salespersonId, id)).orderBy(desc(activitiesTable.createdAt)).limit(20),
+    database.select({ count: sql<number>`count(*)` }).from(activitiesTable).where(sql`${activitiesTable.salespersonId} = ${id} AND ${activitiesTable.type} = 'email'`),
+    database.select({
+      total: sql<number>`count(*)`,
+      answered: sql<number>`count(*) filter (where status = 'answered')`,
+      totalDuration: sql<number>`coalesce(sum(duration_seconds), 0)`,
+    }).from(anuraWebhooksTable).where(eq(anuraWebhooksTable.salespersonId, id)),
+    database.select({ count: sql<number>`count(*)` }).from(activitiesTable).where(eq(activitiesTable.salespersonId, id)),
+  ]);
+
+  res.json({
+    salesperson: sp,
+    calls,
+    activities,
+    stats: {
+      totalCalls: Number(callStats[0]?.total || 0),
+      answeredCalls: Number(callStats[0]?.answered || 0),
+      totalCallDuration: Number(callStats[0]?.totalDuration || 0),
+      totalEmails: Number(emailCount[0]?.count || 0),
+      totalActivities: Number(activityCount[0]?.count || 0),
+    },
+  });
+});
+
 router.use(dashboardRouter);
 router.use(emailsRouter);
 router.use(opportunitiesRouter);

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useGetSalespeople, useCreateSalesperson, useDeleteSalesperson } from "@workspace/api-client-react";
-import { Plus, Search, Trash2, Mail, Phone, Eye, Activity } from "lucide-react";
+import { Plus, Search, Trash2, Mail, Phone, Eye, Activity, PhoneIncoming, PhoneOutgoing, Clock, CheckCircle, PhoneMissed } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getFunctionalRoleLabel, getFunctionalRoleColor, getOppStatusLabel } from "@/lib/translations";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -27,6 +29,9 @@ export default function Salespeople() {
   const [panelData, setPanelData] = useState<any>(null);
   const [panelActivities, setPanelActivities] = useState<any[]>([]);
   const [panelOpps, setPanelOpps] = useState<any[]>([]);
+  const [panelCalls, setPanelCalls] = useState<any[]>([]);
+  const [panelStats, setPanelStats] = useState<any>(null);
+  const [panelTab, setPanelTab] = useState("metrics");
 
   const { data: salespeople, isLoading, refetch } = useGetSalespeople();
   const createMut = useCreateSalesperson({
@@ -63,14 +68,18 @@ export default function Salespeople() {
 
   const openPanel = async (sp: any) => {
     setPanelSp(sp);
+    setPanelTab("metrics");
     try {
-      const [cpRes, actRes, oppsRes] = await Promise.all([
+      const [cpRes, actRes, oppsRes, profileRes] = await Promise.all([
         fetch(`${API_BASE}/api/dashboard/commercial-plan`, { credentials: "include" }).then(r => r.json()),
         fetch(`${API_BASE}/api/activities?salespersonId=${sp.id}`, { credentials: "include" }).then(r => r.json()),
         fetch(`${API_BASE}/api/opportunities?hunterId=${sp.id}&limit=50`, { credentials: "include" }).then(r => r.json()),
+        fetch(`${API_BASE}/api/salespeople/${sp.id}/profile`, { credentials: "include" }).then(r => r.json()),
       ]);
       setPanelData(cpRes);
-      setPanelActivities(Array.isArray(actRes) ? actRes.slice(-10).reverse() : []);
+      setPanelActivities(Array.isArray(actRes) ? actRes.slice(-15).reverse() : []);
+      setPanelCalls(profileRes.calls || []);
+      setPanelStats(profileRes.stats || null);
       const farmerOpps = await fetch(`${API_BASE}/api/opportunities?farmerId=${sp.id}&limit=50`, { credentials: "include" }).then(r => r.json());
       const allOpps = [...(oppsRes.data || []), ...(farmerOpps.data || [])];
       const uniqueOpps = Array.from(new Map(allOpps.map((o: any) => [o.id, o])).values());
@@ -212,144 +221,261 @@ export default function Salespeople() {
       )}
 
       <Sheet open={!!panelSp} onOpenChange={(v) => { if (!v) setPanelSp(null); }}>
-        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{panelSp?.name}</SheetTitle>
-          </SheetHeader>
+        <SheetContent className="w-[480px] sm:w-[600px] p-0 overflow-hidden flex flex-col">
+          <div className="p-6 pb-4 border-b border-border/30 shrink-0">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                  {panelSp?.name?.charAt(0)}
+                </div>
+                <div>
+                  <span>{panelSp?.name}</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant="outline" className={getFunctionalRoleColor(panelSp?.functionalRole)}>
+                      {getFunctionalRoleLabel(panelSp?.functionalRole)}
+                    </Badge>
+                    {panelSp?.email && <span className="text-xs text-muted-foreground font-normal">{panelSp.email}</span>}
+                  </div>
+                </div>
+              </SheetTitle>
+            </SheetHeader>
+
+            {panelStats && (
+              <div className="grid grid-cols-4 gap-3 mt-4">
+                <div className="p-2.5 bg-white/5 rounded-lg text-center">
+                  <p className="text-lg font-bold">{panelStats.totalCalls}</p>
+                  <p className="text-[10px] text-muted-foreground">Llamadas</p>
+                </div>
+                <div className="p-2.5 bg-white/5 rounded-lg text-center">
+                  <p className="text-lg font-bold">{panelStats.answeredCalls}</p>
+                  <p className="text-[10px] text-muted-foreground">Contestadas</p>
+                </div>
+                <div className="p-2.5 bg-white/5 rounded-lg text-center">
+                  <p className="text-lg font-bold">{panelStats.totalEmails}</p>
+                  <p className="text-[10px] text-muted-foreground">Emails</p>
+                </div>
+                <div className="p-2.5 bg-white/5 rounded-lg text-center">
+                  <p className="text-lg font-bold">{panelStats.totalActivities}</p>
+                  <p className="text-[10px] text-muted-foreground">Actividades</p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {panelSp && (
-            <div className="mt-6 space-y-6">
-              <div>
-                <Badge variant="outline" className={getFunctionalRoleColor(panelSp.functionalRole)}>
-                  {getFunctionalRoleLabel(panelSp.functionalRole)}
-                </Badge>
-              </div>
+            <Tabs value={panelTab} onValueChange={setPanelTab} className="flex-1 flex flex-col min-h-0">
+              <TabsList className="mx-6 mt-3 shrink-0">
+                <TabsTrigger value="metrics">Métricas</TabsTrigger>
+                <TabsTrigger value="calls">Llamadas</TabsTrigger>
+                <TabsTrigger value="activities">Actividades</TabsTrigger>
+                <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
+              </TabsList>
 
-              {(() => {
-                const metrics = getPanelMetrics();
-                if (!metrics) return <p className="text-sm text-muted-foreground">Asigná un rol funcional para ver métricas.</p>;
-                
-                if (panelSp.functionalRole === "hunter") return (
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold">Métricas Hunter</h4>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Llamadas esta semana</span>
-                        <span>{metrics.callsThisWeek} / {metrics.callsWeekTarget}</span>
-                      </div>
-                      <Progress value={Math.min((metrics.callsThisWeek / metrics.callsWeekTarget) * 100, 100)} />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Reuniones este mes</span>
-                        <span>{metrics.meetingsThisMonth} / {metrics.meetingsMonthTarget}</span>
-                      </div>
-                      <Progress value={Math.min((metrics.meetingsThisMonth / metrics.meetingsMonthTarget) * 100, 100)} />
-                    </div>
-                    <div className="p-3 bg-white/5 rounded-lg">
-                      <p className="text-2xl font-bold">{metrics.leadsGeneratedThisMonth}</p>
-                      <p className="text-xs text-muted-foreground">Leads generados este mes</p>
-                    </div>
-                  </div>
-                );
-
-                if (panelSp.functionalRole === "farmer") return (
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold">Métricas Farmer</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className={`p-3 rounded-lg ${metrics.leadsAwaitingResponse === 0 ? "bg-green-500/10" : metrics.leadsAwaitingResponse <= 2 ? "bg-yellow-500/10" : "bg-red-500/10"}`}>
-                        <p className="text-2xl font-bold">{metrics.leadsAwaitingResponse}</p>
-                        <p className="text-xs text-muted-foreground">Leads sin responder (&gt;2h)</p>
-                      </div>
-                      <div className="p-3 bg-white/5 rounded-lg">
-                        <p className="text-2xl font-bold">{metrics.avgResponseTimeHours}h</p>
-                        <p className="text-xs text-muted-foreground">Tiempo respuesta prom.</p>
-                      </div>
-                      <div className="p-3 bg-white/5 rounded-lg">
-                        <p className="text-2xl font-bold">{metrics.closeRate}%</p>
-                        <p className="text-xs text-muted-foreground">Tasa de cierre</p>
-                      </div>
-                      <div className={`p-3 rounded-lg ${metrics.staleOpportunities > 0 ? "bg-red-500/10" : "bg-white/5"}`}>
-                        <p className="text-2xl font-bold">{metrics.staleOpportunities}</p>
-                        <p className="text-xs text-muted-foreground">Sin actividad 3+ días</p>
-                      </div>
-                    </div>
-                    <div className="p-3 bg-white/5 rounded-lg">
-                      <p className="text-lg font-bold">{metrics.activeOpportunities}</p>
-                      <p className="text-xs text-muted-foreground">Oportunidades activas</p>
-                    </div>
-                  </div>
-                );
-
-                if (panelSp.functionalRole === "admin_ventas") return (
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold">Métricas Admin Ventas</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-white/5 rounded-lg">
-                        <p className="text-2xl font-bold">{metrics.pendingQuotes}</p>
-                        <p className="text-xs text-muted-foreground">Cotizaciones pendientes</p>
-                      </div>
-                      <div className="p-3 bg-white/5 rounded-lg">
-                        <p className="text-2xl font-bold">{metrics.avgQuoteTurnaroundHours}h</p>
-                        <p className="text-xs text-muted-foreground">Tiempo prom. cotización</p>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Cotizadas en &lt;24h</span>
-                        <span>{metrics.quotesOnTimeRate}%</span>
-                      </div>
-                      <Progress value={metrics.quotesOnTimeRate} />
-                    </div>
-                    <div className="p-3 bg-white/5 rounded-lg">
-                      <p className="text-lg font-bold">{metrics.quotesThisMonth}</p>
-                      <p className="text-xs text-muted-foreground">Cotizaciones este mes</p>
-                    </div>
-                  </div>
-                );
-
-                return null;
-              })()}
-
-              <div>
-                <h4 className="text-sm font-semibold mb-3">Actividades recientes</h4>
-                {panelActivities.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin actividades recientes</p>
-                ) : (
-                  <div className="space-y-2">
-                    {panelActivities.map((a: any) => (
-                      <div key={a.id} className="flex gap-3 p-2 rounded-lg bg-white/5 text-sm">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0"></div>
+              <ScrollArea className="flex-1 px-6 pb-6">
+                <TabsContent value="metrics" className="mt-4 space-y-4">
+                  {(() => {
+                    const metrics = getPanelMetrics();
+                    if (!metrics) return <p className="text-sm text-muted-foreground">Asigná un rol funcional para ver métricas.</p>;
+                    
+                    if (panelSp.functionalRole === "hunter") return (
+                      <div className="space-y-4">
                         <div>
-                          <p className="font-medium">{a.title}</p>
-                          <p className="text-xs text-muted-foreground">{a.type} - {a.completedAt ? format(new Date(a.completedAt), "dd MMM, HH:mm", { locale: es }) : "pendiente"}</p>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Llamadas esta semana</span>
+                            <span>{metrics.callsThisWeek} / {metrics.callsWeekTarget}</span>
+                          </div>
+                          <Progress value={Math.min((metrics.callsThisWeek / metrics.callsWeekTarget) * 100, 100)} />
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Reuniones este mes</span>
+                            <span>{metrics.meetingsThisMonth} / {metrics.meetingsMonthTarget}</span>
+                          </div>
+                          <Progress value={Math.min((metrics.meetingsThisMonth / metrics.meetingsMonthTarget) * 100, 100)} />
+                        </div>
+                        <div className="p-3 bg-white/5 rounded-lg">
+                          <p className="text-2xl font-bold">{metrics.leadsGeneratedThisMonth}</p>
+                          <p className="text-xs text-muted-foreground">Leads generados este mes</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    );
 
-              <div>
-                <h4 className="text-sm font-semibold mb-3">Oportunidades activas</h4>
-                {panelOpps.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin oportunidades activas</p>
-                ) : (
-                  <div className="space-y-2">
-                    {panelOpps.map((o: any) => (
-                      <div key={o.id} className="flex justify-between items-center p-2 rounded-lg bg-white/5 text-sm">
-                        <div>
-                          <p className="font-medium">{o.title}</p>
-                          <Badge variant="outline" className="text-xs mt-1">{getOppStatusLabel(o.status)}</Badge>
+                    if (panelSp.functionalRole === "farmer") return (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className={`p-3 rounded-lg ${metrics.leadsAwaitingResponse === 0 ? "bg-green-500/10" : metrics.leadsAwaitingResponse <= 2 ? "bg-yellow-500/10" : "bg-red-500/10"}`}>
+                            <p className="text-2xl font-bold">{metrics.leadsAwaitingResponse}</p>
+                            <p className="text-xs text-muted-foreground">Leads sin responder (&gt;2h)</p>
+                          </div>
+                          <div className="p-3 bg-white/5 rounded-lg">
+                            <p className="text-2xl font-bold">{metrics.avgResponseTimeHours}h</p>
+                            <p className="text-xs text-muted-foreground">Tiempo respuesta prom.</p>
+                          </div>
+                          <div className="p-3 bg-white/5 rounded-lg">
+                            <p className="text-2xl font-bold">{metrics.closeRate}%</p>
+                            <p className="text-xs text-muted-foreground">Tasa de cierre</p>
+                          </div>
+                          <div className={`p-3 rounded-lg ${metrics.staleOpportunities > 0 ? "bg-red-500/10" : "bg-white/5"}`}>
+                            <p className="text-2xl font-bold">{metrics.staleOpportunities}</p>
+                            <p className="text-xs text-muted-foreground">Sin actividad 3+ días</p>
+                          </div>
                         </div>
-                        {o.estimatedValue && (
-                          <span className="font-semibold">{o.currency || "ARS"} {Number(o.estimatedValue).toLocaleString()}</span>
-                        )}
+                        <div className="p-3 bg-white/5 rounded-lg">
+                          <p className="text-lg font-bold">{metrics.activeOpportunities}</p>
+                          <p className="text-xs text-muted-foreground">Oportunidades activas</p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+                    );
+
+                    if (panelSp.functionalRole === "admin_ventas") return (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-white/5 rounded-lg">
+                            <p className="text-2xl font-bold">{metrics.pendingQuotes}</p>
+                            <p className="text-xs text-muted-foreground">Cotizaciones pendientes</p>
+                          </div>
+                          <div className="p-3 bg-white/5 rounded-lg">
+                            <p className="text-2xl font-bold">{metrics.avgQuoteTurnaroundHours}h</p>
+                            <p className="text-xs text-muted-foreground">Tiempo prom. cotización</p>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Cotizadas en &lt;24h</span>
+                            <span>{metrics.quotesOnTimeRate}%</span>
+                          </div>
+                          <Progress value={metrics.quotesOnTimeRate} />
+                        </div>
+                        <div className="p-3 bg-white/5 rounded-lg">
+                          <p className="text-lg font-bold">{metrics.quotesThisMonth}</p>
+                          <p className="text-xs text-muted-foreground">Cotizaciones este mes</p>
+                        </div>
+                      </div>
+                    );
+
+                    return null;
+                  })()}
+
+                  {panelStats && panelStats.totalCalls > 0 && (
+                    <div className="mt-4 p-3 bg-white/5 rounded-lg">
+                      <p className="text-sm font-medium mb-2 flex items-center gap-1"><Phone className="w-4 h-4" /> Resumen de llamadas</p>
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                          <p className="text-lg font-bold">{panelStats.totalCalls}</p>
+                          <p className="text-[10px] text-muted-foreground">Total</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold text-green-400">{panelStats.answeredCalls}</p>
+                          <p className="text-[10px] text-muted-foreground">Contestadas</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold">{Math.floor(panelStats.totalCallDuration / 60)}m</p>
+                          <p className="text-[10px] text-muted-foreground">Duración total</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="calls" className="mt-4">
+                  {panelCalls.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sin llamadas asignadas a este vendedor</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {panelCalls.map((c: any) => {
+                        const isInbound = c.direction === "inbound";
+                        const statusColor = c.status === "answered" ? "text-green-400" : c.status === "missed" ? "text-red-400" : "text-yellow-400";
+                        return (
+                          <div key={c.id} className="flex gap-3 p-3 rounded-lg bg-white/5 text-sm">
+                            <div className={`p-1.5 rounded-lg ${isInbound ? "bg-green-500/10" : "bg-blue-500/10"}`}>
+                              {isInbound ? <PhoneIncoming className="w-4 h-4 text-green-400" /> : <PhoneOutgoing className="w-4 h-4 text-blue-400" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-center">
+                                <span className="font-mono text-sm">{c.phone || "Sin número"}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {c.receivedAt ? format(new Date(c.receivedAt), "dd MMM, HH:mm", { locale: es }) : "-"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`text-xs ${statusColor}`}>
+                                  {c.status === "answered" ? "Contestada" : c.status === "missed" ? "Perdida" : c.status || "-"}
+                                </span>
+                                {c.durationSeconds > 0 && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                                    <Clock className="w-3 h-3" /> {Math.floor(c.durationSeconds / 60)}m {c.durationSeconds % 60}s
+                                  </span>
+                                )}
+                                {c.recordingUrl && (
+                                  <a href={c.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">MP3</a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="activities" className="mt-4">
+                  {panelActivities.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sin actividades recientes</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {panelActivities.map((a: any) => {
+                        const typeColors: Record<string, string> = {
+                          call: "bg-green-500/10 text-green-400",
+                          email: "bg-blue-500/10 text-blue-400",
+                          visit: "bg-violet-500/10 text-violet-400",
+                          task: "bg-orange-500/10 text-orange-400",
+                          note: "bg-zinc-500/10 text-zinc-400",
+                          follow_up: "bg-yellow-500/10 text-yellow-400",
+                        };
+                        const typeLabels: Record<string, string> = {
+                          call: "Llamada", email: "Email", visit: "Visita",
+                          task: "Tarea", note: "Nota", follow_up: "Seguimiento",
+                        };
+                        return (
+                          <div key={a.id} className="flex gap-3 p-3 rounded-lg bg-white/5 text-sm">
+                            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 shrink-0 ${typeColors[a.type] || ""}`}>
+                              {typeLabels[a.type] || a.type}
+                            </Badge>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{a.title}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {a.completedAt ? format(new Date(a.completedAt), "dd MMM, HH:mm", { locale: es }) : "pendiente"}
+                                {a.outcome && ` — ${a.outcome}`}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="opportunities" className="mt-4">
+                  {panelOpps.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sin oportunidades activas</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {panelOpps.map((o: any) => (
+                        <div key={o.id} className="flex justify-between items-center p-3 rounded-lg bg-white/5 text-sm">
+                          <div>
+                            <p className="font-medium">{o.title}</p>
+                            <Badge variant="outline" className="text-xs mt-1">{getOppStatusLabel(o.status)}</Badge>
+                          </div>
+                          {o.estimatedValue && (
+                            <span className="font-semibold">{o.currency || "ARS"} {Number(o.estimatedValue).toLocaleString()}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </ScrollArea>
+            </Tabs>
           )}
         </SheetContent>
       </Sheet>
