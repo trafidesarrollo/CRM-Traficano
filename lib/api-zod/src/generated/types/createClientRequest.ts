@@ -18,5 +18,6 @@ export interface CreateClientRequest {
   country?: string;
   status?: CreateClientRequestStatus;
   assignedSalespersonId?: number;
+  clientEmails?: string[];
   notes?: string;
 }

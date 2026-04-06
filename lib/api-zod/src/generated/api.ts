@@ -156,6 +156,7 @@ export const GetClientsResponse = zod.object({
       country: zod.string().nullish(),
       status: zod.enum(["active", "inactive", "prospect"]),
       assignedSalespersonId: zod.number().nullish(),
+      clientEmails: zod.array(zod.string()).optional(),
       notes: zod.string().nullish(),
       createdAt: zod.date(),
       updatedAt: zod.date(),
@@ -180,6 +181,7 @@ export const CreateClientBody = zod.object({
   country: zod.string().optional(),
   status: zod.enum(["active", "inactive", "prospect"]).optional(),
   assignedSalespersonId: zod.number().optional(),
+  clientEmails: zod.array(zod.string()).optional(),
   notes: zod.string().optional(),
 });
 
@@ -202,6 +204,7 @@ export const GetClientResponse = zod.object({
   country: zod.string().nullish(),
   status: zod.enum(["active", "inactive", "prospect"]),
   assignedSalespersonId: zod.number().nullish(),
+  clientEmails: zod.array(zod.string()).optional(),
   notes: zod.string().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
@@ -225,6 +228,7 @@ export const UpdateClientBody = zod.object({
   country: zod.string().optional(),
   status: zod.enum(["active", "inactive", "prospect"]).optional(),
   assignedSalespersonId: zod.number().optional(),
+  clientEmails: zod.array(zod.string()).optional(),
   notes: zod.string().optional(),
 });
 
@@ -240,6 +244,7 @@ export const UpdateClientResponse = zod.object({
   country: zod.string().nullish(),
   status: zod.enum(["active", "inactive", "prospect"]),
   assignedSalespersonId: zod.number().nullish(),
+  clientEmails: zod.array(zod.string()).optional(),
   notes: zod.string().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),

@@ -1233,6 +1233,10 @@ components:
           enum: [active, inactive, prospect]
         assignedSalespersonId:
           type: ["integer", "null"]
+        clientEmails:
+          type: array
+          items:
+            type: string
         notes:
           type: ["string", "null"]
         createdAt:
@@ -1291,6 +1295,10 @@ components:
           enum: [active, inactive, prospect]
         assignedSalespersonId:
           type: integer
+        clientEmails:
+          type: array
+          items:
+            type: string
         notes:
           type: string
       required:
@@ -1320,6 +1328,10 @@ components:
           enum: [active, inactive, prospect]
         assignedSalespersonId:
           type: integer
+        clientEmails:
+          type: array
+          items:
+            type: string
         notes:
           type: string
 

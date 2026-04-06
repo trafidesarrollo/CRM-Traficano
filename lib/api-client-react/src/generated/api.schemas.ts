@@ -110,6 +110,7 @@ export interface Client {
   status: ClientStatus;
   /** @nullable */
   assignedSalespersonId?: number | null;
+  clientEmails?: string[];
   /** @nullable */
   notes?: string | null;
   createdAt: string;
@@ -143,6 +144,7 @@ export interface CreateClientRequest {
   country?: string;
   status?: CreateClientRequestStatus;
   assignedSalespersonId?: number;
+  clientEmails?: string[];
   notes?: string;
 }
 
@@ -166,6 +168,7 @@ export interface UpdateClientRequest {
   country?: string;
   status?: UpdateClientRequestStatus;
   assignedSalespersonId?: number;
+  clientEmails?: string[];
   notes?: string;
 }
 

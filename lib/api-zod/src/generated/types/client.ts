@@ -27,6 +27,7 @@ export interface Client {
   status: ClientStatus;
   /** @nullable */
   assignedSalespersonId?: number | null;
+  clientEmails?: string[];
   /** @nullable */
   notes?: string | null;
   createdAt: Date;
