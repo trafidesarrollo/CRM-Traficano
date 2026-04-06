@@ -1,0 +1,399 @@
+Quiero que actúes como un **arquitecto senior de producto + full-stack engineer** y me ayudes a construir de forma **profesional, escalable y prolija** el módulo de **Inbox Comercial / Gestión de Emails** dentro de mi CRM B2B industrial argentino.
+
+## Contexto del producto
+
+Estoy desarrollando un CRM full-stack para una empresa industrial B2B de Argentina. El sistema ya tiene una base funcional y quiero que el **módulo de emails** sea una de las piezas más sólidas y profesionales del producto, mejor organizado y más útil para el equipo comercial que usar Gmail directamente.
+
+## Objetivo principal
+
+Quiero construir un **Inbox Comercial profesional** donde:
+
+* Gmail sea solo el canal de entrada
+* el CRM sea el lugar donde el equipo trabaja
+* los emails se conviertan en **conversaciones comerciales**
+* cada conversación tenga:
+
+  * responsable
+  * estado
+  * prioridad
+  * tipo/categoría
+  * próxima acción
+  * SLA
+  * trazabilidad completa
+
+Quiero que el sistema resuelva estos problemas reales:
+
+* varios usuarios comparten una casilla comercial
+* no se sabe quién respondió
+* no se sabe qué quedó pendiente
+* no hay responsables claros
+* no hay seguimiento ordenado
+* Gmail queda corto para trabajar comercialmente
+
+## Quiero que el CRM sea mejor que Gmail en esto:
+
+* organización comercial
+* asignación de responsables
+* estados de trabajo reales
+* notas internas
+* seguimiento
+* alertas por vencimiento
+* visibilidad de “última acción” y “próxima acción”
+* historial centralizado
+
+---
+
+# Lo que necesito que hagas
+
+Quiero que me ayudes a diseñar e implementar este módulo en **fases**, con mentalidad de producto real.
+
+## 1) Diseñá primero la arquitectura funcional del módulo
+
+Definí claramente:
+
+### A. La entidad principal
+
+No quiero trabajar “mail por mail”, sino por **conversación / thread comercial**.
+
+Ayudame a definir:
+
+* qué es una conversación
+* cómo se relaciona con Gmail threadId
+* cómo se relaciona con empresa, contacto y oportunidad
+* cuándo un thread se convierte en conversación comercial
+* qué pasa si el mail es irrelevante, spam, proveedor o postventa
+
+### B. Flujo de trabajo ideal
+
+Quiero un flujo claro desde que entra un email hasta que queda gestionado.
+
+Ejemplo esperado:
+
+1. entra email
+2. se sincroniza
+3. se agrupa por thread
+4. se crea o actualiza conversación
+5. se clasifica
+6. se asigna responsable
+7. se define estado
+8. se agrega próxima acción
+9. se sigue hasta cierre
+
+Quiero que propongas el flujo más profesional posible.
+
+### C. Estados del inbox comercial
+
+Proponé un set de estados simple pero potente.
+Por ejemplo, evaluá si conviene algo como:
+
+* nuevo
+* sin asignar
+* pendiente de clasificar
+* en gestión
+* esperando respuesta del cliente
+* cotización solicitada
+* cotización enviada
+* cerrado ganado
+* cerrado perdido
+* archivado
+
+Quiero que propongas una versión final coherente.
+
+### D. Prioridades
+
+Definí cómo manejar prioridad:
+
+* urgente
+* estratégica
+* normal
+* baja
+
+Y sugerí si conviene cálculo manual, automático o mixto.
+
+### E. Próxima acción
+
+Definí un modelo sólido para:
+
+* próxima acción
+* fecha compromiso
+* responsable
+* tipo de acción (llamar, responder, reenviar, cotizar, esperar respuesta, etc.)
+
+### F. SLA
+
+Ayudame a definir SLAs útiles para emails/comercial:
+
+* primera respuesta
+* tiempo sin actividad
+* cotización pendiente
+* seguimiento vencido
+
+Quiero que se vea qué está vencido y qué está en riesgo.
+
+---
+
+## 2) Proponé el diseño de base de datos
+
+Quiero una propuesta concreta de tablas/columnas, pensada para Drizzle ORM.
+
+Como mínimo quiero evaluar estas entidades:
+
+* email_accounts / gmail_connections
+* conversations
+* messages
+* message_participants
+* conversation_assignments
+* conversation_events / activity_log
+* conversation_notes
+* follow_ups
+* attachments
+* tags o labels internas
+* SLA tracking si hace falta
+
+Quiero que me devuelvas:
+
+* tablas sugeridas
+* columnas importantes
+* tipos recomendados
+* claves foráneas
+* índices importantes
+* enums útiles
+* qué guardar de Gmail y qué transformar a estructura interna del CRM
+
+Importante:
+
+* evitar duplicados al sincronizar
+* soportar múltiples mensajes por conversación
+* soportar múltiples destinatarios / cc
+* soportar múltiples adjuntos
+* dejar trazabilidad de cambios de estado, responsable y prioridad
+
+---
+
+## 3) Diseñá la API REST mínima viable
+
+Quiero endpoints bien pensados para este módulo.
+
+Separalos por grupos:
+
+### Sync / Gmail
+
+* sincronizar cuenta
+* traer nuevos threads/messages
+* refrescar conversación
+* marcar errores de sync
+
+### Inbox / Conversations
+
+* listar conversaciones
+* ver detalle de conversación
+* asignar responsable
+* cambiar estado
+* cambiar prioridad
+* archivar
+* agregar tags
+* vincular a cliente/contacto/oportunidad
+
+### Notes / Follow-ups
+
+* crear nota interna
+* listar notas
+* crear seguimiento
+* actualizar seguimiento
+* listar vencidos
+
+### Metrics / SLA
+
+* cantidad nuevas
+* sin asignar
+* vencidas
+* tiempo promedio de respuesta
+* por responsable
+
+Quiero que me propongas:
+
+* rutas
+* método HTTP
+* payloads
+* respuestas esperadas
+* validaciones mínimas
+
+---
+
+## 4) Diseñá la UX/UI del Inbox Comercial
+
+Quiero una propuesta de pantallas y layout para React + shadcn/ui.
+
+### Vista principal ideal
+
+Quiero una interfaz de 3 columnas o similar:
+
+#### Columna izquierda
+
+Lista de conversaciones con filtros
+
+#### Columna central
+
+Timeline completo de la conversación
+
+#### Columna derecha
+
+Panel comercial
+
+Definí qué debería mostrar cada una.
+
+### En la lista de conversaciones mostrar:
+
+* empresa/contacto
+* asunto
+* categoría
+* estado
+* responsable
+* prioridad
+* fecha último mensaje
+* tiempo sin responder
+* SLA o badge de vencido
+
+### En el detalle mostrar:
+
+* mensajes recibidos/enviados
+* adjuntos
+* notas internas
+* cambios de estado
+* historial
+* resumen IA opcional
+
+### En el panel lateral mostrar:
+
+* responsable
+* estado
+* prioridad
+* cliente/contacto vinculado
+* oportunidad vinculada
+* próxima acción
+* fecha compromiso
+* SLA
+* acciones rápidas
+
+También quiero:
+
+* filtros rápidos
+* tabs o chips por estado
+* búsqueda
+* indicadores visuales claros
+* colores profesionales y sobrios
+* foco B2B industrial, no estilo app social
+
+---
+
+## 5) Definí fases de implementación
+
+No quiero hacer todo junto. Quiero un roadmap realista.
+
+Proponé fases como:
+
+### Fase 1
+
+Base de datos + sync Gmail + conversaciones
+
+### Fase 2
+
+Inbox UI + detalle + filtros
+
+### Fase 3
+
+Asignación + estados + prioridad
+
+### Fase 4
+
+Notas + seguimientos + actividad
+
+### Fase 5
+
+SLA + métricas + alertas
+
+### Fase 6
+
+IA + automatización
+
+Quiero que cada fase incluya:
+
+* objetivo
+* entregables
+* dependencias
+* qué conviene postergar
+
+---
+
+## 6) Después de diseñarlo, empezá a implementarlo
+
+Una vez definido todo lo anterior, quiero que avances con código real.
+
+### Backend
+
+* schemas Drizzle
+* servicios
+* controladores
+* rutas Express
+* validaciones
+* lógica de sync con Gmail (aunque sea inicialmente mockeada o preparada)
+
+### Frontend
+
+* estructura de páginas/componentes
+* hooks
+* types
+* UI con shadcn/ui
+* tabla/lista de conversaciones
+* panel de detalle
+* panel lateral comercial
+
+### Importante al implementar
+
+* no rompas el sistema actual
+* mantené consistencia con el stack existente
+* usá TypeScript bien tipado
+* modularizá bien
+* evitá overengineering
+* mantené nombres claros
+* dejá comentarios donde de verdad sumen
+* proponé archivos nuevos y cambios de archivos existentes
+* si hace falta, mostrame diff o bloques por archivo
+
+---
+
+# Criterio importante
+
+No quiero una solución genérica de help desk.
+Quiero un **Inbox Comercial B2B** pensado para un equipo de ventas industrial argentino.
+
+Tené en cuenta:
+
+* casilla comercial compartida
+* trazabilidad
+* asignación clara
+* follow-up comercial
+* futuras cotizaciones
+* relación con clientes y oportunidades
+* visión gerente + vendedor + operador
+
+---
+
+# Forma de responder
+
+Quiero que trabajes en este orden:
+
+1. Arquitectura funcional del módulo
+2. Modelo de datos recomendado
+3. API mínima viable
+4. Diseño UX/UI
+5. Roadmap por fases
+6. Recién después implementación técnica
+
+Quiero respuestas concretas, profesionales y aterrizadas a mi stack.
+No me des teoría vacía.
+Quiero propuestas reales que pueda construir dentro de Replit.
+
+Si ves que hay una mejor decisión de producto o arquitectura que la que propuse, decímelo y justificámelo.
+
+Empezá por el punto 1: **Arquitectura funcional del Inbox Comercial**.
