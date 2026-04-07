@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useGetPrompts, useCreatePrompt, useActivatePrompt } from "@workspace/api-client-react";
-import { Plus, CheckCircle2, Circle, Bot, Sparkles } from "lucide-react";
+import { useGetPrompts, useCreatePrompt, useActivatePrompt, useUpdatePrompt } from "@workspace/api-client-react";
+import { Plus, CheckCircle2, Circle, Sparkles, Pencil, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,8 @@ export default function Prompts() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", promptType: "classification", content: "", description: "" });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", content: "", description: "" });
 
   const { data: prompts, isLoading, refetch } = useGetPrompts();
   const createMut = useCreatePrompt({
@@ -27,6 +29,12 @@ export default function Prompts() {
   const activateMut = useActivatePrompt({
     mutation: {
       onSuccess: () => { toast({ title: "Prompt activado" }); refetch(); },
+    },
+  });
+  const updateMut = useUpdatePrompt({
+    mutation: {
+      onSuccess: () => { toast({ title: "Prompt actualizado" }); setEditingId(null); refetch(); },
+      onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
     },
   });
 
@@ -42,6 +50,15 @@ export default function Prompts() {
     extraction: "Extracción de Datos",
     reply: "Generación de Respuestas",
     summary: "Resumen",
+  };
+
+  const startEdit = (prompt: any) => {
+    setEditingId(prompt.id);
+    setEditForm({ name: prompt.name, content: prompt.content || "", description: prompt.description || "" });
+  };
+
+  const saveEdit = (id: number) => {
+    updateMut.mutate({ id, data: editForm as any });
   };
 
   return (
@@ -96,32 +113,73 @@ export default function Prompts() {
                 {TYPE_LABELS[type] || type}
               </h2>
               <div className="space-y-3">
-                {list.map((prompt: any) => (
-                  <Card key={prompt.id} className={`bg-card/50 backdrop-blur-sm transition-colors ${prompt.isActive ? "border-primary/30" : "border-white/5"}`}>
-                    <CardContent className="p-5">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1">
-                            <h3 className="font-semibold">{prompt.name}</h3>
-                            {prompt.isActive ? (
-                              <Badge className="bg-green-500/10 text-green-400 border-green-500/20"><CheckCircle2 className="w-3 h-3 mr-1" />Activo</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-muted-foreground"><Circle className="w-3 h-3 mr-1" />Inactivo</Badge>
-                            )}
-                            <Badge variant="outline">v{prompt.version}</Badge>
+                {list.map((prompt: any) => {
+                  const isEditing = editingId === prompt.id;
+
+                  return (
+                    <Card key={prompt.id} className={`bg-card/50 backdrop-blur-sm transition-colors ${prompt.isActive ? "border-primary/30" : "border-white/5"}`}>
+                      <CardContent className="p-5">
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-xs">Nombre</Label>
+                                <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="h-9" />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Descripción</Label>
+                                <Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="h-9" />
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Contenido del Prompt</Label>
+                              <Textarea
+                                rows={12}
+                                value={editForm.content}
+                                onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                                className="font-mono text-sm mt-1 resize-y"
+                              />
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                                <X className="w-4 h-4 mr-1" /> Cancelar
+                              </Button>
+                              <Button size="sm" disabled={updateMut.isPending || !editForm.name || !editForm.content} onClick={() => saveEdit(prompt.id)}>
+                                <Save className="w-4 h-4 mr-1" /> {updateMut.isPending ? "Guardando..." : "Guardar"}
+                              </Button>
+                            </div>
                           </div>
-                          {prompt.description && <p className="text-sm text-muted-foreground mt-1">{prompt.description}</p>}
-                          <pre className="mt-3 text-xs text-muted-foreground bg-black/20 p-3 rounded-lg overflow-x-auto max-h-32">{prompt.content?.substring(0, 300)}{prompt.content?.length > 300 ? "..." : ""}</pre>
-                        </div>
-                        {!prompt.isActive && (
-                          <Button variant="outline" size="sm" onClick={() => activateMut.mutate({ id: prompt.id })}>
-                            Activar
-                          </Button>
+                        ) : (
+                          <div className="flex justify-between items-start gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-3 mb-1 flex-wrap">
+                                <h3 className="font-semibold">{prompt.name}</h3>
+                                {prompt.isActive ? (
+                                  <Badge className="bg-green-500/10 text-green-400 border-green-500/20"><CheckCircle2 className="w-3 h-3 mr-1" />Activo</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-muted-foreground"><Circle className="w-3 h-3 mr-1" />Inactivo</Badge>
+                                )}
+                                <Badge variant="outline">v{prompt.version}</Badge>
+                              </div>
+                              {prompt.description && <p className="text-sm text-muted-foreground mt-1">{prompt.description}</p>}
+                              <pre className="mt-3 text-xs text-muted-foreground bg-black/20 p-3 rounded-lg overflow-x-auto max-h-48 whitespace-pre-wrap break-words">{prompt.content}</pre>
+                            </div>
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(prompt)} title="Editar">
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              {!prompt.isActive && (
+                                <Button variant="outline" size="sm" className="text-xs" onClick={() => activateMut.mutate({ id: prompt.id })}>
+                                  Activar
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           ))}

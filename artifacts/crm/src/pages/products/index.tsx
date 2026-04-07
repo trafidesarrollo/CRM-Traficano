@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useGetProducts, useCreateProduct, useDeleteProduct } from "@workspace/api-client-react";
-import { Plus, Search, Trash2, Package, Ruler, ScrollText } from "lucide-react";
+import { useGetProducts, useCreateProduct, useDeleteProduct, useUpdateProduct } from "@workspace/api-client-react";
+import { Plus, Search, Trash2, Package, Ruler, ScrollText, Pencil, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,10 @@ export default function Products() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "", code: "", description: "", unit: "", category: "", dimensions: "", standard: "", price: "", currency: "ARS",
+  });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "", code: "", description: "", unit: "", category: "", dimensions: "", standard: "", price: "", currency: "",
   });
 
   const { data: products, isLoading, refetch } = useGetProducts();
@@ -33,10 +37,29 @@ export default function Products() {
   const deleteMut = useDeleteProduct({
     mutation: { onSuccess: () => { toast({ title: "Producto eliminado" }); refetch(); } },
   });
+  const updateMut = useUpdateProduct({
+    mutation: {
+      onSuccess: () => { toast({ title: "Producto actualizado" }); setEditingId(null); refetch(); },
+      onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    },
+  });
 
   const filtered = (products || []).filter((p: any) =>
     `${p.name} ${p.code || ""} ${p.category || ""} ${p.standard || ""} ${p.dimensions || ""}`.toLowerCase().includes(search.toLowerCase())
   );
+
+  const startEdit = (p: any) => {
+    setEditingId(p.id);
+    setEditForm({
+      name: p.name || "", code: p.code || "", description: p.description || "",
+      unit: p.unit || "", category: p.category || "", dimensions: p.dimensions || "",
+      standard: p.standard || "", price: p.price ? String(p.price) : "", currency: p.currency || "ARS",
+    });
+  };
+
+  const saveEdit = (id: number) => {
+    updateMut.mutate({ id, data: { ...editForm, price: editForm.price || undefined } as any });
+  };
 
   return (
     <AppLayout>
@@ -86,29 +109,66 @@ export default function Products() {
         <div className="text-center py-12 text-muted-foreground">No se encontraron productos</div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((product: any) => (
-            <Card key={product.id} className="bg-card/50 backdrop-blur-sm border-white/5 hover:border-primary/30 transition-colors">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold">{product.name}</h3>
-                      {product.code && <Badge variant="outline" className="text-xs">{product.code}</Badge>}
+          {filtered.map((product: any) => {
+            const isEditing = editingId === product.id;
+
+            return (
+              <Card key={product.id} className="bg-card/50 backdrop-blur-sm border-white/5 hover:border-primary/30 transition-colors">
+                <CardContent className="p-5">
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div><Label className="text-xs">Código</Label><Input value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} className="h-9" /></div>
+                        <div><Label className="text-xs">Categoría</Label><Input value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="h-9" /></div>
+                      </div>
+                      <div><Label className="text-xs">Nombre</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="h-9" /></div>
+                      <div><Label className="text-xs">Descripción</Label><Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="h-9" /></div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div><Label className="text-xs">Dimensiones</Label><Input value={editForm.dimensions} onChange={(e) => setEditForm({ ...editForm, dimensions: e.target.value })} className="h-9" /></div>
+                        <div><Label className="text-xs">Norma</Label><Input value={editForm.standard} onChange={(e) => setEditForm({ ...editForm, standard: e.target.value })} className="h-9" /></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div><Label className="text-xs">Unidad</Label><Input value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} className="h-9" /></div>
+                        <div><Label className="text-xs">Precio</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} className="h-9" /></div>
+                        <div><Label className="text-xs">Moneda</Label><Input value={editForm.currency} onChange={(e) => setEditForm({ ...editForm, currency: e.target.value })} className="h-9" /></div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                          <X className="w-4 h-4 mr-1" /> Cancelar
+                        </Button>
+                        <Button size="sm" disabled={updateMut.isPending || !editForm.name} onClick={() => saveEdit(product.id)}>
+                          <Save className="w-4 h-4 mr-1" /> {updateMut.isPending ? "Guardando..." : "Guardar"}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
-                      {product.category && <span className="flex items-center gap-1"><Package className="w-3.5 h-3.5" />{product.category}</span>}
-                      {product.dimensions && <span className="flex items-center gap-1"><Ruler className="w-3.5 h-3.5" />{product.dimensions}</span>}
-                      {product.standard && <span className="flex items-center gap-1"><ScrollText className="w-3.5 h-3.5" />{product.standard}</span>}
-                      {product.price && <span className="font-medium text-foreground">{product.currency} {parseFloat(product.price).toLocaleString("es-AR")}</span>}
+                  ) : (
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-semibold">{product.name}</h3>
+                          {product.code && <Badge variant="outline" className="text-xs">{product.code}</Badge>}
+                        </div>
+                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
+                          {product.category && <span className="flex items-center gap-1"><Package className="w-3.5 h-3.5" />{product.category}</span>}
+                          {product.dimensions && <span className="flex items-center gap-1"><Ruler className="w-3.5 h-3.5" />{product.dimensions}</span>}
+                          {product.standard && <span className="flex items-center gap-1"><ScrollText className="w-3.5 h-3.5" />{product.standard}</span>}
+                          {product.price && <span className="font-medium text-foreground">{product.currency} {parseFloat(product.price).toLocaleString("es-AR")}</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => startEdit(product)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => deleteMut.mutate({ id: product.id })}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => deleteMut.mutate({ id: product.id })}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </AppLayout>

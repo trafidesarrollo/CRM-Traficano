@@ -3,8 +3,8 @@ import { AppLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useGetSalespeople, useCreateSalesperson, useDeleteSalesperson } from "@workspace/api-client-react";
-import { Plus, Search, Trash2, Mail, Phone, Eye, Activity, PhoneIncoming, PhoneOutgoing, Clock, CheckCircle, PhoneMissed } from "lucide-react";
+import { useGetSalespeople, useCreateSalesperson, useDeleteSalesperson, useUpdateSalesperson } from "@workspace/api-client-react";
+import { Plus, Search, Trash2, Mail, Phone, Eye, Activity, PhoneIncoming, PhoneOutgoing, Clock, CheckCircle, PhoneMissed, Pencil, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,8 @@ export default function Salespeople() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", userId: "", functionalRole: "" });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
   const [panelSp, setPanelSp] = useState<any>(null);
   const [panelData, setPanelData] = useState<any>(null);
   const [panelActivities, setPanelActivities] = useState<any[]>([]);
@@ -45,6 +47,21 @@ export default function Salespeople() {
       onSuccess: () => { toast({ title: "Vendedor eliminado" }); refetch(); },
     },
   });
+  const updateMut = useUpdateSalesperson({
+    mutation: {
+      onSuccess: () => { toast({ title: "Vendedor actualizado" }); setEditingId(null); refetch(); },
+      onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    },
+  });
+
+  const startEditSp = (sp: any) => {
+    setEditingId(sp.id);
+    setEditForm({ name: sp.name || "", email: sp.email || "", phone: sp.phone || "" });
+  };
+
+  const saveEditSp = (id: number) => {
+    updateMut.mutate({ id, data: editForm as any });
+  };
 
   const [activityCounts, setActivityCounts] = useState<Record<number, number>>({});
 
@@ -168,55 +185,80 @@ export default function Salespeople() {
         <div className="text-center py-12 text-muted-foreground">No se encontraron vendedores</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((sp: any) => (
-            <Card key={sp.id} className="bg-card/50 backdrop-blur-sm border-white/5 hover:border-primary/30 transition-colors">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                      {sp.name.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">{sp.name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={getFunctionalRoleColor(sp.functionalRole)}>
-                          {getFunctionalRoleLabel(sp.functionalRole)}
-                        </Badge>
-                        {activityCounts[sp.id] ? (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Activity className="w-3 h-3" />{activityCounts[sp.id]} esta semana
-                          </span>
-                        ) : null}
+          {filtered.map((sp: any) => {
+            const isEditing = editingId === sp.id;
+
+            return (
+              <Card key={sp.id} className="bg-card/50 backdrop-blur-sm border-white/5 hover:border-primary/30 transition-colors">
+                <CardContent className="p-5">
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div><Label className="text-xs">Nombre</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="h-9" /></div>
+                      <div><Label className="text-xs">Email</Label><Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="h-9" /></div>
+                      <div><Label className="text-xs">Teléfono</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="h-9" /></div>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                          <X className="w-4 h-4 mr-1" /> Cancelar
+                        </Button>
+                        <Button size="sm" disabled={updateMut.isPending || !editForm.name} onClick={() => saveEditSp(sp.id)}>
+                          <Save className="w-4 h-4 mr-1" /> {updateMut.isPending ? "Guardando..." : "Guardar"}
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => openPanel(sp)}>
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => deleteMut.mutate({ id: sp.id })}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-2 text-sm">
-                  {sp.email && <div className="flex items-center gap-2 text-muted-foreground"><Mail className="w-3.5 h-3.5" />{sp.email}</div>}
-                  {sp.phone && <div className="flex items-center gap-2 text-muted-foreground"><Phone className="w-3.5 h-3.5" />{sp.phone}</div>}
-                </div>
-                <div className="mt-3 pt-3 border-t border-border/30">
-                  <Select value={sp.functionalRole || "none"} onValueChange={(v) => handleUpdateRole(sp.id, v === "none" ? "" : v)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin asignar</SelectItem>
-                      <SelectItem value="hunter">Hunter</SelectItem>
-                      <SelectItem value="farmer">Farmer</SelectItem>
-                      <SelectItem value="admin_ventas">Admin Ventas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                            {sp.name.charAt(0)}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">{sp.name}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className={getFunctionalRoleColor(sp.functionalRole)}>
+                                {getFunctionalRoleLabel(sp.functionalRole)}
+                              </Badge>
+                              {activityCounts[sp.id] ? (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Activity className="w-3 h-3" />{activityCounts[sp.id]} esta semana
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => openPanel(sp)}>
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={() => startEditSp(sp)}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => deleteMut.mutate({ id: sp.id })}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="mt-4 space-y-2 text-sm">
+                        {sp.email && <div className="flex items-center gap-2 text-muted-foreground"><Mail className="w-3.5 h-3.5" />{sp.email}</div>}
+                        {sp.phone && <div className="flex items-center gap-2 text-muted-foreground"><Phone className="w-3.5 h-3.5" />{sp.phone}</div>}
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-border/30">
+                        <Select value={sp.functionalRole || "none"} onValueChange={(v) => handleUpdateRole(sp.id, v === "none" ? "" : v)}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sin asignar</SelectItem>
+                            <SelectItem value="hunter">Hunter</SelectItem>
+                            <SelectItem value="farmer">Farmer</SelectItem>
+                            <SelectItem value="admin_ventas">Admin Ventas</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
