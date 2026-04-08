@@ -21,7 +21,7 @@ async function handleAnuraWebhook(req: Request, res: Response) {
   const externalCallId = body.external_call_id || body.raw_call_id || body.id || null;
   const agentId = body.agent_id || body.raw_agent_id || body.agentid || null;
   const duration = body.duration_seconds || body.duration;
-  const recordingUrl = body.recording_mp3_url || body.audio_file_mp3 || null;
+  const recordingUrl = body.recording_mp3_url || body.audio_file_mp3 || body.audio_play_mp3 || null;
   const occurredAt = body.occurred_at || body.timestamp || null;
   const rawPayload = body.raw_payload || body;
 
