@@ -51,16 +51,22 @@ async function getValidAccessToken(connection: any): Promise<string> {
   return connection.accessToken;
 }
 
-router.get("/gmail/connect", requireRole("admin", "gerente"), (req, res) => {
+router.get("/gmail/connect", (req, res) => {
   const config = getGmailConfig();
   if (!config.clientId || !config.clientSecret) {
     res.status(400).json({ error: "Gmail no configurado. Configure GMAIL_CLIENT_ID y GMAIL_CLIENT_SECRET en Configuración." });
     return;
   }
 
-  const scope = encodeURIComponent("https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email");
+  const scope = encodeURIComponent("https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar");
   const userId = (req as any).userId;
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${userId}`;
+  const nonce = require("crypto").randomBytes(24).toString("hex");
+  const sess = (req as any).session;
+  if (sess) {
+    sess.gmailOAuthState = { nonce, userId, exp: Date.now() + 10 * 60 * 1000 };
+  }
+  const state = `${nonce}.${userId}`;
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
   res.json({ authUrl });
 });
 
@@ -78,11 +84,20 @@ router.get("/gmail/callback", async (req, res) => {
       return;
     }
 
-    const userId = parseInt(state as string);
-    if (!userId || isNaN(userId)) {
+    const stateStr = String(state || "");
+    const [nonce, userIdStr] = stateStr.split(".");
+    const userId = parseInt(userIdStr || "");
+    if (!userId || isNaN(userId) || !nonce) {
       res.status(400).json({ error: "Estado de autenticación inválido" });
       return;
     }
+    const sess = (req as any).session;
+    const stored = sess?.gmailOAuthState;
+    if (!stored || stored.nonce !== nonce || stored.userId !== userId || stored.exp < Date.now()) {
+      res.status(400).json({ error: "Estado de OAuth inválido o vencido. Reintentá la conexión." });
+      return;
+    }
+    if (sess) delete sess.gmailOAuthState;
 
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",

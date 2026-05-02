@@ -20,6 +20,9 @@ export const tasksTable = pgTable("tasks", {
   reminderAt: timestamp("reminder_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   notifyOnDue: boolean("notify_on_due").notNull().default(true),
+  googleEventId: text("google_event_id"),
+  googleCalendarId: text("google_calendar_id"),
+  googleSyncedAt: timestamp("google_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

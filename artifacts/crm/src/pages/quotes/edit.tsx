@@ -220,6 +220,7 @@ export default function QuoteEdit() {
           </div>
         </div>
         <div className="flex gap-2">
+          {!isNew && <Button variant="outline" onClick={() => window.open(`${import.meta.env.VITE_API_URL || ""}/api/quotes/${params!.id}/pdf`, "_blank")}><FileText className="w-4 h-4 mr-2" />Descargar PDF</Button>}
           {!isNew && <Button variant="outline" onClick={convertToOrder}><ShoppingCart className="w-4 h-4 mr-2" />Convertir a pedido</Button>}
           <Button onClick={save}><Save className="w-4 h-4 mr-2" />Guardar</Button>
         </div>

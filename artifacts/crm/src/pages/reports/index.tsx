@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, TrendingUp, DollarSign, Trophy, Users } from "lucide-react";
+import { BarChart3, TrendingUp, DollarSign, Trophy, Users, FileSpreadsheet } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -44,6 +45,10 @@ export default function Reports() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2"><BarChart3 className="h-6 w-6" /><h1 className="text-2xl font-bold">Reportes</h1></div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => window.open(`${API}/api/reports/export/sales.xlsx?days=${days}`, "_blank")}><FileSpreadsheet className="h-4 w-4 mr-1" />Ventas</Button>
+            <Button variant="outline" size="sm" onClick={() => window.open(`${API}/api/reports/export/quotes.xlsx?days=${days}`, "_blank")}><FileSpreadsheet className="h-4 w-4 mr-1" />Cotizaciones</Button>
+            <Button variant="outline" size="sm" onClick={() => window.open(`${API}/api/reports/export/pipeline.xlsx`, "_blank")}><FileSpreadsheet className="h-4 w-4 mr-1" />Pipeline</Button>
           <Select value={days} onValueChange={setDays}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -53,6 +58,7 @@ export default function Reports() {
               <SelectItem value="365">Último año</SelectItem>
             </SelectContent>
           </Select>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -68,6 +68,19 @@ router.post("/tasks", async (req, res) => {
         entityId: row.id,
       });
     }
+    // Push to Google Calendar if enabled (best-effort, async)
+    (async () => {
+      try {
+        if (!row.dueDate || !row.assignedTo) return;
+        const { getUserConnection, getValidAccessToken, pushTaskToGCal } = await import("./gcal.js");
+        const conn = await getUserConnection(row.assignedTo);
+        if (!conn?.calendarSyncEnabled) return;
+        const token = await getValidAccessToken(conn);
+        const r = await pushTaskToGCal(token, row);
+        if (r) await db.update(tasksTable).set({ googleEventId: r.id, googleSyncedAt: new Date() }).where(eq(tasksTable.id, row.id));
+      } catch {}
+    })();
+
     res.status(201).json(row);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

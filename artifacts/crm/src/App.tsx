@@ -12,6 +12,9 @@ import EmailDetail from "@/pages/emails/detail";
 import Opportunities from "@/pages/opportunities/index";
 import Clients from "@/pages/clients/index";
 import Contacts from "@/pages/contacts/index";
+import ContactEdit from "@/pages/contacts/edit";
+import Pipelines from "@/pages/pipelines/index";
+import CalendarSync from "@/pages/calendar/sync";
 import Salespeople from "@/pages/salespeople/index";
 import Products from "@/pages/products/index";
 import Imports from "@/pages/imports/index";
@@ -72,6 +75,10 @@ function Router() {
       <Route path="/opportunities" component={() => <ProtectedRoute component={Opportunities} />} />
       <Route path="/clients" component={() => <ProtectedRoute component={Clients} />} />
       <Route path="/contacts" component={() => <ProtectedRoute component={Contacts} />} />
+      <Route path="/contacts/new" component={() => <ProtectedRoute component={ContactEdit} />} />
+      <Route path="/contacts/:id" component={() => <ProtectedRoute component={ContactEdit} />} />
+      <Route path="/pipelines" component={() => <ProtectedRoute component={Pipelines} />} />
+      <Route path="/calendar/sync" component={() => <ProtectedRoute component={CalendarSync} />} />
       <Route path="/salespeople" component={() => <ProtectedRoute component={Salespeople} />} />
       <Route path="/products" component={() => <ProtectedRoute component={Products} />} />
       <Route path="/imports" component={() => <ProtectedRoute component={Imports} />} />

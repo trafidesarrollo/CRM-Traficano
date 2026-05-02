@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -13,6 +13,9 @@ export const gmailConnectionsTable = pgTable("gmail_connections", {
   lastHistoryId: text("last_history_id"),
   syncStatus: text("sync_status", { enum: ["idle", "syncing", "error"] }).notNull().default("idle"),
   syncError: text("sync_error"),
+  calendarSyncEnabled: boolean("calendar_sync_enabled").notNull().default(false),
+  calendarLastSyncAt: timestamp("calendar_last_sync_at", { withTimezone: true }),
+  calendarSyncToken: text("calendar_sync_token"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

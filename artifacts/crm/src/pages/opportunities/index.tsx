@@ -108,14 +108,21 @@ export default function Opportunities() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [salespeople, setSalespeople] = useState<any[]>([]);
+  const [pipelines, setPipelines] = useState<any[]>([]);
+  const [filterPipelineId, setFilterPipelineId] = useState<string>("all");
   const [clients, setClients] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editOpp, setEditOpp] = useState<any>(null);
   const [dragOpp, setDragOpp] = useState<any>(null);
-  const [form, setForm] = useState({
+  type OppForm = {
+    title: string; clientId: string; status: string; priority: string;
+    estimatedValue: string; currency: string; description: string;
+    hunterId: string; farmerId: string; pipelineId: string; stageId: string;
+  };
+  const [form, setForm] = useState<OppForm>({
     title: "", clientId: "", status: "new", priority: "medium",
     estimatedValue: "", currency: "ARS", description: "",
-    hunterId: "", farmerId: "",
+    hunterId: "", farmerId: "", pipelineId: "", stageId: "",
   });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -128,21 +135,24 @@ export default function Opportunities() {
         fetch(`${API_BASE}/api/salespeople`, { credentials: "include" }).then(r => r.json()),
         fetch(`${API_BASE}/api/clients?limit=200`, { credentials: "include" }).then(r => r.json()),
       ]);
-      setOpps(oppsRes.data || []);
-      setTotal(oppsRes.total || 0);
+      setOpps((oppsRes.data || []).filter((o: any) => filterPipelineId === "all" || String(o.pipelineId || "") === filterPipelineId));
+      setTotal((oppsRes.data || []).length);
       setSalespeople(Array.isArray(spRes) ? spRes : []);
       setClients(clRes.data || clRes || []);
+      const pRes = await fetch(`${API_BASE}/api/pipelines`, { credentials: "include" }).then(r => r.json());
+      setPipelines(pRes.data || []);
     } catch {} finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData, filterPipelineId]);
 
   const hunters = salespeople.filter(s => s.functionalRole === "hunter");
   const farmers = salespeople.filter(s => s.functionalRole === "farmer");
 
   const openCreate = () => {
     setEditOpp(null);
-    setForm({ title: "", clientId: "", status: "new", priority: "medium", estimatedValue: "", currency: "ARS", description: "", hunterId: "", farmerId: "" });
+    const def = pipelines.find(p => p.isDefault) || pipelines[0];
+    setForm({ title: "", clientId: "", status: "new", priority: "medium", estimatedValue: "", currency: "ARS", description: "", hunterId: "", farmerId: "", pipelineId: def?.id?.toString() || "", stageId: def?.stages?.[0]?.id?.toString() || "" });
     setDialogOpen(true);
   };
 
@@ -153,6 +163,7 @@ export default function Opportunities() {
       priority: opp.priority, estimatedValue: opp.estimatedValue?.toString() || "",
       currency: opp.currency || "ARS", description: opp.description || "",
       hunterId: opp.hunterId?.toString() || "", farmerId: opp.farmerId?.toString() || "",
+      pipelineId: opp.pipelineId?.toString() || "", stageId: opp.stageId?.toString() || "",
     });
     setDialogOpen(true);
   };
@@ -172,6 +183,8 @@ export default function Opportunities() {
       estimatedValue: form.estimatedValue || undefined,
       hunterId: form.hunterId ? parseInt(form.hunterId) : null,
       farmerId: form.farmerId ? parseInt(form.farmerId) : null,
+      pipelineId: form.pipelineId ? parseInt(form.pipelineId) : null,
+      stageId: form.stageId ? parseInt(form.stageId) : null,
     };
 
     try {
@@ -260,6 +273,13 @@ export default function Opportunities() {
               <LayoutGrid className="w-4 h-4 mr-1" />Kanban
             </Button>
           </div>
+          <Select value={filterPipelineId} onValueChange={setFilterPipelineId}>
+            <SelectTrigger className="w-48"><SelectValue placeholder="Pipeline" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los pipelines</SelectItem>
+              {pipelines.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Nueva</Button>
         </div>
       </div>
@@ -360,6 +380,25 @@ export default function Opportunities() {
                     <SelectItem value="high">Alta</SelectItem>
                     <SelectItem value="urgent">Urgente</SelectItem>
                   </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Pipeline</Label>
+                <Select value={form.pipelineId} onValueChange={v => {
+                  const p = pipelines.find(pp => String(pp.id) === v);
+                  setForm({ ...form, pipelineId: v, stageId: p?.stages?.[0]?.id?.toString() || "" });
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>{pipelines.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Etapa</Label>
+                <Select value={form.stageId} onValueChange={v => setForm({ ...form, stageId: v })}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>{(pipelines.find(p => String(p.id) === form.pipelineId)?.stages || []).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>

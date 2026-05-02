@@ -25,3 +25,4 @@ export * from "./email_templates";
 export * from "./documents";
 export * from "./automation";
 export * from "./custom_fields";
+export * from "./pipelines";

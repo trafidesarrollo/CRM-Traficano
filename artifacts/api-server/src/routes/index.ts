@@ -31,6 +31,10 @@ import automationRouter from "./automation.js";
 import customFieldsRouter from "./custom-fields.js";
 import reportsRouter from "./reports.js";
 import storageRouter from "./storage.js";
+import pipelinesRouter from "./pipelines.js";
+import quotePdfRouter from "./quote-pdf.js";
+import reportsExportRouter from "./reports-export.js";
+import gcalRouter from "./gcal.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -136,6 +140,16 @@ router.use(storageRouter);
 router.use(requireMinRole("gerente"), automationRouter);
 router.use(requireMinRole("gerente"), customFieldsRouter);
 router.use(requireMinRole("vendedor"), reportsRouter);
+router.use(pipelinesRouter);
+router.use((req, res, next) => {
+  // Defense-in-depth: only admin/gerente can mutate pipelines/stages
+  if (req.method === "GET") return next();
+  if (!req.path.startsWith("/pipelines")) return next();
+  return requireMinRole("gerente")(req, res, next);
+});
+router.use(requireMinRole("vendedor"), quotePdfRouter);
+router.use(requireMinRole("vendedor"), reportsExportRouter);
+router.use(gcalRouter);
 router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 

@@ -221,3 +221,20 @@ pnpm --filter @workspace/api-spec run codegen
 # Build API server
 pnpm --filter @workspace/api-server run build
 ```
+
+## Fase 5 — Expansión Salesforce-level (mayo 2026)
+
+Seis funcionalidades agregadas:
+
+1. **Multi-pipelines + etapas custom**: tablas `pipelines` (4 sembrados: General, OCTG, Trefilados, Exportación) y `pipeline_stages` (6 c/u, color/winProb/SLA). UI: `/pipelines` (admin/gerente). Filtro y selectores en oportunidades.
+2. **PDF cotización server-side**: `/api/quotes/:id/pdf` con pdfkit. Botón "Descargar PDF" en `/quotes/:id`. Requiere `@swc/helpers` para fontkit.
+3. **Excel export reportes**: `/api/reports/export/{sales,quotes,pipeline}.xlsx` con exceljs. Botones en `/reports`.
+4. **Contactos extendidos**: jsonb `additionalEmails`, `additionalPhones`, `tags`; campos `linkedinUrl`, `photoUrl`, `score`, `status`, `source`. UI `/contacts/new` y `/contacts/:id`.
+5. **PWA instalable**: `vite-plugin-pwa` (autoUpdate). Manifest + service worker. Íconos en `public/images/`.
+6. **Google Calendar sync bidireccional**: scope `calendar` agregado al OAuth de Gmail. Tabla `gmail_connections` extendida (`calendarSyncEnabled`, `calendarLastSyncAt`). Tabla `tasks` extendida (`googleEventId`, `googleCalendarId`, `googleSyncedAt`). Endpoints `/api/gcal/{status,toggle,push,pull}`. UI `/calendar/sync`. Push best-effort en POST `/api/tasks`.
+
+### Hardening de seguridad
+- OAuth state ahora es nonce aleatorio + userId firmado en sesión (anti-CSRF).
+- Mutaciones de `/pipelines` requieren rol `gerente` (defensa en profundidad).
+- DELETE de pipeline bloqueado si tiene oportunidades; cascada manual de stages.
+- Pull de Calendar es realmente bidireccional: eventos con `crmTaskId` actualizan la task; eventos cancelados marcan task como `cancelled`.

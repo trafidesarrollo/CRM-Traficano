@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Inbox, Briefcase, Users, Contact2, UserSquare, 
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
   Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo,
-  CalendarDays, BarChart3, Workflow, Sliders, MailOpen
+  CalendarDays, BarChart3, Workflow, Sliders, MailOpen, GitBranch, CalendarClock
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,8 @@ const navItems = [
   { href: "/orders", label: "Pedidos", icon: ShoppingCart },
   { href: "/tasks", label: "Tareas", icon: ListTodo },
   { href: "/calendar", label: "Calendario", icon: CalendarDays },
+  { href: "/calendar/sync", label: "Sync Google Calendar", icon: CalendarClock },
+  { href: "/pipelines", label: "Pipelines", icon: GitBranch, roles: ["admin", "gerente"] },
   { href: "/reports", label: "Reportes", icon: BarChart3 },
   { href: "/clients", label: "Clientes", icon: Users },
   { href: "/contacts", label: "Contactos", icon: Contact2 },

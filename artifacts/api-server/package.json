@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
+    "@swc/helpers": "^0.5.21",
     "@types/bcryptjs": "^3.0.0",
     "@types/express-session": "^1.18.2",
     "@types/multer": "^2.1.0",
@@ -20,10 +21,12 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2",
     "drizzle-orm": "catalog:",
+    "exceljs": "^4.4.0",
     "express": "^5",
     "express-session": "^1.19.0",
     "google-auth-library": "^10.6.2",
     "multer": "^2.1.1",
+    "pdfkit": "^0.18.0",
     "pino": "^9",
     "pino-http": "^10"
   },
@@ -32,6 +35,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "catalog:",
+    "@types/pdfkit": "^0.17.6",
     "esbuild": "^0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13",
