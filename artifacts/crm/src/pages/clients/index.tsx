@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Building2, Search, Mail, X, Pencil } from "lucide-react";
+import { DuplicateWarning } from "@/components/duplicate-warning";
 
 function EmailManager({ emails, onChange }: { emails: string[]; onChange: (emails: string[]) => void }) {
   const [input, setInput] = useState("");
@@ -199,6 +200,8 @@ export default function Clients() {
                   />
                 </div>
               </div>
+              <DuplicateWarning entity="clients" params={{ taxId: form.taxId, companyName: form.companyName }} />
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Teléfono</Label>

@@ -38,6 +38,7 @@ import gcalRouter from "./gcal.js";
 import csvRouter from "./csv.js";
 import searchRouter from "./search.js";
 import bulkRouter from "./bulk.js";
+import duplicatesRouter from "./duplicates.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -156,6 +157,7 @@ router.use(gcalRouter);
 router.use(requireMinRole("gerente"), csvRouter);
 router.use(requireMinRole("vendedor"), searchRouter);
 router.use(requireMinRole("gerente"), bulkRouter);
+router.use(requireMinRole("vendedor"), duplicatesRouter);
 router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 

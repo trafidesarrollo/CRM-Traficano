@@ -59,6 +59,8 @@ The frontend provides a rich set of pages:
 - **Audit Log Viewer (`/audit`)**: Admin/gerente page that browses `audit_logs` with filters by entity, action and user, expandable JSON details, and pagination. Backed by existing `GET /api/audit`.
 - **Keyboard Shortcuts**: Global handler — `?` opens the cheatsheet dialog; `G + letter` navigates (d/c/o/t/q/i/r/a). Ignored when typing in inputs.
 - **Recently Viewed**: Command palette persists last 6 visited entities in `localStorage` and shows them under "Recientes" when the query is empty.
+- **Duplicate Detection**: `GET /api/duplicates/clients` (taxId, companyName) and `/duplicates/contacts` (email, phone), vendedor+. Reusable `DuplicateWarning` component with debounce shows a yellow inline panel under create/edit forms; wired into the new-client dialog.
+- **Today Tasks Widget**: Dashboard card "Mis tareas de hoy" lists pending tasks due today + overdue, sorted by due time, with one-click complete (PATCH `/api/tasks/:id` → `status=completed`) and priority/overdue badges.
 
 ## External Dependencies
 
