@@ -22,6 +22,12 @@ import Followups from "@/pages/followups/index";
 import GoalsPage from "@/pages/goals/index";
 import InboxComercial from "@/pages/inbox/index";
 import AnuraPage from "@/pages/anura/index";
+import PriceLists from "@/pages/price-lists/index";
+import Quotes from "@/pages/quotes/index";
+import QuoteEdit from "@/pages/quotes/edit";
+import Orders from "@/pages/orders/index";
+import OrderEdit from "@/pages/orders/edit";
+import Tasks from "@/pages/tasks/index";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -70,6 +76,15 @@ function Router() {
       <Route path="/goals" component={() => <ProtectedRoute component={GoalsPage} />} />
       <Route path="/prompts" component={() => <ProtectedRoute component={Prompts} />} />
       <Route path="/users" component={() => <ProtectedRoute component={UsersPage} />} />
+
+      <Route path="/price-lists" component={() => <ProtectedRoute component={PriceLists} />} />
+      <Route path="/quotes" component={() => <ProtectedRoute component={Quotes} />} />
+      <Route path="/quotes/new" component={() => <ProtectedRoute component={QuoteEdit} />} />
+      <Route path="/quotes/:id" component={() => <ProtectedRoute component={QuoteEdit} />} />
+      <Route path="/orders" component={() => <ProtectedRoute component={Orders} />} />
+      <Route path="/orders/new" component={() => <ProtectedRoute component={OrderEdit} />} />
+      <Route path="/orders/:id" component={() => <ProtectedRoute component={OrderEdit} />} />
+      <Route path="/tasks" component={() => <ProtectedRoute component={Tasks} />} />
 
       <Route component={NotFound} />
     </Switch>

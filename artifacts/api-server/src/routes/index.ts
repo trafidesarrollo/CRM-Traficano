@@ -20,6 +20,11 @@ import goalsRouter from "./goals.js";
 import settingsRouter from "./settings.js";
 import conversationsRouter from "./conversations.js";
 import integrationsRouter from "./integrations.js";
+import priceListsRouter from "./price-lists.js";
+import quotesRouter from "./quotes.js";
+import ordersRouter from "./orders.js";
+import tasksRouter from "./tasks.js";
+import notificationsRouter from "./notifications.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -114,6 +119,11 @@ router.use(activitiesRouter);
 router.use(gmailRouter);
 router.use(conversationsRouter);
 router.use(importsRouter);
+router.use(requireMinRole("vendedor"), priceListsRouter);
+router.use(requireMinRole("vendedor"), quotesRouter);
+router.use(requireMinRole("vendedor"), ordersRouter);
+router.use(tasksRouter);
+router.use(notificationsRouter);
 router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 

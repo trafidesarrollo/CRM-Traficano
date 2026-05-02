@@ -4,8 +4,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { 
   LayoutDashboard, Inbox, Briefcase, Users, Contact2, UserSquare, 
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
-  Target, Plus, PhoneCall, MessageSquare
+  Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo
 } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,10 +24,14 @@ const navItems = [
   { href: "/inbox", label: "Inbox Comercial", icon: MessageSquare },
   { href: "/emails", label: "Emails (legacy)", icon: Inbox },
   { href: "/opportunities", label: "Oportunidades", icon: Briefcase },
+  { href: "/quotes", label: "Cotizaciones", icon: FileText },
+  { href: "/orders", label: "Pedidos", icon: ShoppingCart },
+  { href: "/tasks", label: "Tareas", icon: ListTodo },
   { href: "/clients", label: "Clientes", icon: Users },
   { href: "/contacts", label: "Contactos", icon: Contact2 },
   { href: "/salespeople", label: "Vendedores", icon: UserSquare },
   { href: "/products", label: "Productos", icon: Package },
+  { href: "/price-lists", label: "Listas de precios", icon: Tag },
   { href: "/imports", label: "Importar CSV", icon: UploadCloud },
   { href: "/followups", label: "Seguimientos", icon: Timer },
   { href: "/goals", label: "Metas", icon: Target, roles: ["admin", "gerente"] },
@@ -252,6 +257,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-8 h-8 rounded-lg" />
           <span className="font-display font-bold text-lg">CRM</span>
         </div>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon"><Menu className="w-6 h-6" /></Button>
@@ -265,10 +272,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           </SheetContent>
         </Sheet>
+        </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-7xl mx-auto">{children}</div>
+      <main className="flex-1 overflow-y-auto">
+        <div className="hidden md:flex items-center justify-end gap-2 p-4 border-b border-border/50 sticky top-0 z-40 bg-background/80 backdrop-blur">
+          <NotificationBell />
+        </div>
+        <div className="p-4 md:p-8">
+          <div className="max-w-7xl mx-auto">{children}</div>
+        </div>
       </main>
 
       <QuickActivityFAB />

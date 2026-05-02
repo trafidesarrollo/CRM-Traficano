@@ -79,7 +79,7 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `/api/imports/*` → admin, gerente, operador
 - All other routes → any authenticated user
 
-## Database Schema (23 tables)
+## Database Schema (32 tables)
 
 - `users` - Internal users with roles
 - `clients` - Client companies (with clientEmails JSON array)
@@ -104,6 +104,15 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `conversation_messages` - Individual messages within conversations
 - `conversation_events` - Status/assignment change audit trail for conversations
 - `anura_webhooks` - Anura telephony webhook events (calls received/made)
+- `price_lists` - Sales/purchase price lists (VENTA/REVENDEDOR/COMPRA, currency, default flag)
+- `price_list_items` - Per-product prices within a price list
+- `sale_conditions` - Payment terms (CONTADO/30/60/90 días)
+- `quotes` - Sales quotes with full Argentine industrial fields (CUIT, FX rate type, priority, type, lines)
+- `quote_lines` - Line items per quote (product, qty, qty_kg, unit_price, totals)
+- `orders` - Customer orders (created from quotes or directly), with status workflow
+- `order_lines` - Line items per order
+- `tasks` - Tasks/todos with assignee, priority, due date, related entity (client/opp/quote/order)
+- `notifications` - Per-user notifications (task assigned, etc.) with read state
 
 ## Frontend Pages
 
@@ -123,6 +132,10 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `/anura` - Anura telephony webhooks viewer (call list + detail with recording playback)
 - `/prompts` - AI prompt management
 - `/users` - User management (admin only)
+- `/quotes` + `/quotes/new` + `/quotes/:id` - Sales quotes list and editor (line items, totals, convert-to-order)
+- `/orders` + `/orders/new` + `/orders/:id` - Customer orders list and editor with status workflow
+- `/tasks` - Task list with stats (pending/overdue/today/completed), today/overdue filters, create dialog
+- `/price-lists` - Price list configuration (VENTA/REVENDEDOR/COMPRA), currency, default selection
 
 ## Quick Activity FAB
 
@@ -167,6 +180,23 @@ Floating action button (bottom-right) on all pages. Allows quick logging of call
 - `GET /api/integrations/anura/webhooks` - List Anura call webhooks (auth required)
 - `PATCH /api/integrations/anura/webhooks/:id` - Assign clientId/salespersonId/notes to a call
 - `GET /api/salespeople/:id/profile` - Salesperson profile with calls, activities, stats
+- `GET/POST/PATCH/DELETE /api/price-lists` - Price lists CRUD (vendedor+)
+- `GET/POST/PATCH/DELETE /api/quotes` - Quotes CRUD with server-canonical totals (vendedor+)
+- `POST /api/quotes/:id/convert-to-order` - Atomic transactional quote-to-order conversion
+- `GET/POST/PATCH/DELETE /api/orders` - Orders CRUD with status workflow (vendedor+)
+- `GET /api/sale-conditions` - Payment terms list
+- `GET/POST/PATCH/DELETE /api/tasks` - Task management with due dates, assignment, related entities
+- `GET /api/tasks/stats/summary` - Per-user task counts (pending/overdue/today/completed)
+- `GET /api/notifications` - Per-user notifications with unreadCount
+- `POST /api/notifications/:id/read`, `POST /api/notifications/read-all` - Mark read
+- Notification bell in app header polls every 60s for unread count
+
+## Phase 1 Salesforce-parity Features (added)
+- **Cotizaciones** (Quotes): Full editor matching Traficaño screenshot — client, CUIT, contacts, sale condition, dates (issue/delivery/due/followup), price list, currency + FX rate, priority, type (COTIZACION/LICITACION/OFERTA), order type (REVENTA/PRODUCCION), description, internal notes, reference, purchase order, line items with product type/code/qty/qty_kg/unit_price/delivery_time/client_code, totals (net, total kg, avg price/kg). One-click convert to order (transactional).
+- **Pedidos** (Orders): Status workflow (draft → confirmed → in_production → shipped → delivered → invoiced), urgent/authorized flags, full line items.
+- **Listas de precios**: Multiple lists with currency, purchase/sale flags, default selection.
+- **Tareas**: Assignment, priority, due date, type (task/call/meeting/email/followup/reminder), related to client/opportunity/quote/order. Stats dashboard.
+- **Notificaciones**: Auto-fired on task assignment/reassignment, displayed in header bell with unread badge.
 
 ## Development Commands
 
