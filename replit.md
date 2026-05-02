@@ -61,6 +61,7 @@ The frontend provides a rich set of pages:
 - **Recently Viewed**: Command palette persists last 6 visited entities in `localStorage` and shows them under "Recientes" when the query is empty.
 - **Duplicate Detection**: `GET /api/duplicates/clients` (taxId, companyName) and `/duplicates/contacts` (email, phone), vendedor+. Reusable `DuplicateWarning` component with debounce shows a yellow inline panel under create/edit forms; wired into the new-client dialog.
 - **Today Tasks Widget**: Dashboard card "Mis tareas de hoy" lists pending tasks due today + overdue, sorted by due time, with one-click complete (PATCH `/api/tasks/:id` → `status=completed`) and priority/overdue badges.
+- **Order PDF**: `GET /api/orders/:id/pdf` (vendedor+) generates an A4 PDF mirroring the quote PDF layout (header, client+vendedor block, line items table, kg/total summary, observations footer). Triggered from a `FileText` action button on the orders list. Build externalized `pdfkit` so the bundled output can read its AFM font assets at runtime — this also fixed the pre-existing quote PDF 500.
 
 ## External Dependencies
 

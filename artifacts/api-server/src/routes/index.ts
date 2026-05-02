@@ -33,6 +33,7 @@ import reportsRouter from "./reports.js";
 import storageRouter from "./storage.js";
 import pipelinesRouter from "./pipelines.js";
 import quotePdfRouter from "./quote-pdf.js";
+import orderPdfRouter from "./order-pdf.js";
 import reportsExportRouter from "./reports-export.js";
 import gcalRouter from "./gcal.js";
 import csvRouter from "./csv.js";
@@ -152,6 +153,7 @@ router.use((req, res, next) => {
   return requireMinRole("gerente")(req, res, next);
 });
 router.use(requireMinRole("vendedor"), quotePdfRouter);
+router.use(requireMinRole("vendedor"), orderPdfRouter);
 router.use(requireMinRole("vendedor"), reportsExportRouter);
 router.use(gcalRouter);
 router.use(requireMinRole("gerente"), csvRouter);

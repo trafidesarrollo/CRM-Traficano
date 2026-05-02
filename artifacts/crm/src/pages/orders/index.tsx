@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Plus, Search, Eye, Trash2, Zap } from "lucide-react";
+import { ShoppingCart, Plus, Search, Eye, Trash2, Zap, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -105,8 +105,9 @@ export default function Orders() {
                     <td className="p-3">{o.isUrgent ? <Badge className="bg-red-500/20 text-red-300"><Zap className="w-3 h-3 mr-1" />SÍ</Badge> : <span className="text-muted-foreground">—</span>}</td>
                     <td className="p-3">{o.isAuthorized ? <Badge className="bg-green-500/20 text-green-300">SÍ</Badge> : <span className="text-muted-foreground">No</span>}</td>
                     <td className="p-3 flex gap-1">
-                      <Link href={`/orders/${o.id}`}><Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button></Link>
-                      <Button size="sm" variant="ghost" onClick={() => del(o.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                      <Link href={`/orders/${o.id}`}><Button size="sm" variant="ghost" aria-label="Ver pedido"><Eye className="w-4 h-4" /></Button></Link>
+                      <a href={`${API}/api/orders/${o.id}/pdf`} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" aria-label="Descargar PDF"><FileText className="w-4 h-4" /></Button></a>
+                      <Button size="sm" variant="ghost" aria-label="Eliminar pedido" onClick={() => del(o.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                     </td>
                   </tr>
                 );
