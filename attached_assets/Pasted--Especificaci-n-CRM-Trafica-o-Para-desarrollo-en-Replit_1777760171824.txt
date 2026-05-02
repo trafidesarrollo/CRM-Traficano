@@ -1,0 +1,405 @@
+# Especificación CRM Traficaño
+## Para desarrollo en Replit
+
+---
+
+## 1. GESTIÓN DE CONTACTOS Y EMPRESAS
+
+### Contactos
+- [ ] Ficha de contacto: nombre, apellido, email, teléfono, celular, cargo, LinkedIn
+- [ ] Foto de perfil (upload o LinkedIn)
+- [ ] Múltiples emails y teléfonos por contacto
+- [ ] Etiquetas/tags personalizables
+- [ ] Campos custom ilimitados
+- [ ] Historial completo de interacciones (timeline)
+- [ ] Vinculación a múltiples empresas
+- [ ] Score de contacto (lead scoring manual o automático)
+- [ ] Estado: activo, inactivo, do-not-contact
+- [ ] Fuente de origen (feria, web, referido, etc.)
+- [ ] Notas y comentarios con @menciones
+- [ ] Archivos adjuntos por contacto
+
+### Empresas/Cuentas
+- [ ] Ficha de empresa: razón social, CUIT, industria, tamaño, facturación estimada
+- [ ] Dirección con geolocalización
+- [ ] Múltiples sucursales/ubicaciones
+- [ ] Jerarquía de empresas (matriz → subsidiarias)
+- [ ] Contactos vinculados con rol (decisor, técnico, compras, etc.)
+- [ ] Segmentación: cliente, prospect, ex-cliente, proveedor, competidor
+- [ ] Clasificación: A, B, C (Pareto 80/20)
+- [ ] Campos custom por industria (ej: consumo anual de caños en toneladas)
+- [ ] Historial de compras
+- [ ] Crédito y condiciones de pago
+- [ ] Documentos vinculados (contratos, certificados)
+
+---
+
+## 2. PIPELINE Y OPORTUNIDADES (DEALS)
+
+### Pipeline visual
+- [ ] Tablero Kanban drag-and-drop
+- [ ] Múltiples pipelines (ej: OCTG, Trefilados, Exportación)
+- [ ] Etapas personalizables por pipeline
+- [ ] Colores por etapa o prioridad
+- [ ] Filtros: vendedor, fecha, valor, producto, probabilidad
+- [ ] Vista lista además de Kanban
+- [ ] Vista calendario de cierres esperados
+
+### Oportunidades/Deals
+- [ ] Nombre del deal
+- [ ] Empresa y contacto vinculados
+- [ ] Valor en USD y ARS (con tipo de cambio configurable)
+- [ ] Productos/líneas de cotización dentro del deal
+- [ ] Probabilidad de cierre (% manual o IA)
+- [ ] Fecha de cierre esperada
+- [ ] Etapa actual
+- [ ] Vendedor asignado (owner)
+- [ ] Co-owners / equipo
+- [ ] Competidores en el deal
+- [ ] Motivo de pérdida (si aplica)
+- [ ] Motivo de ganancia
+- [ ] Próxima acción con fecha
+- [ ] Historial de cambios de etapa
+- [ ] Tiempo en cada etapa
+- [ ] Archivos adjuntos (cotizaciones PDF, specs)
+- [ ] Notas internas
+
+### Productos y cotizaciones
+- [ ] Catálogo de productos con SKU, descripción, precio base
+- [ ] Categorías de productos
+- [ ] Precios por lista (lista 1, lista 2, exportación)
+- [ ] Descuentos por producto o deal
+- [ ] Unidades: toneladas, metros, unidades
+- [ ] Generación de cotización PDF desde el deal
+- [ ] Plantillas de cotización personalizables
+- [ ] Versionado de cotizaciones (v1, v2, v3)
+- [ ] Firma electrónica (integración o nativo)
+- [ ] Tracking de apertura de cotización
+
+---
+
+## 3. ACTIVIDADES Y TAREAS
+
+### Actividades
+- [ ] Tipos: llamada, email, reunión, visita, WhatsApp, nota
+- [ ] Registro manual o automático
+- [ ] Duración de llamadas
+- [ ] Resultado de actividad (conectó, no contestó, buzón, etc.)
+- [ ] Vinculación a contacto, empresa y deal
+- [ ] Recordatorios
+- [ ] Actividades recurrentes
+
+### Tareas
+- [ ] Crear tarea con fecha límite
+- [ ] Asignar a usuario
+- [ ] Prioridad: alta, media, baja
+- [ ] Estado: pendiente, en progreso, completada, cancelada
+- [ ] Vinculación a deal/contacto/empresa
+- [ ] Notificaciones de vencimiento
+- [ ] Vista de tareas por usuario (to-do list)
+- [ ] Vista de tareas vencidas
+
+### Calendario
+- [ ] Vista día, semana, mes
+- [ ] Sincronización con Google Calendar
+- [ ] Sincronización con Outlook
+- [ ] Crear eventos desde el CRM
+- [ ] Eventos vinculados a deals/contactos
+- [ ] Disponibilidad de vendedores
+- [ ] Reserva de salas (opcional)
+
+---
+
+## 4. EMAIL INTEGRADO
+
+### Integración email
+- [ ] Sync bidireccional Gmail
+- [ ] Sync bidireccional Outlook
+- [ ] Enviar email desde el CRM
+- [ ] Templates de email personalizables
+- [ ] Variables dinámicas ({{nombre}}, {{empresa}}, {{producto}})
+- [ ] Tracking de apertura
+- [ ] Tracking de clicks en links
+- [ ] Historial de emails en timeline del contacto
+- [ ] Email masivo (hasta X destinatarios)
+- [ ] Programar envío
+- [ ] Respuestas automáticas básicas
+
+### Secuencias de email (cadencias)
+- [ ] Crear secuencia multi-paso
+- [ ] Triggers: si abre, si no abre, si clickea
+- [ ] Pausar secuencia si responde
+- [ ] Métricas de secuencia: open rate, reply rate
+- [ ] A/B testing de asuntos
+
+---
+
+## 5. AUTOMATIZACIONES (WORKFLOWS)
+
+### Motor de automatización
+- [ ] Trigger → Condición → Acción
+- [ ] Triggers: nuevo contacto, deal cambia etapa, tarea vencida, email abierto, etc.
+- [ ] Condiciones: campo = valor, fecha, vendedor, etc.
+- [ ] Acciones: crear tarea, enviar email, notificar, cambiar campo, asignar owner
+- [ ] Delays (esperar X días)
+- [ ] Bifurcaciones (if/else)
+- [ ] Builder visual drag-and-drop
+- [ ] Templates de automatización predefinidos
+- [ ] Log de ejecución de automatizaciones
+
+### Ejemplos para Traficaño
+- [ ] Cotización sin respuesta 5 días → email + tarea
+- [ ] Deal >100k USD → notificar a Mariano
+- [ ] Nuevo lead de feria → asignar a vendedor de turno
+- [ ] Cliente sin actividad 90 días → alerta de reactivación
+
+---
+
+## 6. REPORTES Y DASHBOARDS
+
+### Dashboards
+- [ ] Dashboard principal personalizable
+- [ ] Widgets drag-and-drop
+- [ ] Filtros globales (fecha, vendedor, pipeline)
+- [ ] Dashboards por rol (vendedor, gerente, CEO)
+- [ ] Compartir dashboard con link
+
+### Reportes de ventas
+- [ ] Pipeline actual (valor por etapa)
+- [ ] Forecast de cierre (por mes, trimestre)
+- [ ] Deals ganados vs perdidos
+- [ ] Tasa de conversión por etapa
+- [ ] Tiempo promedio de cierre
+- [ ] Valor promedio de deal
+- [ ] Deals por vendedor
+- [ ] Deals por producto/categoría
+- [ ] Deals por industria/segmento
+- [ ] Comparativo período anterior
+
+### Reportes de actividad
+- [ ] Actividades por vendedor (calls, emails, reuniones)
+- [ ] Actividades por día/semana
+- [ ] Ranking de vendedores
+- [ ] Tareas completadas vs vencidas
+- [ ] Tiempo de respuesta a leads
+
+### Reportes de clientes
+- [ ] Nuevos contactos por período
+- [ ] Contactos por fuente
+- [ ] Empresas por segmento
+- [ ] Clientes activos vs inactivos
+- [ ] Top clientes por facturación
+
+### Exportación
+- [ ] Exportar a Excel/CSV
+- [ ] Exportar a PDF
+- [ ] Programar envío automático de reportes por email
+
+---
+
+## 7. GESTIÓN DE USUARIOS Y PERMISOS
+
+### Usuarios
+- [ ] Crear usuarios con email y contraseña
+- [ ] Roles: Admin, Gerente, Vendedor, Solo lectura
+- [ ] Foto de perfil
+- [ ] Firma de email por usuario
+- [ ] Objetivos/cuotas por usuario
+- [ ] Activar/desactivar usuarios
+
+### Permisos granulares
+- [ ] Ver todos los deals vs solo los propios
+- [ ] Editar vs solo ver
+- [ ] Eliminar registros
+- [ ] Exportar datos
+- [ ] Acceso a reportes
+- [ ] Configuración del sistema
+- [ ] Gestión de usuarios
+
+### Equipos
+- [ ] Crear equipos (ej: Equipo Reventa, Equipo Producción)
+- [ ] Asignar usuarios a equipos
+- [ ] Reportes por equipo
+- [ ] Deals compartidos en equipo
+
+---
+
+## 8. INTEGRACIONES
+
+### Nativas prioritarias
+- [ ] Gmail API
+- [ ] Google Calendar
+- [ ] Google Contacts
+- [ ] WhatsApp Business API (o link directo wa.me)
+- [ ] Outlook/Microsoft 365
+
+### Otras integraciones
+- [ ] Zapier / Make (para conectar con cualquier app)
+- [ ] API REST documentada
+- [ ] Webhooks (notificar eventos a sistemas externos)
+- [ ] Importar desde Excel/CSV
+- [ ] Importar desde otro CRM
+
+### Integraciones futuras (nice to have)
+- [ ] Facturación/ERP (ej: conectar con sistema de gestión)
+- [ ] Telefonía VoIP (click-to-call)
+- [ ] LinkedIn Sales Navigator
+- [ ] Slack / Teams para notificaciones
+
+---
+
+## 9. MÓVIL
+
+### App móvil o PWA
+- [ ] Acceso desde celular (responsive o app)
+- [ ] Ver y editar contactos
+- [ ] Ver pipeline
+- [ ] Registrar actividades
+- [ ] Ver tareas pendientes
+- [ ] Notificaciones push
+- [ ] Llamar con un click
+- [ ] Enviar WhatsApp con un click
+- [ ] Escanear tarjetas de presentación (OCR)
+- [ ] Modo offline básico
+
+---
+
+## 10. IA Y ASISTENTES
+
+### Funcionalidades IA
+- [ ] Lead scoring automático (probabilidad de cierre)
+- [ ] Sugerencia de próxima acción
+- [ ] Resumen automático de emails/llamadas
+- [ ] Detección de sentimiento en emails
+- [ ] Predicción de fecha de cierre
+- [ ] Alertas de deals en riesgo
+- [ ] Chatbot interno para consultas ("¿cuánto vendió Gustavo este mes?")
+- [ ] Transcripción de notas de voz a texto
+- [ ] Generación de emails con IA
+
+---
+
+## 11. CONFIGURACIÓN Y PERSONALIZACIÓN
+
+### Campos custom
+- [ ] Crear campos custom por entidad (contacto, empresa, deal)
+- [ ] Tipos: texto, número, fecha, dropdown, checkbox, multiselect, usuario, archivo
+- [ ] Campos obligatorios por etapa
+- [ ] Campos calculados (fórmulas)
+
+### Personalización UI
+- [ ] Logo de empresa
+- [ ] Colores corporativos
+- [ ] Idioma español
+- [ ] Formato de fecha (DD/MM/YYYY)
+- [ ] Moneda principal (USD, ARS)
+- [ ] Tipo de cambio manual o automático
+- [ ] Zona horaria (America/Argentina/Buenos_Aires)
+
+### Plantillas
+- [ ] Plantillas de email
+- [ ] Plantillas de cotización
+- [ ] Plantillas de tareas recurrentes
+
+---
+
+## 12. SEGURIDAD Y AUDITORÍA
+
+### Seguridad
+- [ ] Login seguro (hash de contraseñas)
+- [ ] 2FA (autenticación de dos factores)
+- [ ] Sesiones activas (ver y cerrar)
+- [ ] Timeout de sesión configurable
+- [ ] HTTPS obligatorio
+- [ ] Backup automático de datos
+
+### Auditoría
+- [ ] Log de acciones (quién hizo qué, cuándo)
+- [ ] Historial de cambios por registro
+- [ ] Log de login/logout
+- [ ] Exportar logs
+
+---
+
+## 13. ESPECÍFICO TRAFICAÑO
+
+### Campos específicos industria
+- [ ] Tipo de producto: OCTG, Line Pipe, Conducción, Trefilado, Bridas, Accesorios
+- [ ] Especificación: norma (API 5CT, API 5L, ASTM), grado, diámetro, espesor
+- [ ] Volumen en toneladas y metros
+- [ ] Incoterm (FOB, CIF, EXW)
+- [ ] Puerto de destino (si exportación)
+- [ ] Lead time comprometido
+- [ ] Certificaciones requeridas
+
+### Pipelines sugeridos
+- [ ] Pipeline OCTG/Line Pipe (stock)
+- [ ] Pipeline Tubos Trefilados (producción)
+- [ ] Pipeline Exportación
+- [ ] Pipeline Bridas y Accesorios
+
+### Reportes específicos
+- [ ] Toneladas cotizadas vs vendidas
+- [ ] USD/tonelada promedio
+- [ ] Deals por zona (Neuquén, Mendoza, etc.)
+- [ ] Deals por industria (Oil&Gas, Minería, Automotriz)
+
+---
+
+## 14. NICE TO HAVE (FASE 2)
+
+- [ ] Portal de cliente (ver sus cotizaciones, pedidos)
+- [ ] Chat en vivo en web
+- [ ] Base de conocimiento interna
+- [ ] Gestión de contratos con alertas de vencimiento
+- [ ] Encuestas de satisfacción post-venta
+- [ ] Gamification (ranking vendedores, badges)
+- [ ] Integración con BI externo (Power BI, Metabase)
+
+---
+
+## STACK SUGERIDO PARA REPLIT
+
+### Frontend
+- React o Next.js
+- Tailwind CSS
+- Shadcn/UI o similar
+
+### Backend
+- Node.js + Express o FastAPI (Python)
+- PostgreSQL (base de datos)
+- Redis (caché, sesiones)
+
+### Servicios externos
+- Gmail API
+- Google Calendar API
+- OpenAI API (para features IA)
+- Resend o SendGrid (emails transaccionales)
+
+### Hosting
+- Replit para desarrollo
+- Railway / Render / Vercel para producción
+
+---
+
+## PRIORIDAD DE DESARROLLO
+
+### MVP (Fase 1) - 4-6 semanas
+1. Contactos y empresas (CRUD básico)
+2. Pipeline con deals (Kanban)
+3. Actividades y tareas
+4. Usuarios y login
+5. Dashboard básico
+6. Integración Gmail
+
+### Fase 2 - 4 semanas
+7. Automatizaciones básicas
+8. Reportes avanzados
+9. Cotizaciones PDF
+10. App móvil (PWA)
+
+### Fase 3 - 4 semanas
+11. IA (lead scoring, sugerencias)
+12. Secuencias de email
+13. API y webhooks
+14. Integraciones adicionales

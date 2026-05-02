@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { 
   LayoutDashboard, Inbox, Briefcase, Users, Contact2, UserSquare, 
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
-  Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo
+  Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo,
+  CalendarDays, BarChart3, Workflow, Sliders, MailOpen
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -27,11 +28,16 @@ const navItems = [
   { href: "/quotes", label: "Cotizaciones", icon: FileText },
   { href: "/orders", label: "Pedidos", icon: ShoppingCart },
   { href: "/tasks", label: "Tareas", icon: ListTodo },
+  { href: "/calendar", label: "Calendario", icon: CalendarDays },
+  { href: "/reports", label: "Reportes", icon: BarChart3 },
   { href: "/clients", label: "Clientes", icon: Users },
   { href: "/contacts", label: "Contactos", icon: Contact2 },
   { href: "/salespeople", label: "Vendedores", icon: UserSquare },
   { href: "/products", label: "Productos", icon: Package },
   { href: "/price-lists", label: "Listas de precios", icon: Tag },
+  { href: "/email-templates", label: "Plantillas Email", icon: MailOpen },
+  { href: "/automation", label: "Automatizaciones", icon: Workflow, roles: ["admin", "gerente"] },
+  { href: "/custom-fields", label: "Campos personalizados", icon: Sliders, roles: ["admin", "gerente"] },
   { href: "/imports", label: "Importar CSV", icon: UploadCloud },
   { href: "/followups", label: "Seguimientos", icon: Timer },
   { href: "/goals", label: "Metas", icon: Target, roles: ["admin", "gerente"] },

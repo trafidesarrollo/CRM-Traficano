@@ -21,6 +21,14 @@ router.get("/tasks", async (req, res) => {
     if (view === "overdue") {
       conds.push(and(lt(tasksTable.dueDate, new Date()), sql`${tasksTable.status} != 'completed'`));
     }
+    if (req.query.from) {
+      const f = new Date(req.query.from as string);
+      if (!Number.isNaN(f.getTime())) conds.push(gt(tasksTable.dueDate, f));
+    }
+    if (req.query.to) {
+      const t = new Date(req.query.to as string);
+      if (!Number.isNaN(t.getTime())) conds.push(lt(tasksTable.dueDate, t));
+    }
     const where = conds.length ? and(...conds) : undefined;
 
     const data = await db.select({

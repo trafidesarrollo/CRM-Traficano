@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute, Link } from "wouter";
 import { AppLayout } from "@/components/layout";
+import { DocumentUploader } from "@/components/document-uploader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -453,6 +454,7 @@ export default function QuoteEdit() {
           </div>
         </CardContent>
       </Card>
+      {!isNew && id && <div className="mt-4"><DocumentUploader entityType="quote" entityId={id} /></div>}
     </AppLayout>
   );
 }

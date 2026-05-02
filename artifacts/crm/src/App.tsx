@@ -28,6 +28,11 @@ import QuoteEdit from "@/pages/quotes/edit";
 import Orders from "@/pages/orders/index";
 import OrderEdit from "@/pages/orders/edit";
 import Tasks from "@/pages/tasks/index";
+import CalendarPage from "@/pages/calendar/index";
+import EmailTemplates from "@/pages/email-templates/index";
+import Reports from "@/pages/reports/index";
+import Automation from "@/pages/automation/index";
+import CustomFields from "@/pages/custom-fields/index";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -85,6 +90,11 @@ function Router() {
       <Route path="/orders/new" component={() => <ProtectedRoute component={OrderEdit} />} />
       <Route path="/orders/:id" component={() => <ProtectedRoute component={OrderEdit} />} />
       <Route path="/tasks" component={() => <ProtectedRoute component={Tasks} />} />
+      <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
+      <Route path="/email-templates" component={() => <ProtectedRoute component={EmailTemplates} />} />
+      <Route path="/reports" component={() => <ProtectedRoute component={Reports} />} />
+      <Route path="/automation" component={() => <ProtectedRoute component={Automation} />} />
+      <Route path="/custom-fields" component={() => <ProtectedRoute component={CustomFields} />} />
 
       <Route component={NotFound} />
     </Switch>

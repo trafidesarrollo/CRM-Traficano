@@ -25,6 +25,12 @@ import quotesRouter from "./quotes.js";
 import ordersRouter from "./orders.js";
 import tasksRouter from "./tasks.js";
 import notificationsRouter from "./notifications.js";
+import emailTemplatesRouter from "./email-templates.js";
+import documentsRouter from "./documents.js";
+import automationRouter from "./automation.js";
+import customFieldsRouter from "./custom-fields.js";
+import reportsRouter from "./reports.js";
+import storageRouter from "./storage.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -124,6 +130,12 @@ router.use(requireMinRole("vendedor"), quotesRouter);
 router.use(requireMinRole("vendedor"), ordersRouter);
 router.use(tasksRouter);
 router.use(notificationsRouter);
+router.use(requireMinRole("vendedor"), emailTemplatesRouter);
+router.use(documentsRouter);
+router.use(storageRouter);
+router.use(requireMinRole("gerente"), automationRouter);
+router.use(requireMinRole("gerente"), customFieldsRouter);
+router.use(requireMinRole("vendedor"), reportsRouter);
 router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 

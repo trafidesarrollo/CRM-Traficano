@@ -113,6 +113,12 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `order_lines` - Line items per order
 - `tasks` - Tasks/todos with assignee, priority, due date, related entity (client/opp/quote/order)
 - `notifications` - Per-user notifications (task assigned, etc.) with read state
+- `email_templates` - Reusable email templates with variable substitution ({{var}})
+- `documents` - File attachments stored in object storage, linked to any entity (quote/order/client/etc.)
+- `automation_rules` - Trigger-based automation (event + conditions + actions, JSON-based DSL)
+- `automation_logs` - Execution history of automation rules
+- `custom_field_defs` - Per-entity custom field definitions (text/number/date/select/etc.)
+- `custom_field_values` - Values for custom fields per entity instance
 
 ## Frontend Pages
 
@@ -136,6 +142,11 @@ Hunter generates lead → assigns to Farmer → Farmer requests quote → Admin 
 - `/orders` + `/orders/new` + `/orders/:id` - Customer orders list and editor with status workflow
 - `/tasks` - Task list with stats (pending/overdue/today/completed), today/overdue filters, create dialog
 - `/price-lists` - Price list configuration (VENTA/REVENDEDOR/COMPRA), currency, default selection
+- `/calendar` - Weekly calendar view of tasks (color-coded by priority, navigate by week)
+- `/email-templates` - CRUD of reusable email templates with HTML body and variable substitution
+- `/reports` - Dashboard with charts: sales summary KPIs, sales by month (line chart), pipeline funnel (bar), salesperson ranking, activities by type (pie), top clients
+- `/automation` - Trigger-based automation rules (gerente+) with execution logs tab
+- `/custom-fields` - Define custom fields per entity (gerente+)
 
 ## Quick Activity FAB
 

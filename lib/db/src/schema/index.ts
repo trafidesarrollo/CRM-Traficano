@@ -21,3 +21,7 @@ export * from "./quotes";
 export * from "./orders";
 export * from "./tasks";
 export * from "./notifications";
+export * from "./email_templates";
+export * from "./documents";
+export * from "./automation";
+export * from "./custom_fields";
