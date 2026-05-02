@@ -238,3 +238,15 @@ Seis funcionalidades agregadas:
 - Mutaciones de `/pipelines` requieren rol `gerente` (defensa en profundidad).
 - DELETE de pipeline bloqueado si tiene oportunidades; cascada manual de stages.
 - Pull de Calendar es realmente bidireccional: eventos con `crmTaskId` actualizan la task; eventos cancelados marcan task como `cancelled`.
+
+## Import/Export CSV universal (mayo 2026)
+
+Página `/csv` (admin/gerente) y API genérica para todas las entidades clave:
+
+- **Entidades**: clients, contacts, products, opportunities, salespeople, tasks, pipelines, pipeline_stages, quotes, orders.
+- **Endpoints**:
+  - `GET /api/csv/entities` — lista entidades con campos y obligatorios
+  - `GET /api/csv/template/:entity` — descarga plantilla CSV vacía
+  - `GET /api/csv/export/:entity` — exporta hasta 10k filas como CSV
+  - `POST /api/csv/import/:entity` `{csv, mode: "upsert"|"insert"}` — importa con coerción automática (json, numeric, boolean), reporta inserted/updated/skipped/errors por línea.
+- Sube por archivo o pega texto directamente en la UI.

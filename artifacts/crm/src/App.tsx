@@ -18,6 +18,7 @@ import CalendarSync from "@/pages/calendar/sync";
 import Salespeople from "@/pages/salespeople/index";
 import Products from "@/pages/products/index";
 import Imports from "@/pages/imports/index";
+import CsvPage from "@/pages/csv/index";
 import Gmail from "@/pages/gmail/index";
 import Prompts from "@/pages/prompts/index";
 import UsersPage from "@/pages/users/index";
@@ -82,6 +83,7 @@ function Router() {
       <Route path="/salespeople" component={() => <ProtectedRoute component={Salespeople} />} />
       <Route path="/products" component={() => <ProtectedRoute component={Products} />} />
       <Route path="/imports" component={() => <ProtectedRoute component={Imports} />} />
+      <Route path="/csv" component={() => <ProtectedRoute component={CsvPage} />} />
       <Route path="/gmail" component={() => <ProtectedRoute component={Gmail} />} />
       <Route path="/anura" component={() => <ProtectedRoute component={AnuraPage} />} />
       <Route path="/followups" component={() => <ProtectedRoute component={Followups} />} />

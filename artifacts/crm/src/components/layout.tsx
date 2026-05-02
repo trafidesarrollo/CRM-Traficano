@@ -41,6 +41,7 @@ const navItems = [
   { href: "/automation", label: "Automatizaciones", icon: Workflow, roles: ["admin", "gerente"] },
   { href: "/custom-fields", label: "Campos personalizados", icon: Sliders, roles: ["admin", "gerente"] },
   { href: "/imports", label: "Importar CSV", icon: UploadCloud },
+  { href: "/csv", label: "Import/Export CSV", icon: UploadCloud, roles: ["admin", "gerente"] },
   { href: "/followups", label: "Seguimientos", icon: Timer },
   { href: "/goals", label: "Metas", icon: Target, roles: ["admin", "gerente"] },
   { href: "/gmail", label: "Gmail Sync", icon: Mail },
