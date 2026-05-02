@@ -56,6 +56,9 @@ The frontend provides a rich set of pages:
 - **Universal CSV Import/Export**: A generic API and UI for importing and exporting data for key entities (clients, contacts, products, opportunities, etc.) with automatic type coercion and detailed reporting.
 - **Global Search (Cmd/Ctrl+K)**: Cross-entity search palette over clients, contacts, products, opportunities, quotes, and orders. Backend `GET /api/search?q=` (vendedor+); frontend `CommandPalette` with keyboard navigation.
 - **Bulk Actions**: Server endpoints `POST /api/bulk/delete` and `POST /api/bulk/update` (gerente+) for multi-row delete and whitelisted field updates on clients/contacts/products/opportunities/tasks. Multi-select UI on contacts list with action bar.
+- **Audit Log Viewer (`/audit`)**: Admin/gerente page that browses `audit_logs` with filters by entity, action and user, expandable JSON details, and pagination. Backed by existing `GET /api/audit`.
+- **Keyboard Shortcuts**: Global handler — `?` opens the cheatsheet dialog; `G + letter` navigates (d/c/o/t/q/i/r/a). Ignored when typing in inputs.
+- **Recently Viewed**: Command palette persists last 6 visited entities in `localStorage` and shows them under "Recientes" when the query is empty.
 
 ## External Dependencies
 

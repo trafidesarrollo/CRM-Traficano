@@ -39,6 +39,8 @@ import Automation from "@/pages/automation/index";
 import CustomFields from "@/pages/custom-fields/index";
 import NotFound from "@/pages/not-found";
 import { CommandPalette } from "@/components/command-palette";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import AuditLogPage from "@/pages/audit/index";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +87,7 @@ function Router() {
       <Route path="/products" component={() => <ProtectedRoute component={Products} />} />
       <Route path="/imports" component={() => <ProtectedRoute component={Imports} />} />
       <Route path="/csv" component={() => <ProtectedRoute component={CsvPage} />} />
+      <Route path="/audit" component={() => <ProtectedRoute component={AuditLogPage} />} />
       <Route path="/gmail" component={() => <ProtectedRoute component={Gmail} />} />
       <Route path="/anura" component={() => <ProtectedRoute component={AnuraPage} />} />
       <Route path="/followups" component={() => <ProtectedRoute component={Followups} />} />
@@ -119,6 +122,7 @@ function App() {
           <AuthProvider>
             <Router />
             <CommandPalette />
+            <KeyboardShortcuts />
           </AuthProvider>
         </WouterRouter>
         <Toaster />

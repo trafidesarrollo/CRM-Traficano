@@ -18,11 +18,14 @@ router.get("/", async (req, res) => {
     if (action) conditions.push(eq(auditLogsTable.action, action));
     if (userId) conditions.push(eq(auditLogsTable.userId, userId));
 
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
     const [data, countResult] = await Promise.all([
-      conditions.length > 0
-        ? db.select().from(auditLogsTable).where(and(...conditions)).orderBy(desc(auditLogsTable.createdAt)).limit(limit).offset(offset)
+      whereClause
+        ? db.select().from(auditLogsTable).where(whereClause).orderBy(desc(auditLogsTable.createdAt)).limit(limit).offset(offset)
         : db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.createdAt)).limit(limit).offset(offset),
-      db.select({ count: sql<number>`count(*)` }).from(auditLogsTable),
+      whereClause
+        ? db.select({ count: sql<number>`count(*)` }).from(auditLogsTable).where(whereClause)
+        : db.select({ count: sql<number>`count(*)` }).from(auditLogsTable),
     ]);
 
     res.json({ data, total: Number(countResult[0].count), page, limit });

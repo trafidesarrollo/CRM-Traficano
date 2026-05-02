@@ -13,10 +13,21 @@ const ICONS: Record<string, any> = {
 
 type Result = { kind: string; id: number; title: string; subtitle: string; url: string };
 
+const RECENT_KEY = "crm:recentSearches";
+function loadRecent(): Result[] {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
+}
+function pushRecent(r: Result) {
+  const list = loadRecent().filter(x => !(x.kind === r.kind && x.id === r.id));
+  list.unshift(r);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 6)));
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Result[]>([]);
+  const [recent, setRecent] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
   const [, setLocation] = useLocation();
@@ -35,7 +46,8 @@ export function CommandPalette() {
   }, []);
 
   useEffect(() => {
-    if (!open) { setQ(""); setResults([]); setActive(0); return; }
+    if (open) { setRecent(loadRecent()); }
+    else { setQ(""); setResults([]); setActive(0); }
   }, [open]);
 
   useEffect(() => {
@@ -54,13 +66,16 @@ export function CommandPalette() {
 
   function go(r: Result) {
     setOpen(false);
+    pushRecent(r);
     setLocation(r.url);
   }
 
+  const visible = q.trim().length >= 2 ? results : recent;
+
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "ArrowDown") { e.preventDefault(); setActive(i => Math.min(i + 1, results.length - 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive(i => Math.min(i + 1, visible.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive(i => Math.max(i - 1, 0)); }
-    else if (e.key === "Enter" && results[active]) { e.preventDefault(); go(results[active]); }
+    else if (e.key === "Enter" && visible[active]) { e.preventDefault(); go(visible[active]); }
   }
 
   return (
@@ -78,15 +93,18 @@ export function CommandPalette() {
           {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
         <div className="max-h-[400px] overflow-y-auto p-1">
-          {q.trim().length < 2 && (
+          {q.trim().length < 2 && recent.length === 0 && (
             <div className="p-6 text-center text-sm text-muted-foreground">
               Escribí al menos 2 caracteres. Usá <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">↑↓</kbd> y <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">Enter</kbd>.
             </div>
           )}
+          {q.trim().length < 2 && recent.length > 0 && (
+            <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Recientes</div>
+          )}
           {q.trim().length >= 2 && !loading && results.length === 0 && (
             <div className="p-6 text-center text-sm text-muted-foreground">Sin resultados</div>
           )}
-          {results.map((r, i) => {
+          {visible.map((r, i) => {
             const Icon = ICONS[r.kind] || Search;
             return (
               <button
