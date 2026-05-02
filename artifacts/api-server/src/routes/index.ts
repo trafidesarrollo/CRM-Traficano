@@ -36,6 +36,8 @@ import quotePdfRouter from "./quote-pdf.js";
 import reportsExportRouter from "./reports-export.js";
 import gcalRouter from "./gcal.js";
 import csvRouter from "./csv.js";
+import searchRouter from "./search.js";
+import bulkRouter from "./bulk.js";
 import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -152,6 +154,8 @@ router.use(requireMinRole("vendedor"), quotePdfRouter);
 router.use(requireMinRole("vendedor"), reportsExportRouter);
 router.use(gcalRouter);
 router.use(requireMinRole("gerente"), csvRouter);
+router.use(requireMinRole("vendedor"), searchRouter);
+router.use(requireMinRole("gerente"), bulkRouter);
 router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 

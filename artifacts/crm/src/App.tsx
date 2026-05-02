@@ -38,6 +38,7 @@ import Reports from "@/pages/reports/index";
 import Automation from "@/pages/automation/index";
 import CustomFields from "@/pages/custom-fields/index";
 import NotFound from "@/pages/not-found";
+import { CommandPalette } from "@/components/command-palette";
 
 const queryClient = new QueryClient();
 
@@ -117,6 +118,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
             <Router />
+            <CommandPalette />
           </AuthProvider>
         </WouterRouter>
         <Toaster />
