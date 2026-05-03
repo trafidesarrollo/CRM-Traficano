@@ -41,6 +41,9 @@ import NotFound from "@/pages/not-found";
 import { CommandPalette } from "@/components/command-palette";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import AuditLogPage from "@/pages/audit/index";
+import ProductionList from "@/pages/production/index";
+import ProductionDetail from "@/pages/production/detail";
+import ProductionDashboard from "@/pages/production/dashboard";
 
 const queryClient = new QueryClient();
 
@@ -88,6 +91,9 @@ function Router() {
       <Route path="/imports" component={() => <ProtectedRoute component={Imports} />} />
       <Route path="/csv" component={() => <ProtectedRoute component={CsvPage} />} />
       <Route path="/audit" component={() => <ProtectedRoute component={AuditLogPage} />} />
+      <Route path="/production" component={() => <ProtectedRoute component={ProductionList} />} />
+      <Route path="/production/dashboard" component={() => <ProtectedRoute component={ProductionDashboard} />} />
+      <Route path="/production/:id" component={() => <ProtectedRoute component={ProductionDetail} />} />
       <Route path="/gmail" component={() => <ProtectedRoute component={Gmail} />} />
       <Route path="/anura" component={() => <ProtectedRoute component={AnuraPage} />} />
       <Route path="/followups" component={() => <ProtectedRoute component={Followups} />} />

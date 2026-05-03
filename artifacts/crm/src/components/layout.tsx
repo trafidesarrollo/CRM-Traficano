@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Inbox, Briefcase, Users, Contact2, UserSquare, 
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
   Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo,
-  CalendarDays, BarChart3, Workflow, Sliders, MailOpen, GitBranch, CalendarClock, ShieldCheck
+  CalendarDays, BarChart3, Workflow, Sliders, MailOpen, GitBranch, CalendarClock, ShieldCheck, Factory
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ const navItems = [
   { href: "/anura", label: "Anura Llamadas", icon: PhoneCall },
   { href: "/prompts", label: "Prompts IA", icon: Bot },
   { href: "/audit", label: "Auditoría", icon: ShieldCheck, roles: ["admin", "gerente"] },
+  { href: "/production", label: "Producción (MES)", icon: Factory },
   { href: "/users", label: "Usuarios", icon: Settings, roles: ["admin"] },
 ];
 
