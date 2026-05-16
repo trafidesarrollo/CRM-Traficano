@@ -12,3 +12,9 @@ id = "CzayiMx6los_JDu96Pm_A"
 uri = "file://crm-comercial-completo.zip"
 type = "unspecified"
 title = "CRM Comercial B2B - Código Completo (Fases A-F)"
+
+[[outputs]]
+id = "VeeGqpEhXX26iB4yLw-RU"
+uri = "file://crm-traficano.tar.gz"
+type = "unspecified"
+title = "Código fuente — CRM Traficaño"
