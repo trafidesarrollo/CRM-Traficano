@@ -1,12 +1,16 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import pinoHttp from "pino-http";
+import pg from "pg";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import crypto from "crypto";
 
 const app: Express = express();
+
+app.set("trust proxy", 1);
 
 app.use(
   pinoHttp({
@@ -41,8 +45,16 @@ if (!sessionSecret) {
   logger.warn("SESSION_SECRET no configurado. Usando secreto aleatorio temporal (no persistente entre reinicios).");
 }
 
+const PgSession = connectPgSimple(session);
+const pgPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
 app.use(
   session({
+    store: new PgSession({
+      pool: pgPool,
+      createTableIfMissing: true,
+      tableName: "session",
+    }),
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,

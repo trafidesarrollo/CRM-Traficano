@@ -46,6 +46,7 @@ async function buildAll() {
       "cpu-features",
       "dtrace-provider",
       "isolated-vm",
+      "connect-pg-simple",
       "lightningcss",
       "pg-native",
       "oracledb",
