@@ -40,6 +40,7 @@ import CustomFields from "@/pages/custom-fields/index";
 import NotFound from "@/pages/not-found";
 import { CommandPalette } from "@/components/command-palette";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { ErrorBoundary } from "@/components/error-boundary";
 import AuditLogPage from "@/pages/audit/index";
 import ProductionList from "@/pages/production/index";
 import ProductionDetail from "@/pages/production/detail";
@@ -126,9 +127,11 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
-            <Router />
-            <CommandPalette />
-            <KeyboardShortcuts />
+            <ErrorBoundary>
+              <Router />
+              <CommandPalette />
+              <KeyboardShortcuts />
+            </ErrorBoundary>
           </AuthProvider>
         </WouterRouter>
         <Toaster />

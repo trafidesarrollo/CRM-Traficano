@@ -58,8 +58,14 @@ export default function Tasks() {
 
   useEffect(() => { load(); }, [view]);
   useEffect(() => {
-    fetch(`${API}/api/users`, { credentials: "include" }).then(r => r.json()).then(d => setUsers(Array.isArray(d) ? d : (d.data || []))).catch(() => {});
-    fetch(`${API}/api/clients?limit=300`, { credentials: "include" }).then(r => r.json()).then(d => setClients(d.data || d || []));
+    fetch(`${API}/api/users`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setUsers(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []))
+      .catch(() => {});
+    fetch(`${API}/api/clients?limit=300`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setClients(Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []))
+      .catch(() => {});
   }, []);
 
   const create = async () => {
