@@ -65,6 +65,7 @@ router.get("/integrations/anura/webhooks", async (req, res) => {
     Math.max(1, parseInt(req.query.limit as string) || 50),
   );
   const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+  const [data, countResult] = await Promise.all([
     database
       .select()
       .from(anuraWebhooksTable)
