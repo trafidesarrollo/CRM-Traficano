@@ -96,12 +96,16 @@ function QuickActivityFAB() {
         completedAt: new Date().toISOString(),
       };
 
-      await fetch(`${API_BASE}/api/activities`, {
+      const actRes = await fetch(`${API_BASE}/api/activities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(actBody),
       });
+      if (!actRes.ok) {
+        const err = await actRes.json().catch(() => ({}));
+        throw new Error(err.error || `Error ${actRes.status}`);
+      }
 
       if (form.generatesLead) {
         const oppBody: any = {
@@ -111,19 +115,23 @@ function QuickActivityFAB() {
           priority: "medium",
           farmerId: form.farmerId && form.farmerId !== "none" ? parseInt(form.farmerId) : undefined,
         };
-        await fetch(`${API_BASE}/api/opportunities`, {
+        const oppRes = await fetch(`${API_BASE}/api/opportunities`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify(oppBody),
         });
+        if (!oppRes.ok) {
+          const err = await oppRes.json().catch(() => ({}));
+          throw new Error(err.error || `Error ${oppRes.status}`);
+        }
       }
 
       toast({ title: form.generatesLead ? "Actividad registrada y lead creado" : "Actividad registrada" });
       setOpen(false);
       setForm({ type: "call", clientId: "", outcome: "contacted", generatesLead: false, farmerId: "", notes: "" });
-    } catch {
-      toast({ title: "Error al guardar", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: err?.message || "Error al guardar", variant: "destructive" });
     } finally {
       setSaving(false);
     }
