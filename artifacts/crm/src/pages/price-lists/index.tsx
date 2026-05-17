@@ -20,7 +20,7 @@ export default function PriceLists() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<any>({ name: "", currency: "USD", isPurchase: false, isSale: true, isDefault: false });
 
-  const load = () => fetch(`${API}/api/price-lists`, { credentials: "include" }).then(r => r.json()).then(setItems);
+  const load = () => fetch(`${API}/api/price-lists`, { credentials: "include" }).then(r => r.json()).then(d => setItems(Array.isArray(d) ? d : (d.data || [])));
   useEffect(() => { load(); }, []);
 
   const save = async () => {

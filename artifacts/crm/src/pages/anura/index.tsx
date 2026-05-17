@@ -80,8 +80,8 @@ export default function AnuraPage() {
       const res = await fetch(`${API_BASE}/api/integrations/anura/webhooks?limit=50`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
-        setWebhooks(data.data);
-        setTotal(data.total);
+        setWebhooks(data.data || []);
+        setTotal(data.total || 0);
       }
     } catch {} finally { setLoading(false); }
   }, []);
