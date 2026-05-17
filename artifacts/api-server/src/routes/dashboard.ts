@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, clientsTable, opportunitiesTable, emailsTable, activitiesTable, salespeopleTable, goalsTable } from "@workspace/db";
-import { eq, sql, and, gte, inArray, notInArray, isNotNull } from "drizzle-orm";
+import { eq, sql, and, gte, inArray, notInArray, isNotNull, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -43,7 +43,7 @@ router.get("/dashboard/metrics", async (req, res) => {
       db.select({ count: sql<number>`count(*)` }).from(emailsTable).where(eq(emailsTable.category, "quote_request")),
       db.select({ count: sql<number>`count(*)` }).from(emailsTable).where(eq(emailsTable.category, "complaint")),
       db.select({ count: sql<number>`count(*)` }).from(emailsTable).where(eq(emailsTable.category, "inquiry")),
-      db.select().from(activitiesTable).orderBy(activitiesTable.createdAt).limit(10),
+      db.select().from(activitiesTable).orderBy(desc(activitiesTable.createdAt)).limit(10),
       db.select().from(salespeopleTable).where(eq(salespeopleTable.isActive, true)),
     ]);
 

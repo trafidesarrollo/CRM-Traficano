@@ -35,7 +35,14 @@ export default function Dashboard() {
     );
   }
 
-  if (!metrics) return null;
+  if (!metrics) return (
+    <AppLayout>
+      <div className="flex flex-col h-[50vh] items-center justify-center gap-4">
+        <p className="text-muted-foreground">No se pudieron cargar las métricas.</p>
+        <button className="text-primary text-sm underline" onClick={() => window.location.reload()}>Reintentar</button>
+      </div>
+    </AppLayout>
+  );
 
   const oppData = Object.entries(metrics.opportunitiesByStatus || {}).map(([key, value]) => ({
     name: getOppStatusLabel(key),
