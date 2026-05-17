@@ -116,9 +116,10 @@ router.patch("/quotes/:id", async (req, res) => {
     if (Array.isArray(lines)) {
       await db.delete(quoteLinesTable).where(eq(quoteLinesTable.quoteId, id));
       if (lines.length) {
-        await db.insert(quoteLinesTable).values(lines.map((l: any, idx: number) => ({
-          ...l, quoteId: id, lineNumber: l.lineNumber ?? idx + 1,
-        })));
+        await db.insert(quoteLinesTable).values(lines.map((l: any, idx: number) => {
+          const { id: _lineId, ...lineRest } = l;
+          return { ...lineRest, quoteId: id, lineNumber: lineRest.lineNumber ?? idx + 1 };
+        }));
       }
       await recalcTotals(id);
     }
