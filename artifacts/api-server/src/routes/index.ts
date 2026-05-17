@@ -53,9 +53,9 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use(authRouter);
 router.use(integrationsRouter);
-
-router.use(requireAuth);
 router.use(importErpRouter);
+router.use(requireAuth);
+
 
 router.get("/integrations/anura/webhooks", async (req, res) => {
   const { db: database, anuraWebhooksTable } = await import("@workspace/db");
@@ -65,7 +65,6 @@ router.get("/integrations/anura/webhooks", async (req, res) => {
     Math.max(1, parseInt(req.query.limit as string) || 50),
   );
   const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
-  const [data, countResult] = await Promise.all([
     database
       .select()
       .from(anuraWebhooksTable)
