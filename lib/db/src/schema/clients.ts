@@ -16,6 +16,9 @@ export const clientsTable = pgTable("clients", {
   assignedSalespersonId: integer("assigned_salesperson_id"),
   clientEmails: json("client_emails").$type<string[]>().default([]),
   notes: text("notes"),
+  // ID original del cliente en el ERP Traficaño ("Número de cliente").
+  // Sirve para trazabilidad ERP→CRM y futura sincronización bidireccional.
+  externalId: text("external_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -37,11 +37,16 @@ import orderPdfRouter from "./order-pdf.js";
 import reportsExportRouter from "./reports-export.js";
 import gcalRouter from "./gcal.js";
 import csvRouter from "./csv.js";
+import importErpRouter from "./import-erp.js";
 import searchRouter from "./search.js";
 import bulkRouter from "./bulk.js";
 import duplicatesRouter from "./duplicates.js";
 import productionRouter from "./production.js";
-import { requireAuth, requireRole, requireMinRole } from "../middleware/auth.js";
+import {
+  requireAuth,
+  requireRole,
+  requireMinRole,
+} from "../middleware/auth.js";
 
 const router: IRouter = Router();
 
@@ -50,14 +55,23 @@ router.use(authRouter);
 router.use(integrationsRouter);
 
 router.use(requireAuth);
+router.use(importErpRouter);
 
 router.get("/integrations/anura/webhooks", async (req, res) => {
   const { db: database, anuraWebhooksTable } = await import("@workspace/db");
   const { desc, sql } = await import("drizzle-orm");
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const limit = Math.min(
+    100,
+    Math.max(1, parseInt(req.query.limit as string) || 50),
+  );
   const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
   const [data, countResult] = await Promise.all([
-    database.select().from(anuraWebhooksTable).orderBy(desc(anuraWebhooksTable.receivedAt)).limit(limit).offset(offset),
+    database
+      .select()
+      .from(anuraWebhooksTable)
+      .orderBy(desc(anuraWebhooksTable.receivedAt))
+      .limit(limit)
+      .offset(offset),
     database.select({ count: sql<number>`count(*)` }).from(anuraWebhooksTable),
   ]);
   res.json({ data, total: Number(countResult[0].count) });
@@ -67,47 +81,115 @@ router.patch("/integrations/anura/webhooks/:id", async (req, res) => {
   const { db: database, anuraWebhooksTable } = await import("@workspace/db");
   const { eq } = await import("drizzle-orm");
   const id = parseInt(req.params.id);
-  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+  if (isNaN(id)) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
   const { clientId, salespersonId, notes } = req.body;
   const updates: any = {};
   if (clientId !== undefined) {
-    if (clientId !== null && (typeof clientId !== "number" || isNaN(clientId))) { res.status(400).json({ error: "clientId debe ser un número o null" }); return; }
+    if (
+      clientId !== null &&
+      (typeof clientId !== "number" || isNaN(clientId))
+    ) {
+      res.status(400).json({ error: "clientId debe ser un número o null" });
+      return;
+    }
     updates.clientId = clientId || null;
   }
   if (salespersonId !== undefined) {
-    if (salespersonId !== null && (typeof salespersonId !== "number" || isNaN(salespersonId))) { res.status(400).json({ error: "salespersonId debe ser un número o null" }); return; }
+    if (
+      salespersonId !== null &&
+      (typeof salespersonId !== "number" || isNaN(salespersonId))
+    ) {
+      res
+        .status(400)
+        .json({ error: "salespersonId debe ser un número o null" });
+      return;
+    }
     updates.salespersonId = salespersonId || null;
   }
   if (notes !== undefined) {
-    if (notes !== null && typeof notes !== "string") { res.status(400).json({ error: "notes debe ser un string o null" }); return; }
+    if (notes !== null && typeof notes !== "string") {
+      res.status(400).json({ error: "notes debe ser un string o null" });
+      return;
+    }
     updates.notes = notes || null;
   }
-  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "No se enviaron campos para actualizar" }); return; }
-  const [updated] = await database.update(anuraWebhooksTable).set(updates).where(eq(anuraWebhooksTable.id, id)).returning();
-  if (!updated) { res.status(404).json({ error: "Webhook no encontrado" }); return; }
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No se enviaron campos para actualizar" });
+    return;
+  }
+  const [updated] = await database
+    .update(anuraWebhooksTable)
+    .set(updates)
+    .where(eq(anuraWebhooksTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Webhook no encontrado" });
+    return;
+  }
   res.json(updated);
 });
 
 router.get("/salespeople/:id/profile", async (req, res) => {
-  const { db: database, salespeopleTable, activitiesTable, anuraWebhooksTable, emailsTable } = await import("@workspace/db");
+  const {
+    db: database,
+    salespeopleTable,
+    activitiesTable,
+    anuraWebhooksTable,
+    emailsTable,
+  } = await import("@workspace/db");
   const { eq, desc, sql } = await import("drizzle-orm");
   const id = parseInt(req.params.id);
-  if (isNaN(id)) { res.status(400).json({ error: "ID inválido" }); return; }
+  if (isNaN(id)) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
 
-  const [sp] = await database.select().from(salespeopleTable).where(eq(salespeopleTable.id, id)).limit(1);
-  if (!sp) { res.status(404).json({ error: "Vendedor no encontrado" }); return; }
+  const [sp] = await database
+    .select()
+    .from(salespeopleTable)
+    .where(eq(salespeopleTable.id, id))
+    .limit(1);
+  if (!sp) {
+    res.status(404).json({ error: "Vendedor no encontrado" });
+    return;
+  }
 
-  const [calls, activities, emailCount, callStats, activityCount] = await Promise.all([
-    database.select().from(anuraWebhooksTable).where(eq(anuraWebhooksTable.salespersonId, id)).orderBy(desc(anuraWebhooksTable.receivedAt)).limit(20),
-    database.select().from(activitiesTable).where(eq(activitiesTable.salespersonId, id)).orderBy(desc(activitiesTable.createdAt)).limit(20),
-    database.select({ count: sql<number>`count(*)` }).from(activitiesTable).where(sql`${activitiesTable.salespersonId} = ${id} AND ${activitiesTable.type} = 'email'`),
-    database.select({
-      total: sql<number>`count(*)`,
-      answered: sql<number>`count(*) filter (where status = 'answered')`,
-      totalDuration: sql<number>`coalesce(sum(duration_seconds), 0)`,
-    }).from(anuraWebhooksTable).where(eq(anuraWebhooksTable.salespersonId, id)),
-    database.select({ count: sql<number>`count(*)` }).from(activitiesTable).where(eq(activitiesTable.salespersonId, id)),
-  ]);
+  const [calls, activities, emailCount, callStats, activityCount] =
+    await Promise.all([
+      database
+        .select()
+        .from(anuraWebhooksTable)
+        .where(eq(anuraWebhooksTable.salespersonId, id))
+        .orderBy(desc(anuraWebhooksTable.receivedAt))
+        .limit(20),
+      database
+        .select()
+        .from(activitiesTable)
+        .where(eq(activitiesTable.salespersonId, id))
+        .orderBy(desc(activitiesTable.createdAt))
+        .limit(20),
+      database
+        .select({ count: sql<number>`count(*)` })
+        .from(activitiesTable)
+        .where(
+          sql`${activitiesTable.salespersonId} = ${id} AND ${activitiesTable.type} = 'email'`,
+        ),
+      database
+        .select({
+          total: sql<number>`count(*)`,
+          answered: sql<number>`count(*) filter (where status = 'answered')`,
+          totalDuration: sql<number>`coalesce(sum(duration_seconds), 0)`,
+        })
+        .from(anuraWebhooksTable)
+        .where(eq(anuraWebhooksTable.salespersonId, id)),
+      database
+        .select({ count: sql<number>`count(*)` })
+        .from(activitiesTable)
+        .where(eq(activitiesTable.salespersonId, id)),
+    ]);
 
   res.json({
     salesperson: sp,

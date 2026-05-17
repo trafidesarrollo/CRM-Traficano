@@ -5,11 +5,16 @@ import { z } from "zod/v4";
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
+  // email pasa a ser opcional: el ERP de origen no lo trae.
+  // Se conserva la columna para futuras cargas, pero sin notNull ni unique.
+  email: text("email"),
   passwordHash: text("password_hash").notNull(),
   fullName: text("full_name").notNull(),
   role: text("role", { enum: ["admin", "gerente", "vendedor", "operador"] }).notNull().default("vendedor"),
   isActive: boolean("is_active").notNull().default(true),
+  // ID original del usuario en el ERP Traficaño (ej: "U001"). Sirve para trazabilidad
+  // y para futura sincronización bidireccional.
+  externalId: text("external_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
