@@ -11,8 +11,10 @@ export default function ProductionDashboard() {
   const [data, setData] = useState<any>(null);
 
   async function load() {
-    const r = await fetch(`${API}/api/production/dashboard`, { credentials: "include" });
-    setData(await r.json());
+    try {
+      const r = await fetch(`${API}/api/production/dashboard`, { credentials: "include" });
+      if (r.ok) setData(await r.json());
+    } catch { /* silenciar errores de red */ }
   }
   useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, []);
 

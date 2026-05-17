@@ -40,12 +40,20 @@ export default function Tasks() {
   });
 
   const load = async () => {
-    const params = new URLSearchParams();
-    if (view !== "all") params.set("view", view);
-    const r = await fetch(`${API}/api/tasks?${params}`, { credentials: "include" });
-    setItems(await r.json());
-    const s = await fetch(`${API}/api/tasks/stats/summary`, { credentials: "include" });
-    setStats(await s.json());
+    try {
+      const params = new URLSearchParams();
+      if (view !== "all") params.set("view", view);
+      const r = await fetch(`${API}/api/tasks?${params}`, { credentials: "include" });
+      const j = await r.json();
+      setItems(Array.isArray(j) ? j : []);
+      const s = await fetch(`${API}/api/tasks/stats/summary`, { credentials: "include" });
+      if (s.ok) {
+        const sj = await s.json();
+        setStats(sj && typeof sj === "object" && !Array.isArray(sj) ? sj : {});
+      }
+    } catch {
+      setItems([]);
+    }
   };
 
   useEffect(() => { load(); }, [view]);

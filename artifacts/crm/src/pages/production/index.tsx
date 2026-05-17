@@ -47,15 +47,21 @@ export default function ProductionList() {
   const [locForm, setLocForm] = useState({ code: "", name: "", description: "" });
 
   async function load() {
-    const params = new URLSearchParams();
-    if (statusFilter !== "all") params.set("status", statusFilter);
-    if (locFilter !== "all") params.set("locationId", locFilter);
-    const r = await fetch(`${API}/api/production/orders?${params}`, { credentials: "include" });
-    setOrders(await r.json());
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (locFilter !== "all") params.set("locationId", locFilter);
+      const r = await fetch(`${API}/api/production/orders?${params}`, { credentials: "include" });
+      const j = await r.json();
+      setOrders(Array.isArray(j) ? j : []);
+    } catch { setOrders([]); }
   }
   async function loadLocs() {
-    const r = await fetch(`${API}/api/production/locations`, { credentials: "include" });
-    setLocations(await r.json());
+    try {
+      const r = await fetch(`${API}/api/production/locations`, { credentials: "include" });
+      const j = await r.json();
+      setLocations(Array.isArray(j) ? j : []);
+    } catch { setLocations([]); }
   }
   useEffect(() => { loadLocs(); }, []);
   useEffect(() => { load(); }, [statusFilter, locFilter]);
