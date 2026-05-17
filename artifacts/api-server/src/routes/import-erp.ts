@@ -492,7 +492,7 @@ async function importByEntity(entity: string, rows: Record<string, string>[]): P
 // ============================================================================
 // Endpoints
 // ============================================================================
-router.post("/import-erp/:entity", importAuth, upload.single("file"), async (req: Request, res: Response) => {
+router.post("/import-erp/:entity", upload.single("file"), async (req: Request, res: Response) => {
   try {
     if (!req.file) { res.status(400).json({ error: "Falta archivo (campo file)" }); return; }
     const entity = req.params.entity;
