@@ -9,6 +9,187 @@ import { Plus, Search, Trash2, Package, Ruler, ScrollText, Pencil, Save, X } fro
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const UNIT_GROUPS: { label: string; units: { value: string; label: string }[] }[] = [
+  {
+    label: "Longitud",
+    units: [
+      { value: "m", label: "m — Metro" },
+      { value: "mm", label: "mm — Milímetro" },
+      { value: "cm", label: "cm — Centímetro" },
+      { value: "km", label: "km — Kilómetro" },
+      { value: "pulg", label: "pulg — Pulgada" },
+      { value: "pie", label: "pie — Pie" },
+    ],
+  },
+  {
+    label: "Masa / Peso",
+    units: [
+      { value: "kg", label: "kg — Kilogramo" },
+      { value: "g", label: "g — Gramo" },
+      { value: "tn", label: "tn — Tonelada métrica" },
+      { value: "lb", label: "lb — Libra" },
+    ],
+  },
+  {
+    label: "Área",
+    units: [
+      { value: "m2", label: "m² — Metro cuadrado" },
+      { value: "cm2", label: "cm² — Centímetro cuadrado" },
+      { value: "mm2", label: "mm² — Milímetro cuadrado" },
+    ],
+  },
+  {
+    label: "Volumen / Capacidad",
+    units: [
+      { value: "m3", label: "m³ — Metro cúbico" },
+      { value: "lt", label: "lt — Litro" },
+      { value: "ml", label: "ml — Mililitro" },
+      { value: "gl", label: "gl — Galón" },
+    ],
+  },
+  {
+    label: "Unidades / Piezas",
+    units: [
+      { value: "u", label: "u — Unidad" },
+      { value: "pza", label: "pza — Pieza" },
+      { value: "par", label: "par — Par" },
+      { value: "jgo", label: "jgo — Juego" },
+      { value: "set", label: "set — Set / Kit" },
+      { value: "kit", label: "kit — Kit" },
+      { value: "doc", label: "doc — Docena" },
+      { value: "ciento", label: "ciento — Ciento" },
+      { value: "millar", label: "millar — Millar" },
+    ],
+  },
+  {
+    label: "Formato industrial",
+    units: [
+      { value: "barra", label: "barra — Barra" },
+      { value: "tubo", label: "tubo — Tubo" },
+      { value: "caño", label: "caño — Caño" },
+      { value: "rollo", label: "rollo — Rollo" },
+      { value: "bobina", label: "bobina — Bobina" },
+      { value: "plancha", label: "plancha — Plancha" },
+      { value: "chapa", label: "chapa — Chapa" },
+      { value: "varilla", label: "varilla — Varilla" },
+      { value: "perfil", label: "perfil — Perfil" },
+      { value: "viga", label: "viga — Viga" },
+      { value: "codo", label: "codo — Codo" },
+      { value: "te", label: "te — Te" },
+      { value: "reduccion", label: "reducción — Reducción" },
+      { value: "brida", label: "brida — Brida" },
+      { value: "junta", label: "junta — Junta" },
+      { value: "valvula", label: "válvula — Válvula" },
+      { value: "filtro", label: "filtro — Filtro" },
+      { value: "tapa", label: "tapa — Tapa" },
+    ],
+  },
+  {
+    label: "Envase / Contenedor",
+    units: [
+      { value: "caja", label: "caja — Caja" },
+      { value: "bolsa", label: "bolsa — Bolsa" },
+      { value: "saco", label: "saco — Saco" },
+      { value: "balde", label: "balde — Balde" },
+      { value: "lata", label: "lata — Lata" },
+      { value: "tambor", label: "tambor — Tambor" },
+      { value: "garrafa", label: "garrafa — Garrafa" },
+      { value: "bidon", label: "bidón — Bidón" },
+      { value: "pallet", label: "pallet — Pallet" },
+    ],
+  },
+  {
+    label: "Tiempo",
+    units: [
+      { value: "hr", label: "hr — Hora" },
+      { value: "dia", label: "día — Día" },
+      { value: "mes", label: "mes — Mes" },
+    ],
+  },
+  {
+    label: "Eléctrico / Electrónico",
+    units: [
+      { value: "w", label: "W — Watt" },
+      { value: "kw", label: "kW — Kilowatt" },
+      { value: "kwh", label: "kWh — Kilowatt·hora" },
+      { value: "A", label: "A — Ampere" },
+      { value: "v", label: "V — Volt" },
+    ],
+  },
+];
+
+const UNIT_OTHER = "__otro__";
+
+function UnitSelect({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+}) {
+  const allValues = UNIT_GROUPS.flatMap((g) => g.units.map((u) => u.value));
+  const isKnown = !value || allValues.includes(value);
+  const [showCustom, setShowCustom] = useState(!isKnown);
+  const [customVal, setCustomVal] = useState(isKnown ? "" : value);
+
+  const handleSelect = (v: string) => {
+    if (v === UNIT_OTHER) {
+      setShowCustom(true);
+      onChange(customVal);
+    } else {
+      setShowCustom(false);
+      onChange(v);
+    }
+  };
+
+  if (showCustom) {
+    return (
+      <div className="flex gap-1">
+        <Input
+          value={customVal}
+          onChange={(e) => { setCustomVal(e.target.value); onChange(e.target.value); }}
+          placeholder="ej: bobina"
+          className={className}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="shrink-0 h-9 w-9"
+          onClick={() => { setShowCustom(false); setCustomVal(""); onChange(""); }}
+        >
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Select value={value || ""} onValueChange={handleSelect}>
+      <SelectTrigger className={className}>
+        <SelectValue placeholder="Seleccionar..." />
+      </SelectTrigger>
+      <SelectContent className="max-h-72">
+        {UNIT_GROUPS.map((group) => (
+          <SelectGroup key={group.label}>
+            <SelectLabel>{group.label}</SelectLabel>
+            {group.units.map((u) => (
+              <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+            ))}
+          </SelectGroup>
+        ))}
+        <SelectGroup>
+          <SelectLabel>Personalizado</SelectLabel>
+          <SelectItem value={UNIT_OTHER}>✏️ Escribir unidad...</SelectItem>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
 
 export default function Products() {
   const { toast } = useToast();
@@ -79,14 +260,17 @@ export default function Products() {
                 <div><Label>Código</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="TUB-001" /></div>
                 <div><Label>Categoría</Label><Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Tubería" /></div>
               </div>
-              <div><Label>Nombre *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Tubo sin costura 2&quot; SCH40" /></div>
+              <div><Label>Nombre *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder='Tubo sin costura 2" SCH40' /></div>
               <div><Label>Descripción</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Dimensiones</Label><Input value={form.dimensions} onChange={(e) => setForm({ ...form, dimensions: e.target.value })} placeholder='60.3mm x 3.91mm' /></div>
+                <div><Label>Dimensiones</Label><Input value={form.dimensions} onChange={(e) => setForm({ ...form, dimensions: e.target.value })} placeholder="60.3mm x 3.91mm" /></div>
                 <div><Label>Norma</Label><Input value={form.standard} onChange={(e) => setForm({ ...form, standard: e.target.value })} placeholder="ASTM A53" /></div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div><Label>Unidad</Label><Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="metro" /></div>
+                <div>
+                  <Label>Unidad</Label>
+                  <UnitSelect value={form.unit} onChange={(v) => setForm({ ...form, unit: v })} />
+                </div>
                 <div><Label>Precio</Label><Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
                 <div><Label>Moneda</Label><Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} /></div>
               </div>
@@ -128,7 +312,10 @@ export default function Products() {
                         <div><Label className="text-xs">Norma</Label><Input value={editForm.standard} onChange={(e) => setEditForm({ ...editForm, standard: e.target.value })} className="h-9" /></div>
                       </div>
                       <div className="grid grid-cols-3 gap-3">
-                        <div><Label className="text-xs">Unidad</Label><Input value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} className="h-9" /></div>
+                        <div>
+                          <Label className="text-xs">Unidad</Label>
+                          <UnitSelect value={editForm.unit} onChange={(v) => setEditForm({ ...editForm, unit: v })} className="h-9" />
+                        </div>
                         <div><Label className="text-xs">Precio</Label><Input type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} className="h-9" /></div>
                         <div><Label className="text-xs">Moneda</Label><Input value={editForm.currency} onChange={(e) => setEditForm({ ...editForm, currency: e.target.value })} className="h-9" /></div>
                       </div>
@@ -147,6 +334,7 @@ export default function Products() {
                         <div className="flex items-center gap-3 mb-1">
                           <h3 className="font-semibold">{product.name}</h3>
                           {product.code && <Badge variant="outline" className="text-xs">{product.code}</Badge>}
+                          {product.unit && <Badge variant="secondary" className="text-xs">{product.unit}</Badge>}
                         </div>
                         <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
                           {product.category && <span className="flex items-center gap-1"><Package className="w-3.5 h-3.5" />{product.category}</span>}
