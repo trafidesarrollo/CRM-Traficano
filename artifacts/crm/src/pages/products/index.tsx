@@ -1,15 +1,250 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AppLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useGetProducts, useCreateProduct, useDeleteProduct, useUpdateProduct } from "@workspace/api-client-react";
-import { Plus, Search, Trash2, Package, Ruler, ScrollText, Pencil, Save, X } from "lucide-react";
+import { Plus, Search, Trash2, Package, Ruler, ScrollText, Pencil, Save, X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
+// Minimal robust CSV parser (handles quoted fields with commas/newlines)
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  // Normalize BOM and line endings
+  const s = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"') { inQuotes = true; }
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n") {
+        row.push(field); field = "";
+        if (row.some(f => f !== "")) rows.push(row);
+        row = [];
+      } else {
+        field += c;
+      }
+    }
+  }
+  row.push(field);
+  if (row.some(f => f !== "")) rows.push(row);
+  return rows;
+}
+
+function csvToMedidas(rows: string[][]): any[] {
+  if (rows.length < 2) return [];
+  const header = rows[0];
+  const idx = (name: string) => header.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const iCodigo = idx("Código");
+  const iNombre = idx("Nombre");
+  const iDiam = idx("Díametro Exterior");
+  const iEsp = idx("Espesor Nominal");
+  const iLMin = idx("Largo Mínimo");
+  const iLMax = idx("Largo Máximo");
+  const iCos = idx("Tipo Costura");
+  const iAce = idx("Tipo de Acero");
+  const iTerm = idx("Tratamiento Térmico");
+  const iNorma = idx("Norma");
+  const iForma = idx("Forma");
+  const iRubro = idx("Rubro");
+  const iMP = idx("Materia prima");
+  return rows.slice(1).filter(r => r[iNombre]?.trim()).map(r => ({
+    code: r[iCodigo]?.trim() || null,
+    name: r[iNombre]?.trim() || "",
+    outerDiameter: r[iDiam]?.trim() || null,
+    nominalThickness: r[iEsp]?.trim() || null,
+    minLength: r[iLMin]?.trim() || null,
+    maxLength: r[iLMax]?.trim() || null,
+    seamType: r[iCos]?.trim() || null,
+    steelType: r[iAce]?.trim() || null,
+    heatTreatment: r[iTerm]?.trim() || null,
+    standard: r[iNorma]?.trim() || null,
+    shape: r[iForma]?.trim() || null,
+    category: r[iRubro]?.trim() || null,
+    rawMaterial: r[iMP]?.trim() || null,
+  }));
+}
+
+type ImportState = "idle" | "preview" | "importing" | "done" | "error";
+
+function CsvImportDialog() {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<ImportState>("idle");
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [resultMsg, setResultMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const reset = () => {
+    setState("idle"); setParsed([]); setFileName(""); setProgress(0);
+    setResultMsg(""); setErrorMsg("");
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const rows = parseCSV(text);
+      const medidas = csvToMedidas(rows);
+      if (medidas.length === 0) {
+        setErrorMsg("No se encontraron filas válidas en el archivo.");
+        setState("error");
+        return;
+      }
+      setParsed(medidas);
+      setState("preview");
+    };
+    reader.readAsText(file, "utf-8");
+  };
+
+  const handleImport = async () => {
+    if (!parsed.length) return;
+    setState("importing");
+    setProgress(0);
+    const CHUNK = 200;
+    let done = 0;
+    try {
+      for (let i = 0; i < parsed.length; i += CHUNK) {
+        const chunk = parsed.slice(i, i + CHUNK);
+        const res = await fetch(`${API_BASE}/api/products/medidas/import`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows: chunk }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Error del servidor");
+        }
+        done += chunk.length;
+        setProgress(Math.round((done / parsed.length) * 100));
+      }
+      setResultMsg(`${done.toLocaleString("es-AR")} productos importados/actualizados correctamente.`);
+      setState("done");
+      toast({ title: "Importación completada", description: `${done.toLocaleString("es-AR")} productos procesados.` });
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error desconocido al importar.");
+      setState("error");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline"><Upload className="w-4 h-4 mr-2" />Importar CSV</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Importar productos desde CSV</DialogTitle></DialogHeader>
+
+        {state === "idle" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              El CSV debe tener las columnas: <span className="font-medium text-foreground">Código, Nombre, Díametro Exterior, Espesor Nominal, Largo Mínimo, Largo Máximo, Tipo Costura, Tipo de Acero, Tratamiento Térmico, Norma, Forma, Rubro, Materia prima</span>.
+              Si el código ya existe, el registro se actualiza.
+            </p>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-border/60 rounded-lg p-8 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors gap-3">
+              <FileSpreadsheet className="w-10 h-10 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Hacer clic para seleccionar archivo .csv</span>
+              <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
+            </label>
+          </div>
+        )}
+
+        {state === "preview" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm">
+              <FileSpreadsheet className="w-4 h-4 text-primary" />
+              <span className="font-medium">{fileName}</span>
+              <Badge variant="secondary">{parsed.length.toLocaleString("es-AR")} filas</Badge>
+            </div>
+            <div className="text-sm text-muted-foreground">Vista previa (primeras 5 filas):</div>
+            <div className="overflow-x-auto rounded border border-border/40 text-xs">
+              <table className="w-full">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="px-2 py-1 text-left font-medium">Código</th>
+                    <th className="px-2 py-1 text-left font-medium">Nombre</th>
+                    <th className="px-2 py-1 text-left font-medium">Ø Ext</th>
+                    <th className="px-2 py-1 text-left font-medium">Esp.</th>
+                    <th className="px-2 py-1 text-left font-medium">Norma</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsed.slice(0, 5).map((r, i) => (
+                    <tr key={i} className="border-t border-border/20">
+                      <td className="px-2 py-1 text-muted-foreground">{r.code}</td>
+                      <td className="px-2 py-1 max-w-[180px] truncate">{r.name}</td>
+                      <td className="px-2 py-1">{r.outerDiameter}</td>
+                      <td className="px-2 py-1">{r.nominalThickness}</td>
+                      <td className="px-2 py-1 max-w-[100px] truncate">{r.standard}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={reset}>Cancelar</Button>
+              <Button onClick={handleImport}>
+                <Upload className="w-4 h-4 mr-2" />Importar {parsed.length.toLocaleString("es-AR")} productos
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {state === "importing" && (
+          <div className="space-y-4 py-4 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto" />
+            <p className="text-sm text-muted-foreground">Importando productos...</p>
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="text-xs text-muted-foreground">{progress}% completado</p>
+          </div>
+        )}
+
+        {state === "done" && (
+          <div className="space-y-4 py-4 text-center">
+            <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
+            <p className="font-semibold">¡Importación completada!</p>
+            <p className="text-sm text-muted-foreground">{resultMsg}</p>
+            <Button onClick={() => { reset(); setOpen(false); }}>Cerrar</Button>
+          </div>
+        )}
+
+        {state === "error" && (
+          <div className="space-y-4 py-4 text-center">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
+            <p className="font-semibold">Error en la importación</p>
+            <p className="text-sm text-muted-foreground">{errorMsg}</p>
+            <Button variant="outline" onClick={reset}>Intentar de nuevo</Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const UNIT_GROUPS: { label: string; units: { value: string; label: string }[] }[] = [
   {
@@ -249,10 +484,12 @@ export default function Products() {
           <h1 className="text-3xl font-display font-bold">Productos</h1>
           <p className="text-muted-foreground mt-1">{products?.length || 0} productos en catálogo</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" />Nuevo Producto</Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <CsvImportDialog />
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-2" />Nuevo Producto</Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Nuevo Producto</DialogTitle></DialogHeader>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
@@ -279,7 +516,8 @@ export default function Products() {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <div className="relative mb-6">
