@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, productsTable, productsMedidasTable, productsAccesoriosTable } from "@workspace/db";
-import { eq, ilike, sql } from "drizzle-orm";
+import { eq, ilike, sql, and, isNotNull } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -116,6 +116,102 @@ router.post("/products/medidas/import", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al importar productos" });
+  }
+});
+
+// GET /api/products/catalog — unified catalog: accesorios + medidas, paginated + filtered
+router.get("/products/catalog", async (req, res) => {
+  try {
+    const search = (req.query.search as string || "").trim();
+    const type = req.query.type as string | undefined; // "accesorios" | "medidas"
+    const accessoryType = req.query.accessoryType as string | undefined;
+    const category = req.query.category as string | undefined;
+    const hasPrice = req.query.hasPrice === "true";
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
+    const offset = (page - 1) * limit;
+
+    const searchLike = `%${search}%`;
+
+    // Build accesorios query conditions
+    const accConds: string[] = [];
+    if (search) accConds.push(`pa.name ILIKE '%${search.replace(/'/g, "''")}%'`);
+    if (accessoryType) accConds.push(`pa.accessory_type = '${accessoryType.replace(/'/g, "''")}'`);
+    if (hasPrice) accConds.push(`pa.sale_price IS NOT NULL`);
+    const accWhere = accConds.length ? `WHERE ${accConds.join(" AND ")}` : "";
+
+    // Build medidas query conditions
+    const medConds: string[] = [];
+    if (search) medConds.push(`pm.name ILIKE '%${search.replace(/'/g, "''")}%'`);
+    if (category) medConds.push(`pm.category = '${category.replace(/'/g, "''")}'`);
+    if (hasPrice) medConds.push(`pm.sale_price IS NOT NULL`);
+    const medWhere = medConds.length ? `WHERE ${medConds.join(" AND ")}` : "";
+
+    const accSelect = `
+      SELECT pa.id, pa.code, pa.name, pa.standard, pa.sale_price::text AS sale_price,
+             pa.accessory_type AS sub_type, pa.subtype AS sub_type2,
+             pa.weight::text AS weight, NULL::text AS category,
+             NULL::text AS outer_diameter, NULL::text AS nominal_thickness,
+             NULL::text AS seam_type, 'accesorios' AS source
+      FROM products_accesorios pa ${accWhere}
+    `;
+
+    const medSelect = `
+      SELECT pm.id, pm.code, pm.name, pm.standard, pm.sale_price::text AS sale_price,
+             pm.category AS sub_type, NULL::text AS sub_type2,
+             NULL::text AS weight, pm.category,
+             pm.outer_diameter::text AS outer_diameter, pm.nominal_thickness::text AS nominal_thickness,
+             pm.seam_type, 'medidas' AS source
+      FROM products_medidas pm ${medWhere}
+    `;
+
+    let dataQuery: string;
+    let countQuery: string;
+
+    if (type === "accesorios") {
+      dataQuery = `${accSelect} ORDER BY name LIMIT ${limit} OFFSET ${offset}`;
+      countQuery = `SELECT COUNT(*) FROM products_accesorios pa ${accWhere}`;
+    } else if (type === "medidas") {
+      dataQuery = `${medSelect} ORDER BY name LIMIT ${limit} OFFSET ${offset}`;
+      countQuery = `SELECT COUNT(*) FROM products_medidas pm ${medWhere}`;
+    } else {
+      dataQuery = `SELECT * FROM (${accSelect} UNION ALL ${medSelect}) combined ORDER BY name LIMIT ${limit} OFFSET ${offset}`;
+      countQuery = `SELECT COUNT(*) FROM (${accSelect} UNION ALL ${medSelect}) combined`;
+    }
+
+    const [dataResult, countResult] = await Promise.all([
+      db.execute(sql.raw(dataQuery)),
+      db.execute(sql.raw(countQuery)),
+    ]);
+
+    const total = parseInt((countResult.rows[0] as any)?.count || "0");
+
+    res.json({
+      data: dataResult.rows,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (err: any) {
+    req.log.error(err);
+    res.status(500).json({ error: err.message || "Error al listar catálogo" });
+  }
+});
+
+// GET /api/products/catalog/filters — distinct filter values
+router.get("/products/catalog/filters", async (req, res) => {
+  try {
+    const [accTypes, medCats] = await Promise.all([
+      db.execute(sql`SELECT DISTINCT accessory_type FROM products_accesorios WHERE accessory_type IS NOT NULL ORDER BY accessory_type`),
+      db.execute(sql`SELECT DISTINCT category FROM products_medidas WHERE category IS NOT NULL ORDER BY category`),
+    ]);
+    res.json({
+      accessoryTypes: (accTypes.rows as any[]).map(r => r.accessory_type),
+      categories: (medCats.rows as any[]).map(r => r.category),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
