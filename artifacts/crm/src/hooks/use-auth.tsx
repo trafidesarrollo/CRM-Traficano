@@ -1,10 +1,10 @@
 // @refresh reset
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useCallback } from "react";
 import { useLocation } from "wouter";
 import { 
   useGetMe, 
   useLogin, 
-  useLogout, 
+  logout as logoutApi,
   User, 
   LoginRequest 
 } from "@workspace/api-client-react";
@@ -51,15 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  const logoutMutation = useLogout({
-    mutation: {
-      onSuccess: () => {
-        queryClient.setQueryData([`/api/auth/me`], null);
-        queryClient.clear();
-        setLocation("/login");
-      }
-    }
-  });
+  const logout = useCallback(() => {
+    queryClient.setQueryData([`/api/auth/me`], null);
+    queryClient.clear();
+    setLocation("/login");
+    logoutApi().catch(() => {});
+  }, [queryClient, setLocation]);
 
   return (
     <AuthContext.Provider
@@ -67,9 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: error ? null : user,
         isLoading,
         login: (data) => loginMutation.mutate({ data }),
-        logout: () => logoutMutation.mutate(),
+        logout,
         isLoggingIn: loginMutation.isPending,
-        isLoggingOut: logoutMutation.isPending,
+        isLoggingOut: false,
       }}
     >
       {children}
