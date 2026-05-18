@@ -27,7 +27,7 @@ const navItems = [
   { href: "/opportunities", label: "Oportunidades", icon: Briefcase, hiddenFromRoles: ["vendedor"] },
   { href: "/quotes", label: "Cotizaciones", icon: FileText },
   { href: "/orders", label: "Pedidos", icon: ShoppingCart, hiddenFromRoles: ["vendedor"] },
-  { href: "/tasks", label: "Tareas", icon: ListTodo, hiddenFromRoles: ["vendedor"] },
+  { href: "/tasks", label: "Tareas", icon: ListTodo },
   { href: "/calendar", label: "Calendario", icon: CalendarDays },
   { href: "/calendar/sync", label: "Sync Google Calendar", icon: CalendarClock, hiddenFromRoles: ["vendedor"] },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch, roles: ["admin", "gerente"] },

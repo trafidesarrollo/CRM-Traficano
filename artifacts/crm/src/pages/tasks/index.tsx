@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckCircle2, Plus, Trash2, Clock, AlertCircle, Calendar, ListTodo } from "lucide-react";
+import { CheckCircle2, Plus, Trash2, Clock, AlertCircle, Calendar, ListTodo, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -28,6 +29,9 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function Tasks() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isVendedor = user?.role === "vendedor";
+
   const [items, setItems] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [view, setView] = useState<string>("all");
@@ -43,6 +47,8 @@ export default function Tasks() {
     try {
       const params = new URLSearchParams();
       if (view !== "all") params.set("view", view);
+      // Vendedores solo ven sus propias tareas
+      if (isVendedor && user?.id) params.set("assignedTo", String(user.id));
       const r = await fetch(`${API}/api/tasks?${params}`, { credentials: "include" });
       const j = await r.json();
       setItems(Array.isArray(j) ? j : []);
@@ -56,8 +62,9 @@ export default function Tasks() {
     }
   };
 
-  useEffect(() => { load(); }, [view]);
+  useEffect(() => { if (user !== undefined) load(); }, [view, user]);
   useEffect(() => {
+    if (isVendedor) return; // vendedores no necesitan lista de usuarios ni pueden reasignar
     fetch(`${API}/api/users`, { credentials: "include" })
       .then(r => r.json())
       .then(d => setUsers(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []))
@@ -66,13 +73,14 @@ export default function Tasks() {
       .then(r => r.json())
       .then(d => setClients(Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []))
       .catch(() => {});
-  }, []);
+  }, [isVendedor]);
 
   const create = async () => {
     if (!form.title) { toast({ title: "Título requerido", variant: "destructive" }); return; }
     const body: any = {
       ...form,
-      assignedTo: form.assignedTo ? parseInt(form.assignedTo) : null,
+      // Vendedores se auto-asignan
+      assignedTo: isVendedor ? (user?.id || null) : (form.assignedTo ? parseInt(form.assignedTo) : null),
       clientId: form.clientId ? parseInt(form.clientId) : null,
       dueDate: form.dueDate || null,
     };
@@ -103,52 +111,67 @@ export default function Tasks() {
     <AppLayout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-display font-bold flex items-center gap-3"><ListTodo className="w-8 h-8 text-primary" />Tareas</h1>
-          <p className="text-muted-foreground mt-1">Tu lista de pendientes</p>
+          <h1 className="text-3xl font-display font-bold flex items-center gap-3">
+            <ListTodo className="w-8 h-8 text-primary" />Mis Tareas
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {isVendedor ? "Tus tareas asignadas" : "Gestión de tareas del equipo"}
+          </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Nueva Tarea</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Nueva tarea</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div><Label>Título *</Label><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
-              <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Tipo</Label>
-                  <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{Object.entries(TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                  </Select>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={load}>
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-2" />Nueva Tarea</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Nueva tarea</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Título *</Label><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
+                <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Tipo</Label>
+                    <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{Object.entries(TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div><Label>Prioridad</Label>
+                    <Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Baja</SelectItem>
+                        <SelectItem value="medium">Media</SelectItem>
+                        <SelectItem value="high">Alta</SelectItem>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div><Label>Prioridad</Label>
-                  <Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baja</SelectItem>
-                      <SelectItem value="medium">Media</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="urgent">Urgente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <div><Label>Vencimiento</Label><Input type="datetime-local" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
+                {!isVendedor && (
+                  <div><Label>Asignar a</Label>
+                    <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
+                      <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
+                      <SelectContent>{users.map((u: any) => <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {!isVendedor && (
+                  <div><Label>Cliente relacionado</Label>
+                    <Select value={form.clientId} onValueChange={v => setForm({ ...form, clientId: v })}>
+                      <SelectTrigger><SelectValue placeholder="Sin cliente" /></SelectTrigger>
+                      <SelectContent>{clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <Button className="w-full" onClick={create}>Crear tarea</Button>
               </div>
-              <div><Label>Vencimiento</Label><Input type="datetime-local" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
-              <div><Label>Asignar a</Label>
-                <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
-                  <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
-                  <SelectContent>{users.map((u: any) => <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div><Label>Cliente relacionado</Label>
-                <Select value={form.clientId} onValueChange={v => setForm({ ...form, clientId: v })}>
-                  <SelectTrigger><SelectValue placeholder="Sin cliente" /></SelectTrigger>
-                  <SelectContent>{clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <Button className="w-full" onClick={create}>Crear tarea</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
@@ -166,31 +189,47 @@ export default function Tasks() {
 
       <div className="space-y-2">
         {items.map(t => (
-          <Card key={t.id} className={isOverdue(t) ? "border-red-500/50" : ""}>
+          <Card key={t.id} className={`transition-all ${isOverdue(t) ? "border-red-500/50" : ""} ${(t.deferCount ?? 0) > 0 ? "border-orange-500/30" : ""}`}>
             <CardContent className="p-4 flex items-center gap-3">
               <Checkbox checked={t.status === "completed"} onCheckedChange={() => toggle(t)} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`font-medium ${t.status === "completed" ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
-                  <Badge className={PRIORITY_COLORS[t.priority]}>{t.priority}</Badge>
+                  <Badge className={PRIORITY_COLORS[t.priority]}>{t.priority === "urgent" ? "Urgente" : t.priority === "high" ? "Alta" : t.priority === "medium" ? "Media" : "Baja"}</Badge>
                   <Badge variant="outline" className="text-xs">{TYPE_LABELS[t.type] || t.type}</Badge>
                   {t.clientName && <span className="text-xs text-muted-foreground">· {t.clientName}</span>}
-                  {t.assigneeName && <span className="text-xs text-muted-foreground">· {t.assigneeName}</span>}
+                  {!isVendedor && t.assigneeName && <span className="text-xs text-muted-foreground">· {t.assigneeName}</span>}
+                  {(t.deferCount ?? 0) > 0 && (
+                    <span className="text-xs text-orange-400 flex items-center gap-0.5">
+                      <RefreshCw className="w-3 h-3" />Diferida {t.deferCount}x
+                    </span>
+                  )}
                 </div>
                 {t.description && <p className="text-sm text-muted-foreground mt-1">{t.description}</p>}
                 {t.dueDate && (
-                  <div className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(t) ? "text-red-400" : "text-muted-foreground"}`}>
+                  <div className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(t) ? "text-red-400 font-medium" : "text-muted-foreground"}`}>
                     <Clock className="w-3 h-3" />
-                    {new Date(t.dueDate).toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    {new Date(t.dueDate).toLocaleString("es-AR", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                     {isOverdue(t) && " · VENCIDA"}
                   </div>
                 )}
               </div>
-              <Button size="sm" variant="ghost" onClick={() => del(t.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+              {!isVendedor && (
+                <Button size="sm" variant="ghost" onClick={() => del(t.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+              )}
             </CardContent>
           </Card>
         ))}
-        {items.length === 0 && <Card><CardContent className="p-8 text-center text-muted-foreground">Sin tareas</CardContent></Card>}
+        {items.length === 0 && (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <ListTodo className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p className="text-muted-foreground">
+                {isVendedor ? "No tenés tareas asignadas por el momento." : "Sin tareas para mostrar."}
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AppLayout>
   );
