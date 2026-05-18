@@ -30,6 +30,8 @@ import AnuraPage from "@/pages/anura/index";
 import PriceLists from "@/pages/price-lists/index";
 import Quotes from "@/pages/quotes/index";
 import QuoteEdit from "@/pages/quotes/edit";
+import QuotePipeline from "@/pages/quotes/pipeline";
+import ClientDetail from "@/pages/clients/detail";
 import Orders from "@/pages/orders/index";
 import OrderEdit from "@/pages/orders/edit";
 import Tasks from "@/pages/tasks/index";
@@ -121,7 +123,9 @@ function Router() {
       <Route path="/price-lists" component={() => <ProtectedRoute component={PriceLists} />} />
       <Route path="/quotes" component={() => <ProtectedRoute component={Quotes} />} />
       <Route path="/quotes/new" component={() => <ProtectedRoute component={QuoteEdit} />} />
+      <Route path="/quotes/pipeline" component={() => <ProtectedRoute component={QuotePipeline} />} />
       <Route path="/quotes/:id" component={() => <ProtectedRoute component={QuoteEdit} />} />
+      <Route path="/clients/:id" component={() => <ProtectedRoute component={ClientDetail} />} />
       <Route path="/orders" component={() => <ProtectedRoute component={Orders} />} />
       <Route path="/orders/new" component={() => <ProtectedRoute component={OrderEdit} />} />
       <Route path="/orders/:id" component={() => <ProtectedRoute component={OrderEdit} />} />

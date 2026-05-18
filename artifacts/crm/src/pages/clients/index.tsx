@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useGetClients, useCreateClient, useUpdateClient, useGetSalespeople } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +81,7 @@ const INITIAL_FORM = {
 };
 
 export default function Clients() {
+  const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editClient, setEditClient] = useState<any>(null);
@@ -344,7 +346,7 @@ export default function Clients() {
             ) : response.data.map((client: any) => {
               const emails: string[] = Array.isArray(client.clientEmails) ? client.clientEmails : [];
               return (
-                <TableRow key={client.id} className="border-border/50 hover:bg-white/5">
+                <TableRow key={client.id} className="border-border/50 hover:bg-white/5 cursor-pointer" onClick={() => setLocation(`/clients/${client.id}`)}>
                   <TableCell>
                     <p className="font-medium">{client.companyName}</p>
                     <p className="text-xs text-muted-foreground">{client.taxId || client.website || ''}</p>

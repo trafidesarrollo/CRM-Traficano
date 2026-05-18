@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, clientsTable } from "@workspace/db";
-import { eq, ilike, sql } from "drizzle-orm";
+import { db, clientsTable, quotesTable, ordersTable, contactsTable, activitiesTable, salespeopleTable } from "@workspace/db";
+import { eq, ilike, sql, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -50,6 +50,54 @@ router.get("/clients/:id", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al obtener cliente" });
+  }
+});
+
+router.get("/clients/:id/overview", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, id)).limit(1);
+    if (!client) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
+
+    const [quotes, orders, contacts, activities] = await Promise.all([
+      db.execute(sql`
+        SELECT q.*, s.name AS salesperson_name
+        FROM quotes q
+        LEFT JOIN salespeople s ON s.id = q.salesperson_id
+        WHERE q.client_id = ${id}
+        ORDER BY q.date DESC
+        LIMIT 100
+      `),
+      db.execute(sql`
+        SELECT o.*, s.name AS salesperson_name
+        FROM orders o
+        LEFT JOIN salespeople s ON s.id = o.salesperson_id
+        WHERE o.client_id = ${id}
+        ORDER BY o.date DESC
+        LIMIT 100
+      `),
+      db.select().from(contactsTable).where(eq(contactsTable.clientId, id)).orderBy(desc(contactsTable.isPrimary)),
+      db.select().from(activitiesTable).where(eq(activitiesTable.clientId, id)).orderBy(desc(activitiesTable.createdAt)).limit(50),
+    ]);
+
+    const quotesData = quotes.rows as any[];
+    const ordersData = orders.rows as any[];
+    const totalQuoted = quotesData.reduce((s: number, q: any) => s + Number(q.net_amount || q.total || 0), 0);
+    const totalOrdered = ordersData.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+    const wonQuotes = quotesData.filter((q: any) => q.status === "approved").length;
+    const conversionRate = quotesData.length ? (wonQuotes / quotesData.length) * 100 : 0;
+
+    res.json({
+      client,
+      quotes: quotesData,
+      orders: ordersData,
+      contacts: contacts,
+      activities: activities,
+      stats: { totalQuoted, totalOrdered, quotesCount: quotesData.length, ordersCount: ordersData.length, wonQuotes, conversionRate },
+    });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al obtener resumen del cliente" });
   }
 });
 

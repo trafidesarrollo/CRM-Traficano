@@ -1,0 +1,262 @@
+import { useState, useEffect } from "react";
+import { useRoute, Link } from "wouter";
+import { AppLayout } from "@/components/layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Building2, ArrowLeft, FileText, ShoppingCart, Contact2, Activity,
+  Phone, Mail, Globe, MapPin, DollarSign, TrendingUp, CheckCircle2, Percent
+} from "lucide-react";
+
+const API = import.meta.env.VITE_API_URL || "";
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  draft:    { label: "Borrador",  color: "bg-gray-500/20 text-gray-300" },
+  sent:     { label: "Enviada",   color: "bg-blue-500/20 text-blue-300" },
+  approved: { label: "Aprobada",  color: "bg-green-500/20 text-green-300" },
+  rejected: { label: "Rechazada", color: "bg-red-500/20 text-red-300" },
+  partial:  { label: "Parcial",   color: "bg-yellow-500/20 text-yellow-300" },
+  expired:  { label: "Vencida",   color: "bg-orange-500/20 text-orange-300" },
+};
+
+const CLIENT_STATUS: Record<string, { label: string; color: string }> = {
+  prospect: { label: "Prospecto", color: "bg-yellow-500/20 text-yellow-300" },
+  active:   { label: "Activo",    color: "bg-green-500/20 text-green-300" },
+  inactive: { label: "Inactivo",  color: "bg-gray-500/20 text-gray-300" },
+};
+
+const ACTIVITY_ICONS: Record<string, string> = {
+  call: "📞", visit: "🏢", email: "📧", task: "✅", note: "📝", follow_up: "🔔",
+};
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(n || 0);
+}
+
+function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: string; sub?: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+          <Icon className="h-4 w-4" />{label}
+        </div>
+        <div className="text-2xl font-bold">{value}</div>
+        {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function ClientDetail() {
+  const [, params] = useRoute("/clients/:id");
+  const id = params?.id;
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`${API}/api/clients/${id}/overview`, { credentials: "include" });
+        if (!r.ok) throw new Error("No encontrado");
+        setData(await r.json());
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  if (loading) return <AppLayout><div className="flex items-center justify-center h-64 text-muted-foreground">Cargando ficha del cliente...</div></AppLayout>;
+  if (error || !data) return <AppLayout><div className="flex items-center justify-center h-64 text-destructive">{error || "Error al cargar cliente"}</div></AppLayout>;
+
+  const { client, quotes, orders, contacts, activities, stats } = data;
+  const cs = CLIENT_STATUS[client.status] || { label: client.status, color: "bg-gray-500/20 text-gray-300" };
+
+  return (
+    <AppLayout>
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <Link href="/clients">
+            <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Clientes</Button>
+          </Link>
+          <div className="h-4 w-px bg-border" />
+          <Building2 className="h-5 w-5 text-primary" />
+          <h1 className="text-xl font-bold">{client.company_name || client.companyName}</h1>
+          <Badge className={cs.color}>{cs.label}</Badge>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground uppercase tracking-wide">Datos del cliente</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {(client.tax_id || client.taxId) && (
+                <div className="flex items-center gap-2"><span className="text-muted-foreground w-20 shrink-0">CUIT/RUT</span><span className="font-mono">{client.tax_id || client.taxId}</span></div>
+              )}
+              {(client.industry) && (
+                <div className="flex items-center gap-2"><span className="text-muted-foreground w-20 shrink-0">Industria</span><span>{client.industry}</span></div>
+              )}
+              {(client.phone) && (
+                <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground" /><span>{client.phone}</span></div>
+              )}
+              {(client.website) && (
+                <div className="flex items-center gap-2"><Globe className="h-3.5 w-3.5 text-muted-foreground" /><a href={client.website} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline truncate">{client.website}</a></div>
+              )}
+              {(client.city || client.address) && (
+                <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /><span>{[client.address, client.city, client.country].filter(Boolean).join(", ")}</span></div>
+              )}
+              {(client.client_emails || client.clientEmails)?.length > 0 && (
+                <div className="flex items-start gap-2"><Mail className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+                  <div className="flex flex-wrap gap-1">
+                    {(client.client_emails || client.clientEmails || []).map((e: string, i: number) => (
+                      <span key={i} className="text-xs bg-blue-500/10 text-blue-400 rounded-full px-2 py-0.5">{e}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {client.notes && <div className="text-muted-foreground text-xs italic border-t border-border/50 pt-2 mt-2">{client.notes}</div>}
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard icon={FileText} label="Cotizaciones" value={String(stats.quotesCount)} sub={`${stats.wonQuotes} aprobadas`} />
+            <StatCard icon={ShoppingCart} label="Pedidos" value={String(stats.ordersCount)} />
+            <StatCard icon={DollarSign} label="Total cotizado" value={`u$s ${fmt(stats.totalQuoted)}`} />
+            <StatCard icon={Percent} label="Conversión" value={`${stats.conversionRate.toFixed(1)}%`} sub="cot → pedido" />
+          </div>
+        </div>
+
+        <Tabs defaultValue="quotes">
+          <TabsList>
+            <TabsTrigger value="quotes"><FileText className="h-4 w-4 mr-1.5" />Cotizaciones ({quotes.length})</TabsTrigger>
+            <TabsTrigger value="orders"><ShoppingCart className="h-4 w-4 mr-1.5" />Pedidos ({orders.length})</TabsTrigger>
+            <TabsTrigger value="contacts"><Contact2 className="h-4 w-4 mr-1.5" />Contactos ({contacts.length})</TabsTrigger>
+            <TabsTrigger value="activities"><Activity className="h-4 w-4 mr-1.5" />Actividades ({activities.length})</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="quotes" className="mt-4">
+            <Card>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border/50">
+                    <tr className="text-xs text-muted-foreground uppercase text-left">
+                      <th className="p-3">Número</th>
+                      <th className="p-3">Fecha</th>
+                      <th className="p-3">Vendedor</th>
+                      <th className="p-3">Moneda</th>
+                      <th className="p-3 text-right">Monto</th>
+                      <th className="p-3">Estado</th>
+                      <th className="p-3 w-16"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quotes.map((q: any) => {
+                      const s = STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
+                      return (
+                        <tr key={q.id} className="border-b border-border/30 hover:bg-white/5">
+                          <td className="p-3 font-mono">{q.number || `#${q.id}`}</td>
+                          <td className="p-3 text-muted-foreground">{q.date ? new Date(q.date).toLocaleDateString("es-AR") : "—"}</td>
+                          <td className="p-3">{q.salesperson_name || "—"}</td>
+                          <td className="p-3 text-xs">{q.currency === "ARS" ? "$" : "u$s"}</td>
+                          <td className="p-3 text-right font-mono">{fmt(Number(q.net_amount || q.total || 0))}</td>
+                          <td className="p-3"><Badge className={s.color}>{s.label}</Badge></td>
+                          <td className="p-3"><Link href={`/quotes/${q.id}`}><Button size="sm" variant="ghost" className="text-xs">Ver</Button></Link></td>
+                        </tr>
+                      );
+                    })}
+                    {quotes.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Sin cotizaciones</td></tr>}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="orders" className="mt-4">
+            <Card>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border/50">
+                    <tr className="text-xs text-muted-foreground uppercase text-left">
+                      <th className="p-3">Número</th>
+                      <th className="p-3">Fecha</th>
+                      <th className="p-3">Vendedor</th>
+                      <th className="p-3 text-right">Total</th>
+                      <th className="p-3">Estado</th>
+                      <th className="p-3 w-16"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((o: any) => (
+                      <tr key={o.id} className="border-b border-border/30 hover:bg-white/5">
+                        <td className="p-3 font-mono">{o.number || `#${o.id}`}</td>
+                        <td className="p-3 text-muted-foreground">{o.date ? new Date(o.date).toLocaleDateString("es-AR") : "—"}</td>
+                        <td className="p-3">{o.salesperson_name || "—"}</td>
+                        <td className="p-3 text-right font-mono">{fmt(Number(o.total || 0))}</td>
+                        <td className="p-3"><Badge variant="outline">{o.status || "—"}</Badge></td>
+                        <td className="p-3"><Link href={`/orders/${o.id}`}><Button size="sm" variant="ghost" className="text-xs">Ver</Button></Link></td>
+                      </tr>
+                    ))}
+                    {orders.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Sin pedidos</td></tr>}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="contacts" className="mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {contacts.map((c: any) => (
+                <Card key={c.id} className="hover:border-primary/30 transition-colors">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold">{c.firstName} {c.lastName}</p>
+                        {c.position && <p className="text-xs text-muted-foreground">{c.position}</p>}
+                      </div>
+                      {c.isPrimary && <Badge className="bg-primary/20 text-primary text-xs">Principal</Badge>}
+                    </div>
+                    {c.email && <div className="flex items-center gap-1.5 text-sm"><Mail className="h-3.5 w-3.5 text-muted-foreground" /><a href={`mailto:${c.email}`} className="text-blue-400 hover:underline truncate">{c.email}</a></div>}
+                    {c.phone && <div className="flex items-center gap-1.5 text-sm"><Phone className="h-3.5 w-3.5 text-muted-foreground" /><span>{c.phone}</span></div>}
+                  </CardContent>
+                </Card>
+              ))}
+              {contacts.length === 0 && (
+                <div className="col-span-3 text-center py-8 text-muted-foreground">Sin contactos registrados</div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="activities" className="mt-4">
+            <div className="space-y-2">
+              {activities.map((a: any) => (
+                <Card key={a.id}>
+                  <CardContent className="p-3 flex items-start gap-3">
+                    <span className="text-xl mt-0.5">{ACTIVITY_ICONS[a.type] || "📌"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-sm truncate">{a.title}</p>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {a.createdAt ? new Date(a.createdAt).toLocaleDateString("es-AR") : "—"}
+                        </span>
+                      </div>
+                      {a.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{a.description}</p>}
+                      {a.outcome && <p className="text-xs text-primary/80 mt-1">Resultado: {a.outcome}</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {activities.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">Sin actividades registradas</div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </AppLayout>
+  );
+}
