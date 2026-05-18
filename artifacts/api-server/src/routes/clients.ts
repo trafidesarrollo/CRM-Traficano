@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, clientsTable, quotesTable, ordersTable, contactsTable, activitiesTable, salespeopleTable } from "@workspace/db";
+import { db, clientsTable, quotesTable, ordersTable, contactsTable, activitiesTable, salespeopleTable, tasksTable } from "@workspace/db";
 import { eq, ilike, sql, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -59,7 +59,7 @@ router.get("/clients/:id/overview", async (req, res) => {
     const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, id)).limit(1);
     if (!client) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
 
-    const [quotes, orders, contacts, activities] = await Promise.all([
+    const [quotes, orders, contacts, activities, tasks] = await Promise.all([
       db.execute(sql`
         SELECT q.*, s.name AS salesperson_name
         FROM quotes q
@@ -78,6 +78,14 @@ router.get("/clients/:id/overview", async (req, res) => {
       `),
       db.select().from(contactsTable).where(eq(contactsTable.clientId, id)).orderBy(desc(contactsTable.isPrimary)),
       db.select().from(activitiesTable).where(eq(activitiesTable.clientId, id)).orderBy(desc(activitiesTable.createdAt)).limit(50),
+      db.execute(sql`
+        SELECT t.*, u.full_name AS assignee_name
+        FROM tasks t
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.client_id = ${id}
+        ORDER BY t.created_at DESC
+        LIMIT 50
+      `),
     ]);
 
     const quotesData = quotes.rows as any[];
@@ -93,6 +101,7 @@ router.get("/clients/:id/overview", async (req, res) => {
       orders: ordersData,
       contacts: contacts,
       activities: activities,
+      tasks: tasks.rows as any[],
       stats: { totalQuoted, totalOrdered, quotesCount: quotesData.length, ordersCount: ordersData.length, wonQuotes, conversionRate },
     });
   } catch (err) {

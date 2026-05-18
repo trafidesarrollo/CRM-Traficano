@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, ArrowLeft, FileText, ShoppingCart, Contact2, Activity,
-  Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X
+  Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X,
+  CheckCircle2, Circle, Clock, ListTodo
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -128,7 +129,19 @@ export default function ClientDetail() {
   if (loading) return <AppLayout><div className="flex items-center justify-center h-64 text-muted-foreground">Cargando ficha...</div></AppLayout>;
   if (error || !data) return <AppLayout><div className="flex items-center justify-center h-64 text-destructive">{error || "Error al cargar cliente"}</div></AppLayout>;
 
-  const { client, quotes, orders, contacts, activities, stats } = data;
+  const { client, quotes, orders, contacts, activities, tasks = [], stats } = data;
+
+  const TASK_TYPE_ICONS: Record<string, string> = {
+    call: "📞", meeting: "🤝", email: "✉️", followup: "🔁", task: "✅", reminder: "🔔",
+  };
+  const TASK_STATUS_LABELS: Record<string, string> = {
+    pending: "Pendiente", in_progress: "En progreso", completed: "Cerrada", deferred: "Diferida",
+  };
+
+  const mergedTimeline = [
+    ...activities.map((a: any) => ({ ...a, _kind: "activity" as const, _date: a.createdAt })),
+    ...tasks.map((t: any) => ({ ...t, _kind: "task" as const, _date: t.created_at || t.createdAt })),
+  ].sort((a, b) => new Date(b._date || 0).getTime() - new Date(a._date || 0).getTime());
   const cs = CLIENT_STATUS[client.status] || { label: client.status, color: "bg-gray-500/20 text-gray-300" };
 
   return (
@@ -215,7 +228,7 @@ export default function ClientDetail() {
             <TabsTrigger value="quotes"><FileText className="h-4 w-4 mr-1.5" />Cotizaciones ({quotes.length})</TabsTrigger>
             <TabsTrigger value="orders"><ShoppingCart className="h-4 w-4 mr-1.5" />Pedidos ({orders.length})</TabsTrigger>
             <TabsTrigger value="contacts"><Contact2 className="h-4 w-4 mr-1.5" />Contactos ({contacts.length})</TabsTrigger>
-            <TabsTrigger value="activities"><Activity className="h-4 w-4 mr-1.5" />Actividades ({activities.length})</TabsTrigger>
+            <TabsTrigger value="activities"><Activity className="h-4 w-4 mr-1.5" />Actividades ({mergedTimeline.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="quotes" className="mt-4">
@@ -316,25 +329,61 @@ export default function ClientDetail() {
 
           <TabsContent value="activities" className="mt-4">
             <div className="space-y-2">
-              {activities.map((a: any) => (
-                <Card key={a.id}>
-                  <CardContent className="p-3 flex items-start gap-3">
-                    <span className="text-xl mt-0.5">{ACTIVITY_ICONS[a.type] || "📌"}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium text-sm truncate">{a.title}</p>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {a.createdAt ? new Date(a.createdAt).toLocaleDateString("es-AR") : "—"}
-                        </span>
+              {mergedTimeline.map((item: any) => {
+                if (item._kind === "activity") {
+                  return (
+                    <Card key={`act-${item.id}`}>
+                      <CardContent className="p-3 flex items-start gap-3">
+                        <span className="text-xl mt-0.5">{ACTIVITY_ICONS[item.type] || "📌"}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium text-sm truncate">{item.title}</p>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {item.createdAt ? new Date(item.createdAt).toLocaleDateString("es-AR") : "—"}
+                            </span>
+                          </div>
+                          {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
+                          {item.outcome && <p className="text-xs text-primary/80 mt-1">Resultado: {item.outcome}</p>}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                // Task item
+                const isCompleted = item.status === "completed";
+                return (
+                  <Card key={`task-${item.id}`} className={isCompleted ? "border-green-500/20" : "border-orange-500/20"}>
+                    <CardContent className="p-3 flex items-start gap-3">
+                      <span className="text-xl mt-0.5">{TASK_TYPE_ICONS[item.type] || "📋"}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="font-medium text-sm truncate">{item.title}</p>
+                            <Badge className={`text-xs shrink-0 ${isCompleted ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
+                              {TASK_STATUS_LABELS[item.status] || item.status}
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {item._date ? new Date(item._date).toLocaleDateString("es-AR") : "—"}
+                          </span>
+                        </div>
+                        {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
+                        {item.assignee_name && (
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
+                            {item.completed_at && <span className="ml-2 text-green-400">· Cerrada el {new Date(item.completed_at).toLocaleDateString("es-AR")}</span>}
+                          </p>
+                        )}
+                        <p className="text-xs text-blue-400/60 mt-0.5 flex items-center gap-1">
+                          <ListTodo className="h-3 w-3" />Tarea
+                        </p>
                       </div>
-                      {a.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{a.description}</p>}
-                      {a.outcome && <p className="text-xs text-primary/80 mt-1">Resultado: {a.outcome}</p>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {activities.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">Sin actividades registradas</div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {mergedTimeline.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">Sin actividades ni tareas registradas</div>
               )}
             </div>
           </TabsContent>

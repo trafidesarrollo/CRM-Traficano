@@ -74,6 +74,10 @@ export default function Tasks() {
   const [followupNote, setFollowupNote] = useState("");
   const [showFollowupForm, setShowFollowupForm] = useState(false);
 
+  // Bitácora / close form
+  const [showCloseForm, setShowCloseForm] = useState(false);
+  const [closeNote, setCloseNote] = useState("");
+
   // Quote followup modal
   const [selQuote, setSelQuote] = useState<any>(null);
   const [quoteDetailOpen, setQuoteDetailOpen] = useState(false);
@@ -178,11 +182,37 @@ export default function Tasks() {
     } finally { setSaving(false); }
   };
 
-  const closeTask = async () => {
+  const confirmClose = async () => {
     if (!selected) return;
-    await patch(selected.id, { status: "completed", completedAt: new Date().toISOString() });
-    toast({ title: "Tarea cerrada" });
+    const now = new Date().toISOString();
+    await patch(selected.id, { status: "completed", completedAt: now });
+    if (selected.clientId && closeNote.trim()) {
+      const TASK_TO_ACTIVITY: Record<string, string> = {
+        call: "call", meeting: "visit", email: "email",
+        followup: "follow_up", task: "task", reminder: "task",
+      };
+      await fetch(`${API}/api/activities`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: TASK_TO_ACTIVITY[selected.type] || "task",
+          title: selected.title,
+          description: closeNote.trim(),
+          clientId: selected.clientId,
+          completedAt: now,
+          outcome: closeNote.trim(),
+        }),
+      });
+    }
+    setShowCloseForm(false);
+    setCloseNote("");
+    toast({ title: "Tarea cerrada", description: closeNote.trim() ? "Bitácora registrada en el cliente" : undefined });
     load();
+  };
+
+  const closeTask = () => {
+    setShowCloseForm(true);
+    setCloseNote("");
   };
 
   const reopenTask = async () => {
@@ -239,6 +269,7 @@ export default function Tasks() {
   const openDetail = (task: any) => {
     setSelected(task); setDetailOpen(true);
     setShowFollowupForm(false); setFollowupDate(""); setFollowupNote("");
+    setShowCloseForm(false); setCloseNote("");
   };
 
   const openQuoteDetail = (q: any) => {
@@ -500,7 +531,31 @@ export default function Tasks() {
                   <div className="p-3 bg-white/5 rounded-lg text-sm text-muted-foreground leading-relaxed">{selected.description}</div>
                 )}
                 <hr className="border-border/40" />
-                {showFollowupForm ? (
+                {showCloseForm ? (
+                  <div className="space-y-3 p-3 bg-green-500/5 rounded-lg border border-green-500/20">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-400" />
+                        Bitácora de cierre
+                      </p>
+                      <button onClick={() => setShowCloseForm(false)}><X className="w-4 h-4 text-muted-foreground hover:text-foreground" /></button>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">¿Qué se hizo? {selected.clientId && <span className="text-green-400">(se registrará en el cliente)</span>}</Label>
+                      <Textarea
+                        rows={3}
+                        value={closeNote}
+                        onChange={e => setCloseNote(e.target.value)}
+                        placeholder="Describí brevemente lo que se realizó..."
+                        className="mt-1 text-sm"
+                        autoFocus
+                      />
+                    </div>
+                    <Button className="w-full bg-green-600 hover:bg-green-700" onClick={confirmClose} disabled={saving}>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />Confirmar cierre
+                    </Button>
+                  </div>
+                ) : showFollowupForm ? (
                   <div className="space-y-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium flex items-center gap-2"><CalendarClock className="w-4 h-4 text-primary" />Agendar seguimiento</p>
