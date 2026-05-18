@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, Search, Eye, Trash2 } from "lucide-react";
+import { useLocation } from "wouter";
+import { FileText, Plus, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -29,6 +30,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function Quotes() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -109,7 +111,7 @@ export default function Quotes() {
               {filtered.map(q => {
                 const s = STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
                 return (
-                  <tr key={q.id} className="border-b border-border/30 hover:bg-white/5">
+                  <tr key={q.id} className="border-b border-border/30 hover:bg-white/5 cursor-pointer" onClick={() => navigate(`/quotes/${q.id}`)}>
                     <td className="p-3 font-mono">{q.number || `#${q.id}`}</td>
                     <td className="p-3 font-medium max-w-xs truncate">{q.clientName || "—"}</td>
                     <td className="p-3 text-muted-foreground">{q.date ? new Date(q.date).toLocaleDateString("es-AR") : "—"}</td>
@@ -121,8 +123,7 @@ export default function Quotes() {
                     <td className="p-3 text-xs">{q.orderType || "—"}</td>
                     <td className="p-3 text-xs">{q.salespersonName || "—"}</td>
                     <td className="p-3"><Badge className={PRIORITY_COLORS[q.priority || "MEDIA"]}>{q.priority || "MEDIA"}</Badge></td>
-                    <td className="p-3 flex gap-1">
-                      <Link href={`/quotes/${q.id}`}><Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button></Link>
+                    <td className="p-3" onClick={e => e.stopPropagation()}>
                       <Button size="sm" variant="ghost" onClick={() => del(q.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                     </td>
                   </tr>
