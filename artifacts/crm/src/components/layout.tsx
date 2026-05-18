@@ -22,33 +22,33 @@ const API_BASE = import.meta.env.VITE_API_URL || "";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/inbox", label: "Inbox Comercial", icon: MessageSquare },
-  { href: "/emails", label: "Emails (legacy)", icon: Inbox },
-  { href: "/opportunities", label: "Oportunidades", icon: Briefcase },
+  { href: "/inbox", label: "Inbox Comercial", icon: MessageSquare, hiddenFromRoles: ["vendedor"] },
+  { href: "/emails", label: "Emails (legacy)", icon: Inbox, hiddenFromRoles: ["vendedor"] },
+  { href: "/opportunities", label: "Oportunidades", icon: Briefcase, hiddenFromRoles: ["vendedor"] },
   { href: "/quotes", label: "Cotizaciones", icon: FileText },
-  { href: "/orders", label: "Pedidos", icon: ShoppingCart },
-  { href: "/tasks", label: "Tareas", icon: ListTodo },
+  { href: "/orders", label: "Pedidos", icon: ShoppingCart, hiddenFromRoles: ["vendedor"] },
+  { href: "/tasks", label: "Tareas", icon: ListTodo, hiddenFromRoles: ["vendedor"] },
   { href: "/calendar", label: "Calendario", icon: CalendarDays },
-  { href: "/calendar/sync", label: "Sync Google Calendar", icon: CalendarClock },
+  { href: "/calendar/sync", label: "Sync Google Calendar", icon: CalendarClock, hiddenFromRoles: ["vendedor"] },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch, roles: ["admin", "gerente"] },
-  { href: "/reports", label: "Reportes", icon: BarChart3 },
+  { href: "/reports", label: "Reportes", icon: BarChart3, hiddenFromRoles: ["vendedor"] },
   { href: "/clients", label: "Clientes", icon: Users },
-  { href: "/contacts", label: "Contactos", icon: Contact2 },
-  { href: "/salespeople", label: "Vendedores", icon: UserSquare },
+  { href: "/contacts", label: "Contactos", icon: Contact2, hiddenFromRoles: ["vendedor"] },
+  { href: "/salespeople", label: "Vendedores", icon: UserSquare, hiddenFromRoles: ["vendedor"] },
   { href: "/products", label: "Productos", icon: Package },
-  { href: "/price-lists", label: "Listas de precios", icon: Tag },
-  { href: "/email-templates", label: "Plantillas Email", icon: MailOpen },
+  { href: "/price-lists", label: "Listas de precios", icon: Tag, hiddenFromRoles: ["vendedor"] },
+  { href: "/email-templates", label: "Plantillas Email", icon: MailOpen, hiddenFromRoles: ["vendedor"] },
   { href: "/automation", label: "Automatizaciones", icon: Workflow, roles: ["admin", "gerente"] },
   { href: "/custom-fields", label: "Campos personalizados", icon: Sliders, roles: ["admin", "gerente"] },
-  { href: "/imports", label: "Importar CSV", icon: UploadCloud },
+  { href: "/imports", label: "Importar CSV", icon: UploadCloud, hiddenFromRoles: ["vendedor"] },
   { href: "/csv", label: "Import/Export CSV", icon: UploadCloud, roles: ["admin", "gerente"] },
-  { href: "/followups", label: "Seguimientos", icon: Timer },
+  { href: "/followups", label: "Seguimientos", icon: Timer, hiddenFromRoles: ["vendedor"] },
   { href: "/goals", label: "Metas", icon: Target, roles: ["admin", "gerente"] },
-  { href: "/gmail", label: "Gmail Sync", icon: Mail },
-  { href: "/anura", label: "Anura Llamadas", icon: PhoneCall },
-  { href: "/prompts", label: "Prompts IA", icon: Bot },
+  { href: "/gmail", label: "Gmail Sync", icon: Mail, hiddenFromRoles: ["vendedor"] },
+  { href: "/anura", label: "Anura Llamadas", icon: PhoneCall, hiddenFromRoles: ["vendedor"] },
+  { href: "/prompts", label: "Prompts IA", icon: Bot, hiddenFromRoles: ["vendedor"] },
   { href: "/audit", label: "Auditoría", icon: ShieldCheck, roles: ["admin", "gerente"] },
-  { href: "/production", label: "Producción (MES)", icon: Factory },
+  { href: "/production", label: "Producción (MES)", icon: Factory, hiddenFromRoles: ["vendedor"] },
   { href: "/users", label: "Usuarios", icon: Settings, roles: ["admin"] },
 ];
 
@@ -226,6 +226,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <nav className="space-y-1 mt-6">
       {navItems.map((item) => {
         if (item.roles && !item.roles.includes(user?.role || "")) return null;
+        if ((item as any).hiddenFromRoles?.includes(user?.role || "")) return null;
         const isActive = location.startsWith(item.href);
         return (
           <Link 

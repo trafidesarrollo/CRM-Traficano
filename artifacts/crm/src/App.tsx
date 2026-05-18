@@ -7,6 +7,7 @@ import { useEffect } from "react";
 
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
+import DashboardVendedor from "@/pages/dashboard-vendedor";
 import Emails from "@/pages/emails/index";
 import EmailDetail from "@/pages/emails/detail";
 import Opportunities from "@/pages/opportunities/index";
@@ -48,15 +49,24 @@ import ProductionDashboard from "@/pages/production/dashboard";
 
 const queryClient = new QueryClient();
 
+const VENDEDOR_ALLOWED_PATHS = ["/dashboard", "/quotes", "/calendar", "/clients", "/products"];
+
 function ProtectedRoute({ component: Component }: { component: any }) {
   const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
     if (!isLoading && !user) {
       setLocation("/login");
+      return;
     }
-  }, [user, isLoading, setLocation]);
+    if (!isLoading && user?.role === "vendedor") {
+      const allowed = VENDEDOR_ALLOWED_PATHS.some(
+        p => location === p || location.startsWith(p + "/")
+      );
+      if (!allowed) setLocation("/dashboard");
+    }
+  }, [user, isLoading, location, setLocation]);
 
   if (isLoading) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
@@ -68,12 +78,18 @@ function ProtectedRoute({ component: Component }: { component: any }) {
   return <Component />;
 }
 
+function SmartDashboard() {
+  const { user } = useAuth();
+  if (user?.role === "vendedor") return <DashboardVendedor />;
+  return <Dashboard />;
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
+      <Route path="/" component={() => <ProtectedRoute component={SmartDashboard} />} />
       <Route path="/login" component={Login} />
-      <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
+      <Route path="/dashboard" component={() => <ProtectedRoute component={SmartDashboard} />} />
 
       <Route path="/inbox" component={() => <ProtectedRoute component={InboxComercial} />} />
 
