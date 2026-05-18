@@ -50,6 +50,8 @@ export const productsAccesoriosTable = pgTable("products_accesorios", {
   weight: numeric("weight", { precision: 14, scale: 4 }),
   // Norma (ASTM A 105 B16.5, etc.)
   standard: text("standard"),
+  // Precio de venta (lista VENTA importada del ERP)
+  salePrice: numeric("sale_price", { precision: 12, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
@@ -90,6 +92,8 @@ export const productsMedidasTable = pgTable("products_medidas", {
   category: text("category"),
   // Materia prima (mp, pt, etc.)
   rawMaterial: text("raw_material"),
+  // Precio de venta (lista VENTA importada del ERP)
+  salePrice: numeric("sale_price", { precision: 12, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
