@@ -60,6 +60,36 @@ router.get("/quotes", async (req, res) => {
   }
 });
 
+// Quote followups for a date range — used by tasks page and calendar
+router.get("/quotes/followups", async (req, res) => {
+  try {
+    const from = req.query.from ? new Date(req.query.from as string) : (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+    const to   = req.query.to   ? new Date(req.query.to   as string) : (() => { const d = new Date(); d.setHours(23,59,59,999); return d; })();
+    const salespersonId = req.query.salespersonId ? parseInt(req.query.salespersonId as string) : undefined;
+
+    const conds: any[] = [
+      sql`${quotesTable.followupDate} >= ${from}`,
+      sql`${quotesTable.followupDate} <= ${to}`,
+      sql`${quotesTable.status} not in ('approved','rejected')`,
+    ];
+    if (salespersonId) conds.push(eq(quotesTable.salespersonId, salespersonId));
+
+    const data = await db.select({
+      q: quotesTable,
+      clientName: clientsTable.companyName,
+      salespersonName: salespeopleTable.name,
+    }).from(quotesTable)
+      .leftJoin(clientsTable, eq(quotesTable.clientId, clientsTable.id))
+      .leftJoin(salespeopleTable, eq(quotesTable.salespersonId, salespeopleTable.id))
+      .where(and(...conds))
+      .orderBy(quotesTable.followupDate);
+
+    res.json(data.map(r => ({ ...r.q, clientName: r.clientName, salespersonName: r.salespersonName })));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/quotes/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
