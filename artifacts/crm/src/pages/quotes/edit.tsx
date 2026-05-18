@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useRoute, Link } from "wouter";
 import { AppLayout } from "@/components/layout";
 import { DocumentUploader } from "@/components/document-uploader";
@@ -18,6 +18,7 @@ const API = import.meta.env.VITE_API_URL || "";
 interface Line {
   id?: number;
   productType?: string;
+  catalogType?: string; // "medidas" | "accesorios" | "" (libre)
   productId?: number | null;
   productName?: string;
   productCode?: string;
@@ -33,7 +34,7 @@ interface Line {
 }
 
 const blankLine = (): Line => ({
-  productType: "REVENTA", productName: "", unit: "UN",
+  productType: "REVENTA", catalogType: "", productName: "", unit: "UN",
   quantity: "1", quantityKg: "0", unitPrice: "0", unitPriceUm: "0", netTotal: "0",
 });
 
@@ -77,6 +78,26 @@ export default function QuoteEdit() {
   });
 
   const [openProductIdx, setOpenProductIdx] = useState<number | null>(null);
+  const [catalogResults, setCatalogResults] = useState<any[]>([]);
+  const catalogSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const searchCatalog = useCallback((catalogType: string, query: string) => {
+    if (!catalogType) { setCatalogResults([]); return; }
+    if (catalogSearchTimer.current) clearTimeout(catalogSearchTimer.current);
+    catalogSearchTimer.current = setTimeout(async () => {
+      try {
+        const endpoint = catalogType === "medidas" ? "medidas" : "accesorios";
+        const url = query.trim()
+          ? `${API}/api/products/${endpoint}?search=${encodeURIComponent(query)}`
+          : `${API}/api/products/${endpoint}`;
+        const r = await fetch(url, { credentials: "include" });
+        const data = await r.json();
+        setCatalogResults(Array.isArray(data) ? data : []);
+      } catch {
+        setCatalogResults([]);
+      }
+    }, 250);
+  }, []);
 
   useEffect(() => {
     const safe = (p: Promise<any>, fallback: any = []) => p.catch(() => fallback);
@@ -475,44 +496,110 @@ export default function QuoteEdit() {
                       </Select>
                     </td>
                     <td className="p-2">
-                      <div className="relative min-w-[240px]">
+                      <div className="relative min-w-[260px]">
+                        {/* Catalog type toggle */}
+                        <div className="flex gap-1 mb-1">
+                          {(["medidas", "accesorios"] as const).map(ct => (
+                            <button
+                              key={ct}
+                              type="button"
+                              onClick={() => {
+                                const next = l.catalogType === ct ? "" : ct;
+                                updateLine(i, { catalogType: next, productId: null, productName: "" });
+                                setCatalogResults([]);
+                                if (next) searchCatalog(next, "");
+                              }}
+                              className={`px-2 py-0.5 text-[10px] rounded border font-medium transition-colors ${
+                                l.catalogType === ct
+                                  ? ct === "medidas"
+                                    ? "bg-blue-600/30 border-blue-500/60 text-blue-300"
+                                    : "bg-amber-600/30 border-amber-500/60 text-amber-300"
+                                  : "border-border/40 text-muted-foreground hover:border-border"
+                              }`}
+                            >
+                              {ct === "medidas" ? "Medidas" : "Accesorios"}
+                            </button>
+                          ))}
+                        </div>
                         <Input
                           className="h-8 text-xs"
-                          placeholder="Buscar producto..."
+                          placeholder={l.catalogType === "medidas" ? "Buscar en Medidas..." : l.catalogType === "accesorios" ? "Buscar en Accesorios..." : "Buscar producto..."}
                           value={l.productName || ""}
                           onChange={e => {
                             updateLine(i, { productName: e.target.value, productId: null });
                             setOpenProductIdx(i);
+                            if (l.catalogType) {
+                              searchCatalog(l.catalogType, e.target.value);
+                            }
                           }}
-                          onFocus={() => setOpenProductIdx(i)}
+                          onFocus={() => {
+                            setOpenProductIdx(i);
+                            if (l.catalogType) searchCatalog(l.catalogType, l.productName || "");
+                          }}
                           onBlur={() => setTimeout(() => setOpenProductIdx(null), 200)}
                         />
                         {openProductIdx === i && (
-                          <div className="absolute z-[100] top-full left-0 w-72 bg-card border border-border rounded-lg shadow-xl max-h-52 overflow-y-auto mt-1">
-                            {products.filter(p =>
-                              !l.productName ||
-                              p.name?.toLowerCase().includes(l.productName.toLowerCase()) ||
-                              p.code?.toLowerCase().includes(l.productName.toLowerCase())
-                            ).slice(0, 15).map((p: any) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 border-b border-border/30 last:border-0"
-                                onMouseDown={() => {
-                                  setProductInLine(i, String(p.id));
-                                  setOpenProductIdx(null);
-                                }}
-                              >
-                                <div className="font-medium truncate">{p.name}</div>
-                                <div className="text-muted-foreground">{p.code && `${p.code} · `}{p.unit} · {Number(p.price || 0).toLocaleString("es-AR")}</div>
-                              </button>
-                            ))}
-                            {products.filter(p =>
-                              !l.productName ||
-                              p.name?.toLowerCase().includes(l.productName.toLowerCase()) ||
-                              p.code?.toLowerCase().includes(l.productName.toLowerCase())
-                            ).length === 0 && (
-                              <div className="px-3 py-2 text-xs text-muted-foreground">Sin resultados. Escribí el nombre manualmente.</div>
+                          <div className="absolute z-[100] top-full left-0 w-80 bg-card border border-border rounded-lg shadow-xl max-h-64 overflow-y-auto mt-1">
+                            {l.catalogType ? (
+                              // Catalog mode: show results from medidas/accesorios
+                              catalogResults.length > 0 ? catalogResults.map((p: any) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 border-b border-border/30 last:border-0"
+                                  onMouseDown={() => {
+                                    updateLine(i, {
+                                      productId: null,
+                                      productName: p.name,
+                                      productCode: p.code || "",
+                                      unit: p.unit || "UN",
+                                    });
+                                    setOpenProductIdx(null);
+                                  }}
+                                >
+                                  <div className="font-medium truncate">{p.name}</div>
+                                  <div className="text-muted-foreground flex gap-2">
+                                    {p.code && <span>{p.code}</span>}
+                                    {l.catalogType === "medidas" && p.outerDiameter && <span>Ø{p.outerDiameter}mm</span>}
+                                    {l.catalogType === "medidas" && p.standard && <span className="truncate">{p.standard}</span>}
+                                    {l.catalogType === "accesorios" && p.accessoryType && <span>{p.accessoryType}</span>}
+                                    {l.catalogType === "accesorios" && p.standard && <span className="truncate">{p.standard}</span>}
+                                  </div>
+                                </button>
+                              )) : (
+                                <div className="px-3 py-2 text-xs text-muted-foreground">
+                                  {l.productName ? "Sin resultados para esa búsqueda." : `Escribí para buscar en ${l.catalogType === "medidas" ? "Medidas" : "Accesorios"}...`}
+                                </div>
+                              )
+                            ) : (
+                              // Free mode: search in the generic products list
+                              <>
+                                {products.filter(p =>
+                                  !l.productName ||
+                                  p.name?.toLowerCase().includes(l.productName.toLowerCase()) ||
+                                  p.code?.toLowerCase().includes(l.productName.toLowerCase())
+                                ).slice(0, 15).map((p: any) => (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 border-b border-border/30 last:border-0"
+                                    onMouseDown={() => {
+                                      setProductInLine(i, String(p.id));
+                                      setOpenProductIdx(null);
+                                    }}
+                                  >
+                                    <div className="font-medium truncate">{p.name}</div>
+                                    <div className="text-muted-foreground">{p.code && `${p.code} · `}{p.unit} · {Number(p.price || 0).toLocaleString("es-AR")}</div>
+                                  </button>
+                                ))}
+                                {products.filter(p =>
+                                  !l.productName ||
+                                  p.name?.toLowerCase().includes(l.productName.toLowerCase()) ||
+                                  p.code?.toLowerCase().includes(l.productName.toLowerCase())
+                                ).length === 0 && (
+                                  <div className="px-3 py-2 text-xs text-muted-foreground">Sin resultados. Escribí el nombre manualmente.</div>
+                                )}
+                              </>
                             )}
                           </div>
                         )}
