@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { AppLayout } from "@/components/layout";
-import { TodayTasks } from "@/components/today-tasks";
 import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -183,8 +182,6 @@ export default function DashboardVendedor() {
         </div>
 
         <div className="space-y-4">
-          <TodayTasks />
-
           <Card className="bg-card/50 border-white/5">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Accesos rápidos</CardTitle>

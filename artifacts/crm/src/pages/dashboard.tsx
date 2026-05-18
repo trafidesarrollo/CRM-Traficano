@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getOppStatusLabel } from "@/lib/translations";
-import { TodayTasks } from "@/components/today-tasks";
 import { ManagerTasksTab } from "@/components/manager-tasks-tab";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -141,7 +140,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="mb-8"><TodayTasks /></div>
 
       {cpData && (
         <div className="space-y-6">
