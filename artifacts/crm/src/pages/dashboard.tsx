@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useGetDashboardMetrics } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout";
 import { StatCard } from "@/components/stat-card";
-import { Users, Briefcase, Inbox, AlertCircle } from "lucide-react";
+import { Users, Briefcase, Inbox, AlertCircle, LayoutDashboard, ListTodo } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Progress } from "@/components/ui/progress";
@@ -11,12 +11,17 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getOppStatusLabel } from "@/lib/translations";
 import { TodayTasks } from "@/components/today-tasks";
+import { ManagerTasksTab } from "@/components/manager-tasks-tab";
+import { useAuth } from "@/hooks/use-auth";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const { data: metrics, isLoading } = useGetDashboardMetrics();
   const [cpData, setCpData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"overview" | "tasks">("overview");
+  const isManager = user?.role === "gerente" || user?.role === "admin";
 
   useEffect(() => {
     fetch(`${API_BASE}/api/dashboard/commercial-plan`, { credentials: "include" })
@@ -60,10 +65,34 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold">Dashboard Comercial</h1>
-        <p className="text-muted-foreground mt-1">Resumen de actividad y métricas clave.</p>
+      <div className="mb-6 flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-display font-bold">Dashboard Comercial</h1>
+          <p className="text-muted-foreground mt-1">Resumen de actividad y métricas clave.</p>
+        </div>
+        {isManager && (
+          <div className="flex gap-1 bg-white/5 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === "overview" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <LayoutDashboard className="w-4 h-4" />Resumen
+            </button>
+            <button
+              onClick={() => setActiveTab("tasks")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === "tasks" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <ListTodo className="w-4 h-4" />Tareas de vendedores
+            </button>
+          </div>
+        )}
       </div>
+
+      {isManager && activeTab === "tasks" && (
+        <ManagerTasksTab />
+      )}
+
+      {activeTab === "overview" && (<>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard title="Total Clientes" value={metrics.totalClients} icon={<Users className="w-6 h-6" />} delay={0.1} />
@@ -251,6 +280,7 @@ export default function Dashboard() {
           )}
         </div>
       )}
+      </>)}
     </AppLayout>
   );
 }
