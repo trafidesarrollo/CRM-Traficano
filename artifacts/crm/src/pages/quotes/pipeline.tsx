@@ -1,20 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { AppLayout } from "@/components/layout";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Kanban, RefreshCw, DollarSign, FileText, Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Kanban, RefreshCw, DollarSign, FileText, Plus, User } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 const API = import.meta.env.VITE_API_URL || "";
 
 const COLUMNS: { key: string; label: string; color: string; border: string; bg: string }[] = [
-  { key: "draft",    label: "Borrador",   color: "text-gray-300",   border: "border-gray-500/40",  bg: "bg-gray-500/10" },
-  { key: "sent",     label: "Enviada",    color: "text-blue-300",   border: "border-blue-500/40",  bg: "bg-blue-500/10" },
-  { key: "approved", label: "Aprobada",   color: "text-green-300",  border: "border-green-500/40", bg: "bg-green-500/10" },
-  { key: "partial",  label: "Parcial",    color: "text-yellow-300", border: "border-yellow-500/40",bg: "bg-yellow-500/10" },
-  { key: "rejected", label: "Rechazada",  color: "text-red-300",    border: "border-red-500/40",   bg: "bg-red-500/10" },
-  { key: "expired",  label: "Vencida",    color: "text-orange-300", border: "border-orange-500/40",bg: "bg-orange-500/10" },
+  { key: "draft",    label: "Borrador",  color: "text-gray-300",   border: "border-gray-500/40",   bg: "bg-gray-500/10" },
+  { key: "sent",     label: "Enviada",   color: "text-blue-300",   border: "border-blue-500/40",   bg: "bg-blue-500/10" },
+  { key: "approved", label: "Aprobada",  color: "text-green-300",  border: "border-green-500/40",  bg: "bg-green-500/10" },
+  { key: "partial",  label: "Parcial",   color: "text-yellow-300", border: "border-yellow-500/40", bg: "bg-yellow-500/10" },
+  { key: "rejected", label: "Rechazada", color: "text-red-300",    border: "border-red-500/40",    bg: "bg-red-500/10" },
+  { key: "expired",  label: "Vencida",   color: "text-orange-300", border: "border-orange-500/40", bg: "bg-orange-500/10" },
 ];
 
 function fmt(n: number, currency = "USD") {
@@ -23,18 +24,20 @@ function fmt(n: number, currency = "USD") {
 }
 
 function QuoteCard({ q }: { q: any }) {
-  const dateStr = q.date ? new Date(q.date).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
+  const dateStr = q.date
+    ? new Date(q.date).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" })
+    : "—";
   const amount = Number(q.netAmount || q.total || 0);
   return (
     <Link href={`/quotes/${q.id}`}>
-      <div className="bg-card border border-border/40 rounded-lg p-3 mb-2 hover:border-primary/50 hover:bg-white/5 transition-all cursor-pointer group">
+      <div className="bg-card border border-border/40 rounded-lg p-3 mb-2 hover:border-primary/50 hover:bg-white/5 transition-all cursor-pointer">
         <div className="flex items-start justify-between gap-2 mb-1">
           <span className="font-mono text-xs text-muted-foreground">{q.number || `#${q.id}`}</span>
           <span className="text-xs font-semibold text-primary">{fmt(amount, q.currency)}</span>
         </div>
         <p className="text-sm font-medium truncate mb-1">{q.clientName || "Sin cliente"}</p>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{q.salespersonName || "—"}</span>
+          <span className="flex items-center gap-1"><User className="h-2.5 w-2.5" />{q.salespersonName || "—"}</span>
           <span>{dateStr}</span>
         </div>
         {q.reference && (
@@ -46,21 +49,39 @@ function QuoteCard({ q }: { q: any }) {
 }
 
 export default function QuotePipeline() {
-  const [quotes, setQuotes] = useState<any[]>([]);
+  const { user } = useAuth();
+  const role = (user as any)?.role;
+  const isAdmin = role === "admin" || role === "gerente";
+
+  const [allQuotes, setAllQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [salespersonFilter, setSalespersonFilter] = useState<string>("all");
 
   const load = async () => {
     setLoading(true);
     try {
       const r = await fetch(`${API}/api/quotes?limit=500`, { credentials: "include" });
       const j = await r.json();
-      setQuotes(j.data || []);
+      setAllQuotes(j.data || []);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load(); }, []);
+
+  const salespeople = Array.from(
+    new Map(
+      allQuotes
+        .filter(q => q.salespersonName)
+        .map(q => [q.salespersonName, q.salespersonName])
+    ).values()
+  ).sort();
+
+  const quotes =
+    salespersonFilter === "all"
+      ? allQuotes
+      : allQuotes.filter(q => q.salespersonName === salespersonFilter);
 
   const byStatus = (status: string) => quotes.filter(q => q.status === status);
 
@@ -71,16 +92,39 @@ export default function QuotePipeline() {
     return { usd, ars, count: qs.length };
   };
 
+  const grandUsd = quotes.filter(q => q.currency !== "ARS").reduce((s, q) => s + Number(q.netAmount || q.total || 0), 0);
+  const grandArs = quotes.filter(q => q.currency === "ARS").reduce((s, q) => s + Number(q.netAmount || q.total || 0), 0);
+
   return (
     <AppLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <Kanban className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Pipeline de Cotizaciones</h1>
             <Badge variant="outline" className="text-xs">{quotes.length} cotizaciones</Badge>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isAdmin && (
+              <Select value={salespersonFilter} onValueChange={setSalespersonFilter}>
+                <SelectTrigger className="w-48 h-8 text-sm">
+                  <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="Todos los vendedores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los vendedores</SelectItem>
+                  {salespeople.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {isAdmin && salespersonFilter !== "all" && (
+              <div className="text-xs text-muted-foreground border border-border/50 rounded px-2 py-1">
+                {grandUsd > 0 && <span className="font-mono mr-2">{fmt(grandUsd, "USD")}</span>}
+                {grandArs > 0 && <span className="font-mono">{fmt(grandArs, "ARS")}</span>}
+              </div>
+            )}
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
               Actualizar
@@ -91,7 +135,7 @@ export default function QuotePipeline() {
           </div>
         </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: "calc(100vh - 180px)" }}>
+        <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: "calc(100vh - 200px)" }}>
           {COLUMNS.map(col => {
             const qs = byStatus(col.key);
             const { usd, ars, count } = colTotal(col.key);
@@ -116,12 +160,10 @@ export default function QuotePipeline() {
                           <span className="font-mono">{fmt(ars, "ARS")}</span>
                         </div>
                       )}
-                      {usd === 0 && ars === 0 && (
-                        <span className="italic">Sin monto</span>
-                      )}
+                      {usd === 0 && ars === 0 && <span className="italic">Sin monto</span>}
                     </div>
                   </div>
-                  <div className="px-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
+                  <div className="px-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 300px)" }}>
                     {qs.length === 0 && !loading && (
                       <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/50">
                         <FileText className="h-8 w-8 mb-2" />

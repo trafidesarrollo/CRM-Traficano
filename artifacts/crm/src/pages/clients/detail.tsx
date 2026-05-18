@@ -4,11 +4,18 @@ import { AppLayout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, ArrowLeft, FileText, ShoppingCart, Contact2, Activity,
-  Phone, Mail, Globe, MapPin, DollarSign, TrendingUp, CheckCircle2, Percent
+  Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -52,27 +59,73 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string;
 export default function ClientDetail() {
   const [, params] = useRoute("/clients/:id");
   const id = params?.id;
+  const { user } = useAuth();
+  const role = (user as any)?.role;
+  const canEdit = role === "admin" || role === "gerente";
+  const { toast } = useToast();
+
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const load = async () => {
     if (!id) return;
-    (async () => {
-      setLoading(true);
-      try {
-        const r = await fetch(`${API}/api/clients/${id}/overview`, { credentials: "include" });
-        if (!r.ok) throw new Error("No encontrado");
-        setData(await r.json());
-      } catch (e: any) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id]);
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/clients/${id}/overview`, { credentials: "include" });
+      if (!r.ok) throw new Error("No encontrado");
+      const d = await r.json();
+      setData(d);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (loading) return <AppLayout><div className="flex items-center justify-center h-64 text-muted-foreground">Cargando ficha del cliente...</div></AppLayout>;
+  useEffect(() => { load(); }, [id]);
+
+  const openEdit = () => {
+    const c = data.client;
+    setEditForm({
+      companyName: c.company_name || c.companyName || "",
+      taxId: c.tax_id || c.taxId || "",
+      industry: c.industry || "",
+      website: c.website || "",
+      phone: c.phone || "",
+      address: c.address || "",
+      city: c.city || "",
+      country: c.country || "Argentina",
+      status: c.status || "prospect",
+      notes: c.notes || "",
+    });
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/api/clients/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(editForm),
+      });
+      if (!r.ok) throw new Error("Error al guardar");
+      setEditOpen(false);
+      toast({ title: "Cliente actualizado" });
+      load();
+    } catch {
+      toast({ title: "Error al guardar", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <AppLayout><div className="flex items-center justify-center h-64 text-muted-foreground">Cargando ficha...</div></AppLayout>;
   if (error || !data) return <AppLayout><div className="flex items-center justify-center h-64 text-destructive">{error || "Error al cargar cliente"}</div></AppLayout>;
 
   const { client, quotes, orders, contacts, activities, stats } = data;
@@ -81,37 +134,61 @@ export default function ClientDetail() {
   return (
     <AppLayout>
       <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <Link href="/clients">
-            <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Clientes</Button>
-          </Link>
-          <div className="h-4 w-px bg-border" />
-          <Building2 className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">{client.company_name || client.companyName}</h1>
-          <Badge className={cs.color}>{cs.label}</Badge>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Link href="/clients">
+              <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Clientes</Button>
+            </Link>
+            <div className="h-4 w-px bg-border" />
+            <Building2 className="h-5 w-5 text-primary" />
+            <h1 className="text-xl font-bold">{client.company_name || client.companyName}</h1>
+            <Badge className={cs.color}>{cs.label}</Badge>
+          </div>
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={openEdit}>
+              <Pencil className="h-4 w-4 mr-1.5" />Editar cliente
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground uppercase tracking-wide">Datos del cliente</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground uppercase tracking-wide">Datos del cliente</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {(client.tax_id || client.taxId) && (
-                <div className="flex items-center gap-2"><span className="text-muted-foreground w-20 shrink-0">CUIT/RUT</span><span className="font-mono">{client.tax_id || client.taxId}</span></div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-20 shrink-0">CUIT/RUT</span>
+                  <span className="font-mono">{client.tax_id || client.taxId}</span>
+                </div>
               )}
-              {(client.industry) && (
-                <div className="flex items-center gap-2"><span className="text-muted-foreground w-20 shrink-0">Industria</span><span>{client.industry}</span></div>
+              {client.industry && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-20 shrink-0">Industria</span>
+                  <span>{client.industry}</span>
+                </div>
               )}
-              {(client.phone) && (
-                <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground" /><span>{client.phone}</span></div>
+              {client.phone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span>{client.phone}</span>
+                </div>
               )}
-              {(client.website) && (
-                <div className="flex items-center gap-2"><Globe className="h-3.5 w-3.5 text-muted-foreground" /><a href={client.website} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline truncate">{client.website}</a></div>
+              {client.website && (
+                <div className="flex items-center gap-2">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                  <a href={client.website} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline truncate">{client.website}</a>
+                </div>
               )}
               {(client.city || client.address) && (
-                <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /><span>{[client.address, client.city, client.country].filter(Boolean).join(", ")}</span></div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>{[client.address, client.city, client.country].filter(Boolean).join(", ")}</span>
+                </div>
               )}
               {(client.client_emails || client.clientEmails)?.length > 0 && (
-                <div className="flex items-start gap-2"><Mail className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+                <div className="flex items-start gap-2">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
                   <div className="flex flex-wrap gap-1">
                     {(client.client_emails || client.clientEmails || []).map((e: string, i: number) => (
                       <span key={i} className="text-xs bg-blue-500/10 text-blue-400 rounded-full px-2 py-0.5">{e}</span>
@@ -119,7 +196,9 @@ export default function ClientDetail() {
                   </div>
                 </div>
               )}
-              {client.notes && <div className="text-muted-foreground text-xs italic border-t border-border/50 pt-2 mt-2">{client.notes}</div>}
+              {client.notes && (
+                <div className="text-muted-foreground text-xs italic border-t border-border/50 pt-2 mt-2">{client.notes}</div>
+              )}
             </CardContent>
           </Card>
 
@@ -145,13 +224,8 @@ export default function ClientDetail() {
                 <table className="w-full text-sm">
                   <thead className="border-b border-border/50">
                     <tr className="text-xs text-muted-foreground uppercase text-left">
-                      <th className="p-3">Número</th>
-                      <th className="p-3">Fecha</th>
-                      <th className="p-3">Vendedor</th>
-                      <th className="p-3">Moneda</th>
-                      <th className="p-3 text-right">Monto</th>
-                      <th className="p-3">Estado</th>
-                      <th className="p-3 w-16"></th>
+                      <th className="p-3">Número</th><th className="p-3">Fecha</th><th className="p-3">Vendedor</th>
+                      <th className="p-3">Mon.</th><th className="p-3 text-right">Monto</th><th className="p-3">Estado</th><th className="p-3 w-16"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -165,7 +239,9 @@ export default function ClientDetail() {
                           <td className="p-3 text-xs">{q.currency === "ARS" ? "$" : "u$s"}</td>
                           <td className="p-3 text-right font-mono">{fmt(Number(q.net_amount || q.total || 0))}</td>
                           <td className="p-3"><Badge className={s.color}>{s.label}</Badge></td>
-                          <td className="p-3"><Link href={`/quotes/${q.id}`}><Button size="sm" variant="ghost" className="text-xs">Ver</Button></Link></td>
+                          <td className="p-3">
+                            <Link href={`/quotes/${q.id}`}><Button size="sm" variant="ghost" className="text-xs">Ver</Button></Link>
+                          </td>
                         </tr>
                       );
                     })}
@@ -182,12 +258,8 @@ export default function ClientDetail() {
                 <table className="w-full text-sm">
                   <thead className="border-b border-border/50">
                     <tr className="text-xs text-muted-foreground uppercase text-left">
-                      <th className="p-3">Número</th>
-                      <th className="p-3">Fecha</th>
-                      <th className="p-3">Vendedor</th>
-                      <th className="p-3 text-right">Total</th>
-                      <th className="p-3">Estado</th>
-                      <th className="p-3 w-16"></th>
+                      <th className="p-3">Número</th><th className="p-3">Fecha</th><th className="p-3">Vendedor</th>
+                      <th className="p-3 text-right">Total</th><th className="p-3">Estado</th><th className="p-3 w-16"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -198,7 +270,9 @@ export default function ClientDetail() {
                         <td className="p-3">{o.salesperson_name || "—"}</td>
                         <td className="p-3 text-right font-mono">{fmt(Number(o.total || 0))}</td>
                         <td className="p-3"><Badge variant="outline">{o.status || "—"}</Badge></td>
-                        <td className="p-3"><Link href={`/orders/${o.id}`}><Button size="sm" variant="ghost" className="text-xs">Ver</Button></Link></td>
+                        <td className="p-3">
+                          <Link href={`/orders/${o.id}`}><Button size="sm" variant="ghost" className="text-xs">Ver</Button></Link>
+                        </td>
                       </tr>
                     ))}
                     {orders.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Sin pedidos</td></tr>}
@@ -220,8 +294,17 @@ export default function ClientDetail() {
                       </div>
                       {c.isPrimary && <Badge className="bg-primary/20 text-primary text-xs">Principal</Badge>}
                     </div>
-                    {c.email && <div className="flex items-center gap-1.5 text-sm"><Mail className="h-3.5 w-3.5 text-muted-foreground" /><a href={`mailto:${c.email}`} className="text-blue-400 hover:underline truncate">{c.email}</a></div>}
-                    {c.phone && <div className="flex items-center gap-1.5 text-sm"><Phone className="h-3.5 w-3.5 text-muted-foreground" /><span>{c.phone}</span></div>}
+                    {c.email && (
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                        <a href={`mailto:${c.email}`} className="text-blue-400 hover:underline truncate">{c.email}</a>
+                      </div>
+                    )}
+                    {c.phone && (
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span>{c.phone}</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -257,6 +340,73 @@ export default function ClientDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4" />Editar cliente
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <div className="col-span-2 space-y-1">
+              <Label>Razón social</Label>
+              <Input value={editForm.companyName || ""} onChange={e => setEditForm((f: any) => ({ ...f, companyName: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>CUIT / RUT</Label>
+              <Input value={editForm.taxId || ""} onChange={e => setEditForm((f: any) => ({ ...f, taxId: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Estado</Label>
+              <Select value={editForm.status || "prospect"} onValueChange={v => setEditForm((f: any) => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prospect">Prospecto</SelectItem>
+                  <SelectItem value="active">Activo</SelectItem>
+                  <SelectItem value="inactive">Inactivo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Industria</Label>
+              <Input value={editForm.industry || ""} onChange={e => setEditForm((f: any) => ({ ...f, industry: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Teléfono</Label>
+              <Input value={editForm.phone || ""} onChange={e => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label>Sitio web</Label>
+              <Input value={editForm.website || ""} onChange={e => setEditForm((f: any) => ({ ...f, website: e.target.value }))} />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label>Dirección</Label>
+              <Input value={editForm.address || ""} onChange={e => setEditForm((f: any) => ({ ...f, address: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Ciudad</Label>
+              <Input value={editForm.city || ""} onChange={e => setEditForm((f: any) => ({ ...f, city: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>País</Label>
+              <Input value={editForm.country || ""} onChange={e => setEditForm((f: any) => ({ ...f, country: e.target.value }))} />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label>Notas internas</Label>
+              <Textarea rows={3} value={editForm.notes || ""} onChange={e => setEditForm((f: any) => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" size="sm" onClick={() => setEditOpen(false)}>
+              <X className="h-4 w-4 mr-1" />Cancelar
+            </Button>
+            <Button size="sm" onClick={saveEdit} disabled={saving}>
+              <Save className="h-4 w-4 mr-1" />{saving ? "Guardando..." : "Guardar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
