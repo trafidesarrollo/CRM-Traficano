@@ -49,7 +49,7 @@ import ProductionDashboard from "@/pages/production/dashboard";
 
 const queryClient = new QueryClient();
 
-const VENDEDOR_ALLOWED_PATHS = ["/dashboard", "/quotes", "/calendar", "/clients", "/products"];
+const VENDEDOR_ALLOWED_PATHS = ["/dashboard", "/quotes", "/calendar", "/clients", "/products", "/tasks"];
 
 function ProtectedRoute({ component: Component }: { component: any }) {
   const { user, isLoading } = useAuth();
