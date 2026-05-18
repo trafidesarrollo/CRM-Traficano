@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Save, ArrowLeft, Plus, Trash2, FileText, ShoppingCart } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Save, ArrowLeft, Plus, Trash2, FileText, ShoppingCart, CalendarDays, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -63,6 +64,17 @@ export default function QuoteEdit() {
     createSchedule: false, status: "draft",
   });
   const [lines, setLines] = useState<Line[]>([blankLine()]);
+
+  const followupDateDefault = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  const [showFollowup, setShowFollowup] = useState(false);
+  const [savedQuote, setSavedQuote] = useState<{ id: number; number: string; clientId: number } | null>(null);
+  const [savingFollowup, setSavingFollowup] = useState(false);
+  const [followupForm, setFollowupForm] = useState({
+    date: followupDateDefault,
+    time: "09:00",
+    type: "call",
+    notes: "",
+  });
 
   useEffect(() => {
     Promise.all([
@@ -191,10 +203,50 @@ export default function QuoteEdit() {
     if (r.ok) {
       const data = await r.json();
       toast({ title: "Cotización guardada" });
-      if (isNew) setLocation(`/quotes/${data.id}`);
+      if (isNew) {
+        setSavedQuote({ id: data.id, number: data.number || `#${data.id}`, clientId: data.clientId });
+        setShowFollowup(true);
+      }
     } else {
       toast({ title: "Error al guardar", variant: "destructive" });
     }
+  };
+
+  const scheduleFollowup = async () => {
+    if (!followupForm.date) { toast({ title: "La fecha es requerida", variant: "destructive" }); return; }
+    setSavingFollowup(true);
+    try {
+      const dueDate = new Date(`${followupForm.date}T${followupForm.time || "09:00"}:00`);
+      const clientName = clients.find(c => c.id === savedQuote?.clientId)?.companyName || "";
+      const typeLabel: Record<string, string> = { call: "Llamada", visit: "Visita", meeting: "Reunión" };
+      const title = `${typeLabel[followupForm.type] || "Seguimiento"} - ${savedQuote?.number} ${clientName ? `(${clientName})` : ""}`.trim();
+      await fetch(`${API}/api/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title,
+          type: followupForm.type,
+          description: followupForm.notes || null,
+          dueDate: dueDate.toISOString(),
+          clientId: savedQuote?.clientId || null,
+          status: "pending",
+          priority: "high",
+        }),
+      });
+      toast({ title: "Seguimiento agendado en el calendario" });
+      setShowFollowup(false);
+      if (savedQuote) setLocation(`/quotes/${savedQuote.id}`);
+    } catch {
+      toast({ title: "Error al agendar el seguimiento", variant: "destructive" });
+    } finally {
+      setSavingFollowup(false);
+    }
+  };
+
+  const skipFollowup = () => {
+    setShowFollowup(false);
+    if (savedQuote) setLocation(`/quotes/${savedQuote.id}`);
   };
 
   const convertToOrder = async () => {
@@ -456,6 +508,70 @@ export default function QuoteEdit() {
         </CardContent>
       </Card>
       {!isNew && id && <div className="mt-4"><DocumentUploader entityType="quote" entityId={id} /></div>}
+
+      <Dialog open={showFollowup} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={e => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <CalendarDays className="w-5 h-5 text-primary" />
+              Agendar seguimiento
+            </DialogTitle>
+            <DialogDescription>
+              La cotización <span className="font-semibold text-foreground">{savedQuote?.number}</span> fue guardada. Agendá un seguimiento para no perder el contacto con el cliente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-300">El seguimiento se agregará al calendario y se sincronizará con Google Calendar si tenés la integración activa.</p>
+            </div>
+
+            <div>
+              <Label>Tipo de seguimiento *</Label>
+              <Select value={followupForm.type} onValueChange={v => setFollowupForm({ ...followupForm, type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call">📞 Llamada</SelectItem>
+                  <SelectItem value="visit">🤝 Visita</SelectItem>
+                  <SelectItem value="meeting">💬 Reunión</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Fecha *</Label>
+                <Input type="date" value={followupForm.date} onChange={e => setFollowupForm({ ...followupForm, date: e.target.value })} />
+              </div>
+              <div>
+                <Label>Hora</Label>
+                <Input type="time" value={followupForm.time} onChange={e => setFollowupForm({ ...followupForm, time: e.target.value })} />
+              </div>
+            </div>
+
+            <div>
+              <Label>Notas del seguimiento</Label>
+              <Textarea
+                rows={2}
+                placeholder="¿Qué vas a hablar con el cliente?"
+                value={followupForm.notes}
+                onChange={e => setFollowupForm({ ...followupForm, notes: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button className="flex-1" onClick={scheduleFollowup} disabled={savingFollowup}>
+                <CalendarDays className="w-4 h-4 mr-2" />
+                {savingFollowup ? "Agendando..." : "Agendar seguimiento"}
+              </Button>
+              <Button variant="ghost" onClick={skipFollowup} disabled={savingFollowup} className="text-muted-foreground">
+                Omitir
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
