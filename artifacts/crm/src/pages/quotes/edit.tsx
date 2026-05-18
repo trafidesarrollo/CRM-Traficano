@@ -76,14 +76,17 @@ export default function QuoteEdit() {
     notes: "",
   });
 
+  const [openProductIdx, setOpenProductIdx] = useState<number | null>(null);
+
   useEffect(() => {
+    const safe = (p: Promise<any>, fallback: any = []) => p.catch(() => fallback);
     Promise.all([
-      fetch(`${API}/api/clients?limit=500`, { credentials: "include" }).then(r => r.json()),
-      fetch(`${API}/api/salespeople`, { credentials: "include" }).then(r => r.json()),
-      fetch(`${API}/api/products`, { credentials: "include" }).then(r => r.json()),
-      fetch(`${API}/api/price-lists`, { credentials: "include" }).then(r => r.json()),
-      fetch(`${API}/api/sale-conditions`, { credentials: "include" }).then(r => r.json()),
-      fetch(`${API}/api/opportunities`, { credentials: "include" }).then(r => r.json()),
+      safe(fetch(`${API}/api/clients?limit=500`, { credentials: "include" }).then(r => r.json()), { data: [] }),
+      safe(fetch(`${API}/api/salespeople`, { credentials: "include" }).then(r => r.json()), []),
+      safe(fetch(`${API}/api/products`, { credentials: "include" }).then(r => r.json()), []),
+      safe(fetch(`${API}/api/price-lists`, { credentials: "include" }).then(r => r.json()), []),
+      safe(fetch(`${API}/api/sale-conditions`, { credentials: "include" }).then(r => r.json()), []),
+      safe(fetch(`${API}/api/opportunities`, { credentials: "include" }).then(r => r.json()), { data: [] }),
     ]).then(([cl, sp, pr, pl, sc, op]) => {
       setClients(cl.data || cl || []);
       setSalespeople(Array.isArray(sp) ? sp : []);
@@ -472,14 +475,47 @@ export default function QuoteEdit() {
                       </Select>
                     </td>
                     <td className="p-2">
-                      <div className="flex gap-1">
-                        <Select value={l.productId ? String(l.productId) : ""} onValueChange={v => setProductInLine(i, v)}>
-                          <SelectTrigger className="h-8 text-xs w-32"><SelectValue placeholder="Catálogo..." /></SelectTrigger>
-                          <SelectContent>
-                            {products.slice(0, 200).map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <Input className="h-8 text-xs" placeholder="Producto..." value={l.productName} onChange={e => updateLine(i, { productName: e.target.value })} />
+                      <div className="relative min-w-[240px]">
+                        <Input
+                          className="h-8 text-xs"
+                          placeholder="Buscar producto..."
+                          value={l.productName || ""}
+                          onChange={e => {
+                            updateLine(i, { productName: e.target.value, productId: null });
+                            setOpenProductIdx(i);
+                          }}
+                          onFocus={() => setOpenProductIdx(i)}
+                          onBlur={() => setTimeout(() => setOpenProductIdx(null), 200)}
+                        />
+                        {openProductIdx === i && (
+                          <div className="absolute z-[100] top-full left-0 w-72 bg-card border border-border rounded-lg shadow-xl max-h-52 overflow-y-auto mt-1">
+                            {products.filter(p =>
+                              !l.productName ||
+                              p.name?.toLowerCase().includes(l.productName.toLowerCase()) ||
+                              p.code?.toLowerCase().includes(l.productName.toLowerCase())
+                            ).slice(0, 15).map((p: any) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 border-b border-border/30 last:border-0"
+                                onMouseDown={() => {
+                                  setProductInLine(i, String(p.id));
+                                  setOpenProductIdx(null);
+                                }}
+                              >
+                                <div className="font-medium truncate">{p.name}</div>
+                                <div className="text-muted-foreground">{p.code && `${p.code} · `}{p.unit} · {Number(p.price || 0).toLocaleString("es-AR")}</div>
+                              </button>
+                            ))}
+                            {products.filter(p =>
+                              !l.productName ||
+                              p.name?.toLowerCase().includes(l.productName.toLowerCase()) ||
+                              p.code?.toLowerCase().includes(l.productName.toLowerCase())
+                            ).length === 0 && (
+                              <div className="px-3 py-2 text-xs text-muted-foreground">Sin resultados. Escribí el nombre manualmente.</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-2"><Input className="h-8 text-xs w-16" value={l.unit} onChange={e => updateLine(i, { unit: e.target.value })} /></td>
