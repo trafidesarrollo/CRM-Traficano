@@ -247,7 +247,10 @@ export default function Tasks() {
   };
 
   const isOverdue = (t: any) => t.dueDate && t.status !== "completed" && isPast(parseISO(t.dueDate));
-  const isFollowupOverdue = (q: any) => q.followupDate && isPast(parseISO(q.followupDate));
+  const isFollowupOverdue = (q: any) => {
+    const d = q.followupDate || q.dueDate;
+    return d && isPast(parseISO(d));
+  };
 
   return (
     <AppLayout>
@@ -410,7 +413,12 @@ export default function Tasks() {
                   {q.description && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xl">{q.description}</p>}
                   <div className={`text-xs mt-1 flex items-center gap-1 ${isFollowupOverdue(q) ? "text-orange-400 font-medium" : "text-muted-foreground"}`}>
                     <Clock className="w-3 h-3" />
-                    Seguimiento: {format(parseISO(q.followupDate), "EEE d MMM, HH:mm", { locale: es })}
+                    {q.followupDate
+                      ? <>Seguimiento: {format(parseISO(q.followupDate), "EEE d MMM, HH:mm", { locale: es })}</>
+                      : q.dueDate
+                        ? <>Vence: {format(parseISO(q.dueDate), "EEE d MMM", { locale: es })}</>
+                        : null
+                    }
                     {isFollowupOverdue(q) && " · VENCIDO"}
                   </div>
                   {q.total && Number(q.total) > 0 && (

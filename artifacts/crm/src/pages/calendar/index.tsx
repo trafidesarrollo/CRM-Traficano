@@ -119,7 +119,10 @@ export default function CalendarPage() {
   }, [anchor, isVendedor, user?.id, salespersonId]);
 
   const tasksFor = (d: Date) => tasks.filter(t => t.dueDate && isSameDay(parseISO(t.dueDate), d));
-  const quotesFor = (d: Date) => quotes.filter(q => q.followupDate && isSameDay(parseISO(q.followupDate), d));
+  const quotesFor = (d: Date) => quotes.filter(q => {
+    const ref = q.followupDate || q.dueDate;
+    return ref && isSameDay(parseISO(ref), d);
+  });
 
   const move = (n: number) => {
     const x = new Date(anchor); x.setDate(x.getDate() + n * 7); setAnchor(x);

@@ -60,20 +60,39 @@ router.get("/quotes", async (req, res) => {
   }
 });
 
-// Quote followups for a date range — used by tasks page and calendar
+// Quote followups — shows active quotes needing attention.
+// Uses followupDate when set; falls back to showing all sent/partial/draft quotes.
+// Date filters apply to followupDate (if set) OR dueDate as fallback.
 router.get("/quotes/followups", async (req, res) => {
   try {
     const from = req.query.from ? new Date(req.query.from as string) : null;
     const to   = req.query.to   ? new Date(req.query.to   as string) : null;
     const salespersonId = req.query.salespersonId ? parseInt(req.query.salespersonId as string) : undefined;
 
-    const conds: any[] = [
-      sql`${quotesTable.followupDate} is not null`,
-      sql`${quotesTable.status} not in ('approved','rejected')`,
-    ];
-    if (from) conds.push(sql`${quotesTable.followupDate} >= ${from}`);
-    if (to)   conds.push(sql`${quotesTable.followupDate} <= ${to}`);
-    if (salespersonId) conds.push(eq(quotesTable.salespersonId, salespersonId));
+    // Only show quotes that still need follow-up (not finalized)
+    const statusCond = sql`${quotesTable.status} in ('draft','sent','partial','expired')`;
+    const spCond = salespersonId ? eq(quotesTable.salespersonId, salespersonId) : sql`1=1`;
+
+    let dateCond: any;
+    if (from && to) {
+      // Filter: followupDate in range, OR (no followupDate AND dueDate in range)
+      dateCond = sql`(
+        (${quotesTable.followupDate} >= ${from} AND ${quotesTable.followupDate} <= ${to})
+        OR
+        (${quotesTable.followupDate} IS NULL AND ${quotesTable.dueDate} >= ${from} AND ${quotesTable.dueDate} <= ${to})
+      )`;
+    } else if (to) {
+      // Overdue: followupDate <= to, OR dueDate <= to when no followupDate
+      dateCond = sql`(
+        (${quotesTable.followupDate} IS NOT NULL AND ${quotesTable.followupDate} <= ${to})
+        OR
+        (${quotesTable.followupDate} IS NULL AND ${quotesTable.dueDate} <= ${to})
+      )`;
+    }
+    // No date filter → show all active quotes
+
+    const conds: any[] = [statusCond, spCond];
+    if (dateCond) conds.push(dateCond);
 
     const data = await db.select({
       q: quotesTable,
@@ -83,7 +102,11 @@ router.get("/quotes/followups", async (req, res) => {
       .leftJoin(clientsTable, eq(quotesTable.clientId, clientsTable.id))
       .leftJoin(salespeopleTable, eq(quotesTable.salespersonId, salespeopleTable.id))
       .where(and(...conds))
-      .orderBy(quotesTable.followupDate);
+      .orderBy(
+        // Sort: explicit followupDate first, then by dueDate
+        sql`coalesce(${quotesTable.followupDate}, ${quotesTable.dueDate}) asc nulls last`
+      )
+      .limit(100);
 
     res.json(data.map(r => ({ ...r.q, clientName: r.clientName, salespersonName: r.salespersonName })));
   } catch (err: any) {
