@@ -10,6 +10,7 @@ export interface AuthenticatedRequest extends Request {
 
 const ROLE_HIERARCHY: Record<string, number> = {
   admin: 100,
+  gerente_comercial: 100,
   gerente: 75,
   vendedor: 50,
   operador: 25,

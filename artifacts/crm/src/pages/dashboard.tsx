@@ -20,7 +20,7 @@ export default function Dashboard() {
   const { data: metrics, isLoading } = useGetDashboardMetrics();
   const [cpData, setCpData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "tasks">("overview");
-  const isManager = user?.role === "gerente" || user?.role === "admin";
+  const isManager = user?.role === "gerente" || user?.role === "admin" || user?.role === "gerente_comercial";
 
   useEffect(() => {
     fetch(`${API_BASE}/api/dashboard/commercial-plan`, { credentials: "include" })

@@ -62,7 +62,7 @@ export default function ClientDetail() {
   const id = params?.id;
   const { user } = useAuth();
   const role = (user as any)?.role;
-  const canEdit = role === "admin" || role === "gerente";
+  const canEdit = role === "admin" || role === "gerente" || role === "gerente_comercial";
   const { toast } = useToast();
 
   const [data, setData] = useState<any>(null);

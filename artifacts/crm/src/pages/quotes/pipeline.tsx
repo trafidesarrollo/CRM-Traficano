@@ -51,7 +51,7 @@ function QuoteCard({ q }: { q: any }) {
 export default function QuotePipeline() {
   const { user } = useAuth();
   const role = (user as any)?.role;
-  const isAdmin = role === "admin" || role === "gerente";
+  const isAdmin = role === "admin" || role === "gerente" || role === "gerente_comercial";
 
   const [allQuotes, setAllQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, userModulePermissionsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { auditAction } from "../lib/audit.js";
 
@@ -27,20 +27,31 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const { username, email, password, fullName, role } = req.body;
-    if (!username || !email || !password || !fullName || !role) {
-      res.status(400).json({ error: "Todos los campos son requeridos" });
+    if (!username || !password || !fullName || !role) {
+      res.status(400).json({ error: "Usuario, contraseña, nombre y rol son requeridos" });
       return;
     }
     const passwordHash = await bcrypt.hash(password, 10);
-    const [user] = await db.insert(usersTable).values({ username, email, passwordHash, fullName, role }).returning();
+    const [user] = await db.insert(usersTable).values({ username, email: email || null, passwordHash, fullName, role }).returning();
     const { passwordHash: _, ...safeUser } = user;
-
     await auditAction(req, "crear_usuario", "user", user.id, { username, role });
-
     res.status(201).json(safeUser);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al crear usuario" });
+  }
+});
+
+router.get("/me/permissions", async (req, res) => {
+  try {
+    const userId = (req as any).userId;
+    const perms = await db.select({ module: userModulePermissionsTable.module })
+      .from(userModulePermissionsTable)
+      .where(eq(userModulePermissionsTable.userId, userId));
+    res.json({ modules: perms.map(p => p.module) });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al obtener permisos" });
   }
 });
 
@@ -56,10 +67,7 @@ router.get("/:id", async (req, res) => {
       isActive: usersTable.isActive,
       createdAt: usersTable.createdAt,
     }).from(usersTable).where(eq(usersTable.id, id)).limit(1);
-    if (!users[0]) {
-      res.status(404).json({ error: "Usuario no encontrado" });
-      return;
-    }
+    if (!users[0]) { res.status(404).json({ error: "Usuario no encontrado" }); return; }
     res.json(users[0]);
   } catch (err) {
     req.log.error(err);
@@ -67,17 +75,45 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.get("/:id/permissions", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const perms = await db.select({ module: userModulePermissionsTable.module })
+      .from(userModulePermissionsTable)
+      .where(eq(userModulePermissionsTable.userId, id));
+    res.json({ modules: perms.map(p => p.module) });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al obtener permisos" });
+  }
+});
+
+router.put("/:id/permissions", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { modules } = req.body as { modules: string[] };
+    if (!Array.isArray(modules)) {
+      res.status(400).json({ error: "modules debe ser un array" });
+      return;
+    }
+    await db.delete(userModulePermissionsTable).where(eq(userModulePermissionsTable.userId, id));
+    if (modules.length > 0) {
+      await db.insert(userModulePermissionsTable).values(modules.map(m => ({ userId: id, module: m })));
+    }
+    await auditAction(req, "modificar_permisos", "user", id, { modules });
+    res.json({ modules });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al guardar permisos" });
+  }
+});
+
 router.patch("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { email, fullName, role, isActive, password } = req.body;
-
     const existing = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
-    if (!existing[0]) {
-      res.status(404).json({ error: "Usuario no encontrado" });
-      return;
-    }
-
+    if (!existing[0]) { res.status(404).json({ error: "Usuario no encontrado" }); return; }
     const updates: any = {};
     const changes: Record<string, any> = {};
     if (email !== undefined) { updates.email = email; changes.email = { old: existing[0].email, new: email }; }
@@ -85,12 +121,9 @@ router.patch("/:id", async (req, res) => {
     if (role !== undefined) { updates.role = role; changes.role = { old: existing[0].role, new: role }; }
     if (isActive !== undefined) { updates.isActive = isActive; changes.isActive = { old: existing[0].isActive, new: isActive }; }
     if (password) { updates.passwordHash = await bcrypt.hash(password, 10); changes.password = "cambiada"; }
-
     const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     const { passwordHash: _, ...safeUser } = updated;
-
     await auditAction(req, "modificar_usuario", "user", id, changes);
-
     res.json(safeUser);
   } catch (err) {
     req.log.error(err);
@@ -102,10 +135,7 @@ router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const currentUserId = (req as any).userId;
-    if (id === currentUserId) {
-      res.status(400).json({ error: "No puede eliminar su propio usuario" });
-      return;
-    }
+    if (id === currentUserId) { res.status(400).json({ error: "No puede eliminar su propio usuario" }); return; }
     await db.delete(usersTable).where(eq(usersTable.id, id));
     await auditAction(req, "eliminar_usuario", "user", id);
     res.json({ message: "Usuario eliminado" });

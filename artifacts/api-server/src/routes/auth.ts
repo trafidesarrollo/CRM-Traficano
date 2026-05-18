@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, userModulePermissionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { auditLogin, auditLoginFailed, auditLogout } from "../lib/audit.js";
@@ -79,7 +79,17 @@ router.get("/auth/me", async (req, res) => {
       return;
     }
     const { passwordHash: _, ...safeUser } = user;
-    res.json(safeUser);
+
+    let modulePermissions: string[] | null = null;
+    if (user.role !== "admin" && user.role !== "gerente_comercial") {
+      const perms = await db
+        .select({ module: userModulePermissionsTable.module })
+        .from(userModulePermissionsTable)
+        .where(eq(userModulePermissionsTable.userId, userId));
+      if (perms.length > 0) modulePermissions = perms.map(p => p.module);
+    }
+
+    res.json({ ...safeUser, modulePermissions });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error interno del servidor" });

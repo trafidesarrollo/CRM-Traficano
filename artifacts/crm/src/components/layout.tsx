@@ -20,37 +20,39 @@ import { useToast } from "@/hooks/use-toast";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
+const PRIVILEGED_ROLES = ["admin", "gerente_comercial"];
+
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/inbox", label: "Inbox Comercial", icon: MessageSquare, hiddenFromRoles: ["vendedor"] },
-  { href: "/emails", label: "Emails (legacy)", icon: Inbox, hiddenFromRoles: ["vendedor"] },
-  { href: "/opportunities", label: "Oportunidades", icon: Briefcase, hiddenFromRoles: ["vendedor"] },
-  { href: "/quotes", label: "Cotizaciones", icon: FileText },
-  { href: "/quotes/pipeline", label: "Pipeline Visual", icon: Kanban },
-  { href: "/orders", label: "Pedidos", icon: ShoppingCart, hiddenFromRoles: ["vendedor"] },
-  { href: "/tasks", label: "Tareas", icon: ListTodo },
-  { href: "/calendar", label: "Calendario", icon: CalendarDays },
-  { href: "/calendar/sync", label: "Sync Google Calendar", icon: CalendarClock, hiddenFromRoles: ["vendedor"] },
-  { href: "/pipelines", label: "Pipelines", icon: GitBranch, roles: ["admin", "gerente"] },
-  { href: "/reports", label: "Reportes", icon: BarChart3, hiddenFromRoles: ["vendedor"] },
-  { href: "/clients", label: "Clientes", icon: Users },
-  { href: "/contacts", label: "Contactos", icon: Contact2, hiddenFromRoles: ["vendedor"] },
-  { href: "/salespeople", label: "Vendedores", icon: UserSquare, hiddenFromRoles: ["vendedor"] },
-  { href: "/products", label: "Productos", icon: Package },
-  { href: "/price-lists", label: "Listas de precios", icon: Tag, hiddenFromRoles: ["vendedor"] },
-  { href: "/email-templates", label: "Plantillas Email", icon: MailOpen, hiddenFromRoles: ["vendedor"] },
-  { href: "/automation", label: "Automatizaciones", icon: Workflow, roles: ["admin", "gerente"] },
-  { href: "/custom-fields", label: "Campos personalizados", icon: Sliders, roles: ["admin", "gerente"] },
-  { href: "/imports", label: "Importar CSV", icon: UploadCloud, hiddenFromRoles: ["vendedor"] },
-  { href: "/csv", label: "Import/Export CSV", icon: UploadCloud, roles: ["admin", "gerente"] },
-  { href: "/followups", label: "Seguimientos", icon: Timer, hiddenFromRoles: ["vendedor"] },
-  { href: "/goals", label: "Metas", icon: Target, roles: ["admin", "gerente"] },
-  { href: "/gmail", label: "Gmail Sync", icon: Mail, hiddenFromRoles: ["vendedor"] },
-  { href: "/anura", label: "Anura Llamadas", icon: PhoneCall, hiddenFromRoles: ["vendedor"] },
-  { href: "/prompts", label: "Prompts IA", icon: Bot, hiddenFromRoles: ["vendedor"] },
-  { href: "/audit", label: "Auditoría", icon: ShieldCheck, roles: ["admin", "gerente"] },
-  { href: "/production", label: "Producción (MES)", icon: Factory, hiddenFromRoles: ["vendedor"] },
-  { href: "/users", label: "Usuarios", icon: Settings, roles: ["admin"] },
+  { href: "/dashboard",        label: "Dashboard",             icon: LayoutDashboard, module: "dashboard" },
+  { href: "/inbox",            label: "Inbox Comercial",       icon: MessageSquare,   module: "inbox",             hiddenFromRoles: ["vendedor"] },
+  { href: "/emails",           label: "Emails (legacy)",       icon: Inbox,           module: "emails",            hiddenFromRoles: ["vendedor"] },
+  { href: "/opportunities",    label: "Oportunidades",         icon: Briefcase,       module: "oportunidades",     hiddenFromRoles: ["vendedor"] },
+  { href: "/quotes",           label: "Cotizaciones",          icon: FileText,        module: "cotizaciones" },
+  { href: "/quotes/pipeline",  label: "Pipeline Visual",       icon: Kanban,          module: "cotizaciones" },
+  { href: "/orders",           label: "Pedidos",               icon: ShoppingCart,    module: "pedidos",           hiddenFromRoles: ["vendedor"] },
+  { href: "/tasks",            label: "Tareas",                icon: ListTodo,        module: "tareas" },
+  { href: "/calendar",         label: "Calendario",            icon: CalendarDays,    module: "calendario" },
+  { href: "/calendar/sync",    label: "Sync Google Calendar",  icon: CalendarClock,   module: "calendario",        hiddenFromRoles: ["vendedor"] },
+  { href: "/pipelines",        label: "Pipelines",             icon: GitBranch,       module: "pipelines",         roles: ["admin", "gerente", "gerente_comercial"] },
+  { href: "/reports",          label: "Reportes",              icon: BarChart3,       module: "reportes",          hiddenFromRoles: ["vendedor"] },
+  { href: "/clients",          label: "Clientes",              icon: Users,           module: "clientes" },
+  { href: "/contacts",         label: "Contactos",             icon: Contact2,        module: "contactos",         hiddenFromRoles: ["vendedor"] },
+  { href: "/salespeople",      label: "Vendedores",            icon: UserSquare,      module: "vendedores",        hiddenFromRoles: ["vendedor"] },
+  { href: "/products",         label: "Productos",             icon: Package,         module: "productos" },
+  { href: "/price-lists",      label: "Listas de precios",     icon: Tag,             module: "listas_precios",    hiddenFromRoles: ["vendedor"] },
+  { href: "/email-templates",  label: "Plantillas Email",      icon: MailOpen,        module: "plantillas_email",  hiddenFromRoles: ["vendedor"] },
+  { href: "/automation",       label: "Automatizaciones",      icon: Workflow,        module: "automatizaciones",  roles: ["admin", "gerente", "gerente_comercial"] },
+  { href: "/custom-fields",    label: "Campos personalizados", icon: Sliders,         module: "campos",            roles: ["admin", "gerente", "gerente_comercial"] },
+  { href: "/imports",          label: "Importar CSV",          icon: UploadCloud,     module: "importaciones",     hiddenFromRoles: ["vendedor"] },
+  { href: "/csv",              label: "Import/Export CSV",     icon: UploadCloud,     module: "csv",               roles: ["admin", "gerente", "gerente_comercial"] },
+  { href: "/followups",        label: "Seguimientos",          icon: Timer,           module: "seguimientos",      hiddenFromRoles: ["vendedor"] },
+  { href: "/goals",            label: "Metas",                 icon: Target,          module: "metas",             roles: ["admin", "gerente", "gerente_comercial"] },
+  { href: "/gmail",            label: "Gmail Sync",            icon: Mail,            module: "gmail",             hiddenFromRoles: ["vendedor"] },
+  { href: "/anura",            label: "Anura Llamadas",        icon: PhoneCall,       module: "anura",             hiddenFromRoles: ["vendedor"] },
+  { href: "/prompts",          label: "Prompts IA",            icon: Bot,             module: "prompts",           hiddenFromRoles: ["vendedor"] },
+  { href: "/audit",            label: "Auditoría",             icon: ShieldCheck,     module: "auditoria",         roles: ["admin", "gerente", "gerente_comercial"] },
+  { href: "/production",       label: "Producción (MES)",      icon: Factory,         module: "produccion",        hiddenFromRoles: ["vendedor"] },
+  { href: "/users",            label: "Usuarios",              icon: Settings,        module: "usuarios",          roles: ["admin", "gerente_comercial"] },
 ];
 
 function QuickActivityFAB() {
@@ -223,31 +225,43 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
 
-  const NavLinks = () => (
-    <nav className="space-y-1 mt-6">
-      {navItems.map((item) => {
-        if (item.roles && !item.roles.includes(user?.role || "")) return null;
-        if ((item as any).hiddenFromRoles?.includes(user?.role || "")) return null;
-        const isActive = location.startsWith(item.href);
-        return (
-          <Link 
-            key={item.href} 
-            href={item.href}
-            className={`
-              flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
-              ${isActive 
-                ? 'bg-primary/10 text-primary font-medium' 
-                : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
-              }
-            `}
-          >
-            <item.icon className={`w-5 h-5 transition-colors ${isActive ? 'text-primary' : 'group-hover:text-foreground'}`} />
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  const NavLinks = () => {
+    const role = user?.role || "";
+    const isPrivileged = PRIVILEGED_ROLES.includes(role);
+    const modulePerms: string[] | null = isPrivileged ? null : ((user as any)?.modulePermissions ?? null);
+
+    const visible = navItems.filter((item) => {
+      if (isPrivileged) return true;
+      if (modulePerms !== null && item.module) return modulePerms.includes(item.module);
+      if ((item as any).roles && !(item as any).roles.includes(role)) return false;
+      if ((item as any).hiddenFromRoles?.includes(role)) return false;
+      return true;
+    });
+
+    return (
+      <nav className="space-y-1 mt-6">
+        {visible.map((item) => {
+          const isActive = location.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`
+                flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
+                ${isActive
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                }
+              `}
+            >
+              <item.icon className={`w-5 h-5 transition-colors ${isActive ? 'text-primary' : 'group-hover:text-foreground'}`} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">

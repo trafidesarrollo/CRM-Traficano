@@ -249,10 +249,10 @@ router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 
 router.use("/goals", goalsRouter);
 
-router.use("/settings", requireRole("admin"), settingsRouter);
+router.use("/settings", requireRole("admin", "gerente_comercial"), settingsRouter);
 
-router.use("/users", requireRole("admin"), usersRouter);
-router.use("/prompts", requireRole("admin", "gerente"), promptsRouter);
-router.use("/audit", requireRole("admin", "gerente"), auditRouter);
+router.use("/users", requireRole("admin", "gerente_comercial"), usersRouter);
+router.use("/prompts", requireRole("admin", "gerente_comercial", "gerente"), promptsRouter);
+router.use("/audit", requireRole("admin", "gerente_comercial", "gerente"), auditRouter);
 
 export default router;

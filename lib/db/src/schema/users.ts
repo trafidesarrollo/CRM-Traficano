@@ -10,7 +10,7 @@ export const usersTable = pgTable("users", {
   email: text("email"),
   passwordHash: text("password_hash").notNull(),
   fullName: text("full_name").notNull(),
-  role: text("role", { enum: ["admin", "gerente", "vendedor", "operador"] }).notNull().default("vendedor"),
+  role: text("role", { enum: ["admin", "gerente_comercial", "gerente", "vendedor", "operador"] }).notNull().default("vendedor"),
   isActive: boolean("is_active").notNull().default(true),
   // ID original del usuario en el ERP Traficaño (ej: "U001"). Sirve para trazabilidad
   // y para futura sincronización bidireccional.
