@@ -6,37 +6,43 @@ import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Plus, Users, CalendarDays, Package, Clock, CheckCircle2, Send } from "lucide-react";
+import { FileText, Plus, Users, CalendarDays, Package, Clock, CheckCircle2, Send, ListTodo, AlertCircle } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  draft: { label: "Borrador", color: "bg-gray-500/20 text-gray-300" },
-  sent: { label: "Enviada", color: "bg-blue-500/20 text-blue-300" },
-  approved: { label: "Aprobada", color: "bg-green-500/20 text-green-300" },
+  draft:    { label: "Borrador",  color: "bg-gray-500/20 text-gray-300" },
+  sent:     { label: "Enviada",   color: "bg-blue-500/20 text-blue-300" },
+  approved: { label: "Aprobada",  color: "bg-green-500/20 text-green-300" },
   rejected: { label: "Rechazada", color: "bg-red-500/20 text-red-300" },
-  partial: { label: "Parcial", color: "bg-yellow-500/20 text-yellow-300" },
-  expired: { label: "Vencida", color: "bg-orange-500/20 text-orange-300" },
+  partial:  { label: "Parcial",   color: "bg-yellow-500/20 text-yellow-300" },
+  expired:  { label: "Vencida",   color: "bg-orange-500/20 text-orange-300" },
 };
 
 export default function DashboardVendedor() {
   const { user } = useAuth();
   const [quotes, setQuotes] = useState<any[]>([]);
+  const [taskStats, setTaskStats] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/api/quotes?limit=50`, { credentials: "include" })
-      .then(r => r.json())
-      .then(d => {
-        setQuotes(d.data || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+    if (!user?.id) return;
+
+    Promise.all([
+      fetch(`${API}/api/quotes?limit=50`, { credentials: "include" })
+        .then(r => r.json()).catch(() => ({ data: [] })),
+      fetch(`${API}/api/tasks/stats/summary?assignedTo=${user.id}`, { credentials: "include" })
+        .then(r => r.json()).catch(() => ({})),
+    ]).then(([quotesData, stats]) => {
+      setQuotes(quotesData.data || []);
+      setTaskStats(stats && typeof stats === "object" && !Array.isArray(stats) ? stats : {});
+      setLoading(false);
+    });
+  }, [user?.id]);
 
   const stats = {
-    draft: quotes.filter(q => q.status === "draft").length,
-    sent: quotes.filter(q => q.status === "sent").length,
+    draft:    quotes.filter(q => q.status === "draft").length,
+    sent:     quotes.filter(q => q.status === "sent").length,
     approved: quotes.filter(q => q.status === "approved").length,
   };
 
@@ -51,11 +57,12 @@ export default function DashboardVendedor() {
         <p className="text-muted-foreground mt-1">Resumen de tu actividad comercial.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      {/* Quote stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <Card className="bg-card/50 border-white/5">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gray-500/20 flex items-center justify-center">
-              <Clock className="w-6 h-6 text-gray-300" />
+            <div className="w-11 h-11 rounded-xl bg-gray-500/20 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 text-gray-300" />
             </div>
             <div>
               <p className="text-2xl font-bold">{stats.draft}</p>
@@ -65,8 +72,8 @@ export default function DashboardVendedor() {
         </Card>
         <Card className="bg-card/50 border-white/5">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <Send className="w-6 h-6 text-blue-300" />
+            <div className="w-11 h-11 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
+              <Send className="w-5 h-5 text-blue-300" />
             </div>
             <div>
               <p className="text-2xl font-bold">{stats.sent}</p>
@@ -76,8 +83,8 @@ export default function DashboardVendedor() {
         </Card>
         <Card className="bg-card/50 border-white/5">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-green-300" />
+            <div className="w-11 h-11 rounded-xl bg-green-500/20 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5 text-green-300" />
             </div>
             <div>
               <p className="text-2xl font-bold">{stats.approved}</p>
@@ -85,6 +92,31 @@ export default function DashboardVendedor() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pending tasks card */}
+        <Link href="/tasks">
+          <Card className={`bg-card/50 border-white/5 cursor-pointer hover:bg-white/5 transition-all h-full ${(taskStats.overdue ?? 0) > 0 ? "border-red-500/30" : ""}`}>
+            <CardContent className="p-5 flex items-center gap-4 h-full">
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${(taskStats.overdue ?? 0) > 0 ? "bg-red-500/20" : "bg-primary/20"}`}>
+                {(taskStats.overdue ?? 0) > 0
+                  ? <AlertCircle className="w-5 h-5 text-red-400" />
+                  : <ListTodo className="w-5 h-5 text-primary" />
+                }
+              </div>
+              <div>
+                <p className={`text-2xl font-bold ${(taskStats.overdue ?? 0) > 0 ? "text-red-400" : ""}`}>
+                  {taskStats.pending ?? 0}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Tareas pendientes
+                  {(taskStats.overdue ?? 0) > 0 && (
+                    <span className="block text-xs text-red-400">{taskStats.overdue} vencida{taskStats.overdue > 1 ? "s" : ""}</span>
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -161,6 +193,17 @@ export default function DashboardVendedor() {
               <Link href="/quotes/new">
                 <Button variant="outline" className="w-full justify-start gap-2">
                   <FileText className="w-4 h-4 text-primary" />Nueva cotización
+                </Button>
+              </Link>
+              <Link href="/tasks">
+                <Button variant="outline" className="w-full justify-start gap-2">
+                  <ListTodo className="w-4 h-4 text-primary" />
+                  Mis tareas
+                  {(taskStats.pending ?? 0) > 0 && (
+                    <Badge className={`ml-auto text-xs ${(taskStats.overdue ?? 0) > 0 ? "bg-red-500/20 text-red-300" : "bg-primary/20 text-primary"}`}>
+                      {taskStats.pending}
+                    </Badge>
+                  )}
                 </Button>
               </Link>
               <Link href="/clients">

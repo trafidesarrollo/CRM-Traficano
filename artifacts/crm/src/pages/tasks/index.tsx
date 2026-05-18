@@ -112,20 +112,15 @@ export default function Tasks() {
 
   const loadFollowups = async () => {
     try {
-      // For "all" view show next 30 days; for "today" show just today; for "overdue" show past
-      let from: Date, to: Date;
       const now = new Date();
+      const params = new URLSearchParams();
       if (view === "today") {
-        from = startOfDay(now);
-        to = endOfDay(now);
+        params.set("from", startOfDay(now).toISOString());
+        params.set("to", endOfDay(now).toISOString());
       } else if (view === "overdue") {
-        from = new Date("2000-01-01");
-        to = now;
-      } else {
-        from = startOfDay(now);
-        to = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+        params.set("to", now.toISOString()); // past only
       }
-      const params = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
+      // "all" view: no date filter — show everything with followupDate
       if (isVendedor && salespersonId) params.set("salespersonId", String(salespersonId));
       const r = await fetch(`${API}/api/quotes/followups?${params}`, { credentials: "include" });
       if (r.ok) {
