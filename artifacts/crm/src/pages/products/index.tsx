@@ -81,7 +81,203 @@ function csvToMedidas(rows: string[][]): any[] {
   }));
 }
 
+function csvToAccesorios(rows: string[][]): any[] {
+  if (rows.length < 2) return [];
+  const header = rows[0];
+  const idx = (name: string) => header.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const iCodigo = idx("Código");
+  const iNombre = idx("Nombre");
+  const iTipo = idx("Tipo de accesorio");
+  const iSubtipo = idx("Subtipo");
+  const iUnidad = idx("Unidad de medida");
+  const iV1 = idx("Valor 1");
+  const iV2 = idx("Valor 2");
+  const iV3 = idx("Valor 3");
+  const iV4 = idx("Valor 4");
+  const iV5 = idx("Valor 5");
+  const iPeso = idx("Peso");
+  const iNorma = idx("Norma");
+  return rows.slice(1).filter(r => r[iNombre]?.trim()).map(r => ({
+    code: r[iCodigo]?.trim() || null,
+    name: r[iNombre]?.trim() || "",
+    accessoryType: r[iTipo]?.trim() || null,
+    subtype: r[iSubtipo]?.trim() || null,
+    unit: r[iUnidad]?.trim() || null,
+    value1: r[iV1]?.trim() || null,
+    value2: r[iV2]?.trim() || null,
+    value3: r[iV3]?.trim() || null,
+    value4: r[iV4]?.trim() || null,
+    value5: r[iV5]?.trim() || null,
+    weight: r[iPeso]?.trim() || null,
+    standard: r[iNorma]?.trim() || null,
+  }));
+}
+
 type ImportState = "idle" | "preview" | "importing" | "done" | "error";
+
+function CsvImportAccesoriosDialog() {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<ImportState>("idle");
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [resultMsg, setResultMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const reset = () => {
+    setState("idle"); setParsed([]); setFileName(""); setProgress(0);
+    setResultMsg(""); setErrorMsg("");
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const rows = parseCSV(text);
+      const accesorios = csvToAccesorios(rows);
+      if (accesorios.length === 0) {
+        setErrorMsg("No se encontraron filas válidas. Verificá que sea el CSV de Accesorios.");
+        setState("error");
+        return;
+      }
+      setParsed(accesorios);
+      setState("preview");
+    };
+    reader.readAsText(file, "utf-8");
+  };
+
+  const handleImport = async () => {
+    if (!parsed.length) return;
+    setState("importing");
+    setProgress(0);
+    const CHUNK = 200;
+    let done = 0;
+    try {
+      for (let i = 0; i < parsed.length; i += CHUNK) {
+        const chunk = parsed.slice(i, i + CHUNK);
+        const res = await fetch(`${API_BASE}/api/products/accesorios/import`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ rows: chunk }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Error del servidor");
+        }
+        done += chunk.length;
+        setProgress(Math.round((done / parsed.length) * 100));
+      }
+      setResultMsg(`${done.toLocaleString("es-AR")} accesorios importados/actualizados correctamente.`);
+      setState("done");
+      toast({ title: "Importación completada", description: `${done.toLocaleString("es-AR")} accesorios procesados.` });
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error desconocido al importar.");
+      setState("error");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline"><Upload className="w-4 h-4 mr-2" />Importar Accesorios</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Importar Accesorios desde CSV</DialogTitle></DialogHeader>
+
+        {state === "idle" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              El CSV debe tener las columnas: <span className="font-medium text-foreground">Código, Nombre, Tipo de accesorio, Subtipo, Unidad de medida, Valor 1–5, Peso, Norma</span>.
+              Si el código ya existe, el registro se actualiza.
+            </p>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-amber-500/30 rounded-lg p-8 cursor-pointer hover:border-amber-500/60 hover:bg-amber-500/5 transition-colors gap-3">
+              <FileSpreadsheet className="w-10 h-10 text-amber-500/60" />
+              <span className="text-sm text-muted-foreground">Hacer clic para seleccionar archivo .csv de Accesorios</span>
+              <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
+            </label>
+          </div>
+        )}
+
+        {state === "preview" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm">
+              <FileSpreadsheet className="w-4 h-4 text-amber-500" />
+              <span className="font-medium">{fileName}</span>
+              <Badge variant="secondary">{parsed.length.toLocaleString("es-AR")} filas</Badge>
+            </div>
+            <div className="text-sm text-muted-foreground">Vista previa (primeras 5 filas):</div>
+            <div className="overflow-x-auto rounded border border-border/40 text-xs">
+              <table className="w-full">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="px-2 py-1 text-left font-medium">Código</th>
+                    <th className="px-2 py-1 text-left font-medium">Nombre</th>
+                    <th className="px-2 py-1 text-left font-medium">Tipo</th>
+                    <th className="px-2 py-1 text-left font-medium">Peso</th>
+                    <th className="px-2 py-1 text-left font-medium">Norma</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsed.slice(0, 5).map((r, i) => (
+                    <tr key={i} className="border-t border-border/20">
+                      <td className="px-2 py-1 text-muted-foreground">{r.code}</td>
+                      <td className="px-2 py-1 max-w-[180px] truncate">{r.name}</td>
+                      <td className="px-2 py-1">{r.accessoryType}</td>
+                      <td className="px-2 py-1">{r.weight}</td>
+                      <td className="px-2 py-1 max-w-[100px] truncate">{r.standard}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={reset}>Cancelar</Button>
+              <Button onClick={handleImport}>
+                <Upload className="w-4 h-4 mr-2" />Importar {parsed.length.toLocaleString("es-AR")} accesorios
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {state === "importing" && (
+          <div className="space-y-4 py-4 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500 mx-auto" />
+            <p className="text-sm text-muted-foreground">Importando accesorios...</p>
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div className="bg-amber-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="text-xs text-muted-foreground">{progress}% completado</p>
+          </div>
+        )}
+
+        {state === "done" && (
+          <div className="space-y-4 py-4 text-center">
+            <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
+            <p className="font-semibold">¡Importación completada!</p>
+            <p className="text-sm text-muted-foreground">{resultMsg}</p>
+            <Button onClick={() => { reset(); setOpen(false); }}>Cerrar</Button>
+          </div>
+        )}
+
+        {state === "error" && (
+          <div className="space-y-4 py-4 text-center">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
+            <p className="font-semibold">Error en la importación</p>
+            <p className="text-sm text-muted-foreground">{errorMsg}</p>
+            <Button variant="outline" onClick={reset}>Intentar de nuevo</Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function CsvImportDialog() {
   const { toast } = useToast();
@@ -485,6 +681,7 @@ export default function Products() {
           <p className="text-muted-foreground mt-1">{products?.length || 0} productos en catálogo</p>
         </div>
         <div className="flex gap-2">
+          <CsvImportAccesoriosDialog />
           <CsvImportDialog />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
