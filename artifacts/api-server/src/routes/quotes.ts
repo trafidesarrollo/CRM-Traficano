@@ -72,15 +72,23 @@ router.get("/quotes/:id", async (req, res) => {
   }
 });
 
+function parseDateField(val: any): Date | null | undefined {
+  if (!val || val === "") return null;
+  if (typeof val === "string") return new Date(val);
+  return val;
+}
+
 router.post("/quotes", async (req, res) => {
   try {
     const { lines, ...rest } = req.body;
     const userId = (req as any).session?.userId;
     const data: any = { ...rest, createdBy: userId };
-    if (data.date && typeof data.date === "string") data.date = new Date(data.date);
-    if (data.deliveryDate && typeof data.deliveryDate === "string") data.deliveryDate = new Date(data.deliveryDate);
-    if (data.dueDate && typeof data.dueDate === "string") data.dueDate = new Date(data.dueDate);
-    if (data.followupDate && typeof data.followupDate === "string") data.followupDate = new Date(data.followupDate);
+    data.date = parseDateField(data.date) ?? new Date();
+    data.deliveryDate = parseDateField(data.deliveryDate);
+    data.dueDate = parseDateField(data.dueDate);
+    data.followupDate = parseDateField(data.followupDate);
+    data.sentAt = parseDateField(data.sentAt);
+    data.approvedAt = parseDateField(data.approvedAt);
 
     const [quote] = await db.insert(quotesTable).values(data).returning();
     const number = `COT-${String(quote.id).padStart(5, "0")}`;
@@ -108,8 +116,9 @@ router.patch("/quotes/:id", async (req, res) => {
     const { lines, ...rest } = req.body;
     const data: any = { ...rest };
     for (const k of ["date", "deliveryDate", "dueDate", "followupDate", "sentAt", "approvedAt"]) {
-      if (data[k] && typeof data[k] === "string") data[k] = new Date(data[k]);
+      data[k] = parseDateField(data[k]);
     }
+    if (data.date === null) delete data.date;
     if (Object.keys(data).length) {
       await db.update(quotesTable).set(data).where(eq(quotesTable.id, id));
     }
