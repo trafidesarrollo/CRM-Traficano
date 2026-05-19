@@ -74,23 +74,13 @@ export default function QuoteEdit() {
     clientId: "", contactId: "", opportunityId: "", salespersonId: "", priceListId: "", saleConditionId: "",
     cuit: "", date: today, deliveryDate: "", dueDate: dueDefault, followupDate: "",
     currency: "USD", exchangeRate: "0", exchangeRateType: "DIVISA VENTA BNA",
-    quoteStatus: "EN PROCESO", priority: "ALTA", quoteType: "COTIZACION", orderType: "REVENTA",
-    description: "", internalNote: "", reference: "", purchaseOrder: "",
-    createSchedule: false, status: "draft",
+    quoteStatus: "EN PROCESO", priority: "", quoteType: "", orderType: "",
+    description: "", reference: "",
+    status: "draft",
   });
   const [lines, setLines] = useState<Line[]>([blankLine()]);
 
   const followupDateDefault = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
-  const [showFollowup, setShowFollowup] = useState(false);
-  const [savedQuote, setSavedQuote] = useState<{ id: number; number: string; clientId: number } | null>(null);
-  const [savingFollowup, setSavingFollowup] = useState(false);
-  const [followupForm, setFollowupForm] = useState({
-    date: followupDateDefault,
-    time: "09:00",
-    type: "call",
-    notes: "",
-  });
-
   const [openProductIdx, setOpenProductIdx] = useState<number | null>(null);
   const [catalogResults, setCatalogResults] = useState<any[]>([]);
   const catalogSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -209,14 +199,11 @@ export default function QuoteEdit() {
         exchangeRate: q.exchangeRate || "0",
         exchangeRateType: q.exchangeRateType || "DIVISA VENTA BNA",
         quoteStatus: q.quoteStatus || "EN PROCESO",
-        priority: q.priority || "ALTA",
-        quoteType: q.quoteType || "COTIZACION",
-        orderType: q.orderType || "REVENTA",
+        priority: q.priority || "",
+        quoteType: q.quoteType || "",
+        orderType: q.orderType || "",
         description: q.description || "",
-        internalNote: q.internalNote || "",
         reference: q.reference || "",
-        purchaseOrder: q.purchaseOrder || "",
-        createSchedule: !!q.createSchedule,
         status: q.status || "draft",
       });
       setLines((q.lines || []).map((l: any) => ({
@@ -267,7 +254,7 @@ export default function QuoteEdit() {
       productName: p.name,
       productCode: p.code || "",
       unit: p.unit || "UN",
-      unitPrice: p.price ? String(p.price) : "0",
+      unitPrice: String(p.price ?? p.unitPrice ?? p.salePrice ?? p.priceUm ?? p.sale_price ?? 0),
     });
   };
 
@@ -503,7 +490,7 @@ export default function QuoteEdit() {
             </div>
 
             <div>
-              <Label>Prioridad *</Label>
+              <Label>Prioridad</Label>
               <Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -515,7 +502,7 @@ export default function QuoteEdit() {
               </Select>
             </div>
             <div>
-              <Label>Tipo de cotización *</Label>
+              <Label>Tipo de cotización</Label>
               <Select value={form.quoteType} onValueChange={v => setForm({ ...form, quoteType: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -536,7 +523,7 @@ export default function QuoteEdit() {
               </Select>
             </div>
             <div>
-              <Label>Tipo de orden *</Label>
+              <Label>Tipo de orden</Label>
               <Select value={form.orderType} onValueChange={v => setForm({ ...form, orderType: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -546,19 +533,8 @@ export default function QuoteEdit() {
               </Select>
             </div>
 
-            <div className="col-span-2 flex items-center justify-between p-3 bg-white/5 rounded-lg">
-              <Label>Crear seguimiento</Label>
-              <Switch checked={form.createSchedule} onCheckedChange={v => setForm({ ...form, createSchedule: v })} />
-            </div>
-            {form.createSchedule && (
-              <div className="col-span-2"><Label>Fecha de seguimiento</Label><Input type="date" value={form.followupDate} onChange={e => setForm({ ...form, followupDate: e.target.value })} /></div>
-            )}
-
             <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-            <div><Label>Nota interna</Label><Textarea rows={3} value={form.internalNote} onChange={e => setForm({ ...form, internalNote: e.target.value })} /></div>
-
-            <div><Label>Referencia</Label><Input value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} /></div>
-            <div><Label>Orden de compra</Label><Input value={form.purchaseOrder} onChange={e => setForm({ ...form, purchaseOrder: e.target.value })} /></div>
+            <div><Label>Referencia de Cliente</Label><Input value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} /></div>
           </div>
         </CardContent>
       </Card>
@@ -683,6 +659,7 @@ export default function QuoteEdit() {
                                       productName: p.name,
                                       productCode: p.code || "",
                                       unit: p.unit || "UN",
+                                      unitPrice: String(p.price ?? p.unitPrice ?? p.salePrice ?? p.priceUm ?? p.sale_price ?? 0),
                                     });
                                     setOpenProductIdx(null);
                                   }}
@@ -762,69 +739,6 @@ export default function QuoteEdit() {
       </Card>
       {!isNew && id && <div className="mt-4"><DocumentUploader entityType="quote" entityId={id} /></div>}
 
-      <Dialog open={showFollowup} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" onInteractOutside={e => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <CalendarDays className="w-5 h-5 text-primary" />
-              Agendar seguimiento
-            </DialogTitle>
-            <DialogDescription>
-              La cotización <span className="font-semibold text-foreground">{savedQuote?.number}</span> fue guardada. Agendá un seguimiento para no perder el contacto con el cliente.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 mt-2">
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-              <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-300">El seguimiento se agregará al calendario y se sincronizará con Google Calendar si tenés la integración activa.</p>
-            </div>
-
-            <div>
-              <Label>Tipo de seguimiento *</Label>
-              <Select value={followupForm.type} onValueChange={v => setFollowupForm({ ...followupForm, type: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="call">📞 Llamada</SelectItem>
-                  <SelectItem value="visit">🤝 Visita</SelectItem>
-                  <SelectItem value="meeting">💬 Reunión</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Fecha *</Label>
-                <Input type="date" value={followupForm.date} onChange={e => setFollowupForm({ ...followupForm, date: e.target.value })} />
-              </div>
-              <div>
-                <Label>Hora</Label>
-                <Input type="time" value={followupForm.time} onChange={e => setFollowupForm({ ...followupForm, time: e.target.value })} />
-              </div>
-            </div>
-
-            <div>
-              <Label>Notas del seguimiento</Label>
-              <Textarea
-                rows={2}
-                placeholder="¿Qué vas a hablar con el cliente?"
-                value={followupForm.notes}
-                onChange={e => setFollowupForm({ ...followupForm, notes: e.target.value })}
-              />
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button className="flex-1" onClick={scheduleFollowup} disabled={savingFollowup}>
-                <CalendarDays className="w-4 h-4 mr-2" />
-                {savingFollowup ? "Agendando..." : "Agendar seguimiento"}
-              </Button>
-              <Button variant="ghost" onClick={skipFollowup} disabled={savingFollowup} className="text-muted-foreground">
-                Omitir
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </AppLayout>
   );
 }
