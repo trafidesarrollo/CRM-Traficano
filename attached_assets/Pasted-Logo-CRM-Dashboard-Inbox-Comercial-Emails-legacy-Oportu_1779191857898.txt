@@ -1,0 +1,389 @@
+Logo
+CRM
+Dashboard
+Inbox Comercial
+Emails (legacy)
+Oportunidades
+Cotizaciones
+Pipeline Visual
+Pedidos
+Tareas
+Calendario
+Sync Google Calendar
+Pipelines
+Reportes
+Clientes
+Contactos
+Vendedores
+Productos
+Listas de precios
+Plantillas Email
+Automatizaciones
+Campos personalizados
+Importar CSV
+Import/Export CSV
+Seguimientos
+Metas
+Gmail Sync
+Anura Llamadas
+Prompts IA
+Auditoría
+Producción (MES)
+Usuarios
+A
+Administrador
+
+admin
+
+Cerrar Sesión
+
+Clientes
+Directorio de empresas.
+
+Importar CSV
+Nuevo Cliente
+Buscar empresa...
+Nro.	Empresa	Emails	Industria	Ubicación	Estado	
+1	
+Metales del Sur S.A.
+
+30-71234567-8
+
+-	Industria Metalúrgica	Buenos Aires, Argentina	Activo	
+2	
+Construcciones Patagónica S.R.L.
+
+30-65432198-1
+
+-	Construcción	Neuquén, Argentina	Activo	
+3	
+Petroquímica Norte S.A.
+
+30-54321987-6
+
+-	Petroquímica	Córdoba, Argentina	Prospecto	
+4	
+Aceros del Sur SA
+
+30-12345678-9
+
+-	Siderurgia	Buenos Aires, Argentina	Prospecto	
+5	
+Tubos Patagonia SRL
+
+30-98765432-1
+
+-	Tubería	Neuquén, Argentina	Prospecto	
+6	
+Metalúrgica Norte SA
+
+30-55667788-0
+
+-	Metalurgia	Tucumán, Argentina	Prospecto	
+7	
+Válvulas Premium SA
+
+30-11223344-5
+
+-	Válvulas	Rosario, Argentina	Prospecto	
+8	
+Aceros del Sur S.A.
+
+30-71234567-9
+
+-	Metalúrgica	Rosario, Argentina	Prospecto	
+10	
+Test Emails SA
+
+ventas@testemails.com
+compras@testemails.com
+-	-	Activo	
+11	
+Industrial Emails Test SRL
+
+ventas@industrial.com
+gerencia@industrial.com
+-	-	Prospecto	
+9	
+nistal
+
+tomas.nistal.net
+
+tomas@nistal.net
+programacion	-	Prospecto	
+12	
+Test Client SA
+
+30-99999999-9
+
+-	-	-	Activo	
+"10039"	
+"A GIACOMELLI S.A."
+
+"30566613766"
+
+-	"PARA TREFILAR"	"FERREYRA", "CORDOBA"	Activo	
+"12908"	
+"A&C SOLUCIONES S.A"
+
+"30709849936"
+
+-	""	"", ""	Prospecto	
+"10002"	
+"A-EVANGELISTA S.A."
+
+"30685218190"
+
+"frivast@repsolypf.com"
+""	"EZEIZA, "ESTEBAN ECHEVERRIA"	Prospecto	
+"12089"	
+"A.E.B. AMERICA S.R.L."
+
+"30709402923"
+
+-	""	"EL TALAR", "BUENOS AIRES"	Prospecto	
+"10959"	
+"ABA GAS S.A."
+
+"30707358684"
+
+-	""	"Capital Federal", "CIUDAD AUTONOMA DE BUENOS AIRES"	Prospecto	
+"12909"	
+"ABAC S R L"
+
+"30609968792"
+
+-	""	"", ""	Prospecto	
+"12121"	
+"ABELARDO ESTEBAN (VALVULAS ESTEBAN)"
+
+"20105339330"
+
+-	""	"CIUDADELA", "BUENOS AIRES"	Prospecto	
+"12979"	
+"ABERCAR S.R.L."
+
+"30658121819"
+
+"ventas@abercar.com.ar"
+""	"", ""	Prospecto	
+
+0
+Importar Clientes desde CSV
+2406
+
+Nuevos
+
+4
+
+Actualizados
+
+728
+
+Omitidos
+
+100 fila(s) con error
+
+Línea 21: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ACERBEN S.A.","","","4442-2292/4379","TABLADA", "LA MATANZA","TABLADA","BUENOS AIRES",prospect,,[],Zona: "ZONA TRAFICAÑO" | Partido: "LA MATANZA" | Responsable 2: "","10535"
+
+Línea 35: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ACEROS DHERS","","CILINDRO HIDRAULICO","4137-7494/7498","AVELLANEDA", "AVELLANEDA","AVELLANEDA","BUENOS AIRES",prospect,,[],Zona: "ZONA SUR" | Partido: "AVELLANEDA" | Responsable 2: "","11554"
+
+Línea 42: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ACEROS MAYORANO SRL","","","4601-1648602-8568651-0873","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10536"
+
+Línea 52: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ACINDAR GRUPO ARCELOR MITTAL","","CILINDRO HIDRAULICO","03400-478200","VILLA CONSTITUCION", "CONSTITUCION","VILLA CONSTITUCION","SANTA FE",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CONSTITUCION" | Responsable 2: "","10041"
+
+Línea 56: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ACONTIMBER S.A.U","","","[]","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12614"
+
+Línea 60: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ACQUATRON S.A.","","","4776-0101/4773-2584","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,["\"acquaron@arnet.com.ar\""],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10879"
+
+Línea 61: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ACROM REPUESTOS","","","4712-3672","SANTOS LUGARES", "TRES DE FEBRERO","SANTOS LUGARES","BUENOS AIRES",prospect,,[],Zona: "" | Partido: "TRES DE FEBRERO" | Responsable 2: "","12284"
+
+Línea 69: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AES ARGENTINA GENERACIÓN SA","","","(0336)448-7189","SAN NICOLAS DE LOS ARROYOS, EST.S.NICOLAS","SAN NICOLAS DE LOS ARROYOS,"SAN NICOLAS",prospect,,[],Zona: "" | Partido: EST.S.NICOLAS" | Responsable 2: "","11253"
+
+Línea 72: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AFNE","","ESTRUCTURAL","0221-4690017/4690023/4690332","ENSENADA", "ENSENADA","ENSENADA","BUENOS AIRES",prospect,,[],Zona: "ZONA SUR" | Partido: "ENSENADA" | Responsable 2: "","10045"
+
+Línea 86: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AGROMETAL","","CILINDRO HIDRAULICO","(03468)47-1311/(03468)47-1321/(03468)47-1331","MONTE MAIZ", "UNION","MONTE MAIZ","CORDOBA",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "UNION" | Responsable 2: "","10563"
+
+Línea 88: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AGROPARAMONGA","","","51994640292","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12206"
+
+Línea 97: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AGUSTIN BERASATEGUI","","ESTRUCTURAL","0341-4570602/4560577/4560346","ROSARIO", "ROSARIO","ROSARIO","SANTA FE",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "ROSARIO" | Responsable 2: "","10457"
+
+Línea 100: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AIR GNC","","","4281-7951","MONTE GRANDE", "GRANEROS","MONTE GRANDE","TUCUMAN",prospect,,[],Zona: "ZONA SUR" | Partido: "GRANEROS" | Responsable 2: "","10226"
+
+Línea 101: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AIR-TEC","","","","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12203"
+
+Línea 105: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AIRMETAL SRL","","CILINDRO HIDRAULICO","4651-0226/0913","SAN JUSTO", "LA MATANZA","SAN JUSTO","BUENOS AIRES",prospect,,[],Zona: "ZONA TRAFICAÑO" | Partido: "LA MATANZA" | Responsable 2: "","11734"
+
+Línea 108: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALADDIN","","","4502-5847","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10742"
+
+Línea 109: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALADIO","","","","LUQUE", "RIO SEGUNDO","LUQUE","CORDOBA",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "RIO SEGUNDO" | Responsable 2: "","10538"
+
+Línea 110: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALBACE","","","[]","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12595"
+
+Línea 115: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALBERTO PERALTA","","","","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","10939"
+
+Línea 122: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALDERETE JULIO CESAR","20116880688","","","", "","","",prospect,,[],Zona: "ZONA SUR" | Partido: "" | Responsable 2: "","12509"
+
+Línea 129: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALERCIA HNOS.","","","","CORDOBA", "CAPITAL","CORDOBA","CORDOBA",prospect,,[],Zona: "" | Partido: "CAPITAL" | Responsable 2: "","11558"
+
+Línea 132: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALETUB S.A.","","GNC","4635-6208/4187/6056","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10049"
+
+Línea 135: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALFIO PAPONNET","","ESTRUCTURAL","03472-15629394","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11673"
+
+Línea 136: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALFREDO E. JUDA","","","4798-3793/4793-6024","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,["\"info@alfredojuda.com.ar\""],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10494"
+
+Línea 139: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALICORP","","","4876-4000(int485454)","SAN JUSTO", "LA MATANZA","SAN JUSTO","BUENOS AIRES",prospect,,[],Zona: "" | Partido: "LA MATANZA" | Responsable 2: "","12254"
+
+Línea 142: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALLKEM LIMITED","","","1126195570","", "","","",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "" | Responsable 2: "","12496"
+
+Línea 149: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ALPES SRL","","","4208-8143","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11318"
+
+Línea 162: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AMERICA AUTOPIEZAS","","CIRCUITO HIDRAULICO","4635-3594/4682-6458","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,["\"braext@ciudad.com.ar\""],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10877"
+
+Línea 167: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AMISUR","","","","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","10846"
+
+Línea 173: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AMORTIGUADORES TRS","","","","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12061"
+
+Línea 174: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ANCA","","","4709-3008/9","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11412"
+
+Línea 184: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ANTONIO R. MONTICH Y CIA SA","","CIRCUITO HIDRAULICO","0351-456-2061","CORDOBA", "CAPITAL","CORDOBA","CORDOBA",prospect,,["\"mkrayeski@montichsa.com.a\""],Zona: "CAPITAL FEDERAL" | Partido: "CAPITAL" | Responsable 2: "","10813"
+
+Línea 193: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ARBILUBA","","","4204-9200","LANUS", "LANUS","LANUS","BUENOS AIRES",prospect,,[],Zona: "ZONA SUR" | Partido: "LANUS" | Responsable 2: "","10734"
+
+Línea 211: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ARMAS SHARK","","","4729-3266","", "","","",prospect,,[],Zona: "ZONA NORTE" | Partido: "" | Responsable 2: "","11456"
+
+Línea 212: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ARMETAL S.A.","","","4736-3311/3300/2845","EL TALAR", "TIGRE","EL TALAR","BUENOS AIRES",prospect,,[],Zona: "ZONA NORTE" | Partido: "TIGRE" | Responsable 2: "","10543"
+
+Línea 216: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ARQUITECTURA Y VCONSTRUCCION SRL","30714374601","CILINDRO HIDRAULICO","03865-1552-6463","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11917"
+
+Línea 218: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ARTECO","","","4488-1651","", "","","",prospect,,[],Zona: "ZONA TRAFICAÑO" | Partido: "" | Responsable 2: "","10544"
+
+Línea 220: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ARUAL CAUCHOS","","CIRCUITO HIDRAULICO","011-4709-4769","", "","","",prospect,,[],Zona: "ZONA SUR" | Partido: "" | Responsable 2: "","11663"
+
+Línea 222: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AS INDUSTRIAS SRL","","","5435-6700","CASEROS", "TRES DE FEBRERO","CASEROS","BUENOS AIRES",prospect,,[],Zona: "ZONA NORTE" | Partido: "TRES DE FEBRERO" | Responsable 2: "","11176"
+
+Línea 228: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ASEMFI S.R.L.","","BUENOS AIRES","4756-1596/3565/3566",com, ar",com,"MUNRO",prospect,,["\"asemfi@asemfi"],Zona: "" | Partido: ar" | Responsable 2: "ZONA NORTE","10893"
+
+Línea 233: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AST. ALNABI S.A.","","","4342-4245","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10057"
+
+Línea 238: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ATEND S.R.L","","","[]","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12578"
+
+Línea 242: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "ATZCO","","","","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12454"
+
+Línea 252: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AUTO RICAMBI SRL","","","4/469-1042","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","10799"
+
+Línea 253: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AUTOCAR GNC","","","4441-0942","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","10866"
+
+Línea 255: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AUTOPARTES","","CIRCUITO HIDRAULICO","4450-9279","ITUZAINGO", "ITUZAINGO","ITUZAINGO","CORRIENTES",prospect,,[],Zona: "ZONA OESTE" | Partido: "ITUZAINGO" | Responsable 2: "","10781"
+
+Línea 262: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AUTOPARTES RTD","","","3973-1876/1565659967","LANUS", "LANUS","LANUS","BUENOS AIRES",prospect,,[],Zona: "ZONA SUR" | Partido: "LANUS" | Responsable 2: "","11472"
+
+Línea 264: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AXEL","","","0341-4397650/4307311","ROSARIO", "ROSARIO","ROSARIO","SANTA FE",prospect,,["\"axeiros@arnet.com.ar\""],Zona: "CAPITAL FEDERAL" | Partido: "ROSARIO" | Responsable 2: "","10451"
+
+Línea 266: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "AXION LIFT","","","356442222","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11567"
+
+Línea 279: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BAKER HUGHES WIRELINE","","","[]","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12624"
+
+Línea 280: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BALIARDA S.A.","","","41225800","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","11967"
+
+Línea 281: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BARANSIK","","","","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12270"
+
+Línea 282: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BARBERO SA","","","(03564)439000","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12193"
+
+Línea 283: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BARBIERI E HIJOS","","","0341-4618488","ROSARIO", "ROSARIO","ROSARIO","SANTA FE",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "ROSARIO" | Responsable 2: "","10453"
+
+Línea 285: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BARNABA Y CIA SRL","","","(03424)891679/1510/5498/0308","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12201"
+
+Línea 287: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BARRANCOS JORGE ANTONIO","","","4233-3552","LONGCHAMPS", "ALMIRANTE BROWN","LONGCHAMPS","BUENOS AIRES",prospect,,[],Zona: "ZONA SUR" | Partido: "ALMIRANTE BROWN" | Responsable 2: "","10919"
+
+Línea 290: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BASCULAS MAGRIS SA","","","(03382)429043/(03382)426700","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11339"
+
+Línea 302: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BENTELER AUTOMOTIVE","","CIRCUITO HIDRAULICO","4001-7727/4001-7742","EL TALAR", "TIGRE","EL TALAR","BUENOS AIRES",prospect,,[],Zona: "ZONA NORTE" | Partido: "TIGRE" | Responsable 2: "","11565"
+
+Línea 304: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BERAZATEGUI","","","0341-4570602","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","10842"
+
+Línea 308: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BERMAN CARLOS MARCELO","","","4639-4977","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10263"
+
+Línea 331: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BIT S.A.","","","4691-2244","TABLADA", "LA MATANZA","TABLADA","BUENOS AIRES",prospect,,[],Zona: "ZONA TRAFICAÑO" | Partido: "LA MATANZA" | Responsable 2: "","10950"
+
+Línea 333: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BLASEVICH HNOS. S.R.L.","","GNC","4205-4321","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10506"
+
+Línea 339: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BOGAMAC ASCENSORES","","","(0351)497-9461","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11467"
+
+Línea 345: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BONFINI","","","0223-4742887","MAR DEL PLATA", "GENERAL PUEYRREDON","MAR DEL PLATA","BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "GENERAL PUEYRREDON" | Responsable 2: "","10963"
+
+Línea 348: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BORAX","","","[]","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12566"
+
+Línea 350: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BORIS HNOS S.A.","","","4252-6100/6599/4251-6154","BERNAL", "QUILMES","BERNAL","BUENOS AIRES",prospect,,["\"boris@boris.com.ar\""],Zona: "ZONA SUR" | Partido: "QUILMES" | Responsable 2: "","11032"
+
+Línea 353: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BOSCH ARG. INDUSTRIAS S.A.","","","4753-8040/80914754-4509/4521","SAN MARTIN", "CAPAYAN","SAN MARTIN","CATAMARCA",prospect,,[],Zona: "ZONA NORTE" | Partido: "CAPAYAN" | Responsable 2: "","10548"
+
+Línea 358: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BRAMAJO Y DIAZ S.H.","","","4601-4320","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10945"
+
+Línea 367: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BSI BOMBAS","","","[]","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12601"
+
+Línea 370: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BTS CORREAS","","","4653-3855","CIUDADELA", "TRES DE FEBRERO","CIUDADELA","BUENOS AIRES",prospect,,[],Zona: "ZONA NORTE" | Partido: "TRES DE FEBRERO" | Responsable 2: "","11697"
+
+Línea 375: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BUDEGUER","","","[]","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","10003"
+
+Línea 381: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BUFFALO S.A.I.C.","","CIRCUITO HIDRAULICO","4744-13304744-39014744-3910","SAN FERNANDO", "COLON","SAN FERNANDO","CORDOBA",prospect,,[],Zona: "ZONA NORTE" | Partido: "COLON" | Responsable 2: "","10069"
+
+Línea 382: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BUGATTI (GNC S.A.)","","","4671-2904/2105/7615","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10303"
+
+Línea 383: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "BUHLMANN GROUP","","GNC","","", "","","",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "" | Responsable 2: "","11609"
+
+Línea 391: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "C. F. GOMA","","CONDUCCION","0351-4970303","FERREYRA", "CAPITAL","FERREYRA","CORDOBA",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CAPITAL" | Responsable 2: "","10458"
+
+Línea 392: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "C. V. J.","","","4202-1241/4272-8613","GUILLON, LUIS","GUILLON,"ESTEBAN ECHEVERRIA",prospect,,[],Zona: "" | Partido: LUIS" | Responsable 2: "","10341"
+
+Línea 393: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "C.G.P. AUTOPARTES,"CUIT","","30684809217","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","13012"
+
+Línea 395: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CA EQUIPAMENT","","CILINDRO HIDRAULICO","4","", "","","",prospect,,[],Zona: "ZONA NORTE" | Partido: "" | Responsable 2: "","12373"
+
+Línea 398: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CABLES ARGENTINOS (RAUL ALEJANDRO GIMENEZ)","","","3976-7451","QUILMES", "QUILMES","QUILMES","BUENOS AIRES",prospect,,[],Zona: "" | Partido: "QUILMES" | Responsable 2: "","12058"
+
+Línea 406: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CAFIX","","","","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","12204"
+
+Línea 410: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CALD METHAL SA","","","4767-6343","GENERAL SAN MARTIN, EST.SAN MARTIN","GENERAL SAN MARTIN,"GENERAL SAN MARTIN",prospect,,[],Zona: "" | Partido: EST.SAN MARTIN" | Responsable 2: "","11573"
+
+Línea 417: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CALDERAS ROLON","","","0223-4834092","MAR DEL PLATA", "GENERAL PUEYRREDON","MAR DEL PLATA","BUENOS AIRES",prospect,,[],Zona: "" | Partido: "GENERAL PUEYRREDON" | Responsable 2: "","11447"
+
+Línea 419: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CALDIMET SRL","","","(0260)442-1713","SAN RAFAEL", "SAN RAFAEL","SAN RAFAEL","MENDOZA",prospect,,[],Zona: "ZONA SUR" | Partido: "SAN RAFAEL" | Responsable 2: "","11826"
+
+Línea 420: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CALEU AUTOPARTES","","","4919-9785","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11486"
+
+Línea 426: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CALROCAL S.A.","","","4760-1824/8873","FLORIDA", "VICENTE LOPEZ","FLORIDA","BUENOS AIRES",prospect,,[],Zona: "ZONA NORTE" | Partido: "VICENTE LOPEZ" | Responsable 2: "","10483"
+
+Línea 433: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CAMOZZI","","","4911-0816","", "","","",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "" | Responsable 2: "","11393"
+
+Línea 450: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CARBONE LORRAINE ARG. S.A.","","GNC","4918-2121","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10507"
+
+Línea 452: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CARDANES ARGENTINOS","","","(0221)414-0008","LA PLATA", "LA PLATA","LA PLATA","BUENOS AIRES",prospect,,[],Zona: "ZONA SUR" | Partido: "LA PLATA" | Responsable 2: "","11536"
+
+Línea 457: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CARLOS CABALLERO SRL","","","59133492929","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","11847"
+
+Línea 459: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CARLOS MARKOW","","","4654-2927","RAMOS MEJIA", "LA MATANZA","RAMOS MEJIA","BUENOS AIRES",prospect,,[],Zona: "ZONA OESTE" | Partido: "LA MATANZA" | Responsable 2: "","10553"
+
+Línea 460: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CARLOS ZINOVICH","","","4441-8620/15-4971-4615","TABLADA", "LA MATANZA","TABLADA","BUENOS AIRES",prospect,,[],Zona: "ZONA TRAFICAÑO" | Partido: "LA MATANZA" | Responsable 2: "","11385"
+
+Línea 462: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CARMELO GRIECO","","","4653-3220","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","10554"
+
+Línea 464: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CARPI","","","","", "","","",prospect,,[],Zona: "" | Partido: "" | Responsable 2: "","10822"
+
+Línea 470: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CARTER","","","4714-4296","SAN FERNANDO", "COLON","SAN FERNANDO","CORDOBA",prospect,,[],Zona: "ZONA NORTE" | Partido: "COLON" | Responsable 2: "","10376"
+
+Línea 478: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CASANOVA","","","","AVELLANEDA", "AVELLANEDA","AVELLANEDA","BUENOS AIRES",prospect,,[],Zona: "ZONA SUR" | Partido: "AVELLANEDA" | Responsable 2: "","10956"
+
+Línea 479: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CASER GOM SRL","","CONDUCCION","4757-834/4712-0227","SAN MARTIN", "CAPAYAN","SAN MARTIN","CATAMARCA",prospect,,[],Zona: "ZONA NORTE" | Partido: "CAPAYAN" | Responsable 2: "","10807"
+
+Línea 480: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CASIA","","","4747-06564651-0981","EL TALAR", "TIGRE","EL TALAR","BUENOS AIRES",prospect,,[],Zona: "ZONA NORTE" | Partido: "TIGRE" | Responsable 2: "","10082"
+
+Línea 484: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CASUCCI","","","4862-3174","Capital Federal", "CABA","Capital Federal","CIUDAD AUTONOMA DE BUENOS AIRES",prospect,,[],Zona: "CAPITAL FEDERAL" | Partido: "CABA" | Responsable 2: "","11302"
+
+Línea 485: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CATALANI INDUSTRIA METALURGICA SA","","CILINDRO HIDRAULICO","(0261)496-0201","LUJAN DE CUYO", "LUJAN DE CUYO","LUJAN DE CUYO","MENDOZA",prospect,,[],Zona: "ZONA SUR" | Partido: "LUJAN DE CUYO" | Responsable 2: "","11591"
+
+Línea 488: Failed query: insert into "clients" ("id", "company_name", "tax_id", "industry", "website", "phone", "address", "city", "country", "status", "assigned_salesperson_id", "client_emails", "notes", "external_id", "created_at", "updated_at") values (default, $1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, $11, $12, default, default) params: "CATLEY SOCIEDAD ANONIM","30610037549","","4651-8766","", "","","",prospect,,[],Zona: "ZONA TRAFICAÑO" | Partido: "" | Responsable 2: "","11364"
+
+Nueva importación
+Cerrar
+Close

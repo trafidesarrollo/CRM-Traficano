@@ -305,12 +305,12 @@ export default function Clients() {
         <div className="flex items-center gap-2">
           <ImportClientsDialog onDone={refetch} />
           <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />Nuevo Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />Nuevo Cliente
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Building2 className="w-5 h-5" />{editClient ? "Editar Cliente" : "Nuevo Cliente"}
@@ -445,8 +445,8 @@ export default function Clients() {
                 </Button>
               </div>
             </form>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
