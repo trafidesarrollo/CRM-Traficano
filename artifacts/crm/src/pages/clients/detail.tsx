@@ -73,6 +73,11 @@ export default function ClientDetail() {
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
+  const BLANK_CONTACT = { firstName: "", lastName: "", position: "", email: "", phone: "", isPrimary: false };
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactForm, setContactForm] = useState(BLANK_CONTACT);
+  const [savingContact, setSavingContact] = useState(false);
+
   const load = async () => {
     if (!id) return;
     setLoading(true);
@@ -122,6 +127,28 @@ export default function ClientDetail() {
       toast({ title: "Error al guardar", variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveContact = async () => {
+    if (!contactForm.firstName.trim()) return;
+    setSavingContact(true);
+    try {
+      const r = await fetch(`${API}/api/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ clientId: Number(id), ...contactForm }),
+      });
+      if (!r.ok) throw new Error("Error al crear contacto");
+      toast({ title: "Contacto creado" });
+      setContactOpen(false);
+      setContactForm(BLANK_CONTACT);
+      load();
+    } catch {
+      toast({ title: "Error al crear contacto", variant: "destructive" });
+    } finally {
+      setSavingContact(false);
     }
   };
 
@@ -303,6 +330,11 @@ export default function ClientDetail() {
           </TabsContent>
 
           <TabsContent value="contacts" className="mt-4">
+            <div className="flex justify-end mb-3">
+              <Button size="sm" onClick={() => { setContactForm(BLANK_CONTACT); setContactOpen(true); }}>
+                <Contact2 className="h-4 w-4 mr-1.5" />Nuevo contacto
+              </Button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {contacts.map((c: any) => (
                 <Card key={c.id} className="hover:border-primary/30 transition-colors">
@@ -483,6 +515,59 @@ export default function ClientDetail() {
             <Button size="sm" onClick={saveEdit} disabled={saving}>
               <Save className="h-4 w-4 mr-1" />{saving ? "Guardando..." : "Guardar"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: Nuevo Contacto ── */}
+      <Dialog open={contactOpen} onOpenChange={setContactOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Contact2 className="w-4 h-4" />Nuevo Contacto
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Nombre <span className="text-destructive">*</span></Label>
+                <Input value={contactForm.firstName} onChange={e => setContactForm(f => ({ ...f, firstName: e.target.value }))} placeholder="Juan" />
+              </div>
+              <div>
+                <Label>Apellido</Label>
+                <Input value={contactForm.lastName} onChange={e => setContactForm(f => ({ ...f, lastName: e.target.value }))} placeholder="García" />
+              </div>
+            </div>
+            <div>
+              <Label>Cargo / Puesto</Label>
+              <Input value={contactForm.position} onChange={e => setContactForm(f => ({ ...f, position: e.target.value }))} placeholder="Comprador, Gerente de Planta..." />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input type="email" value={contactForm.email} onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))} placeholder="juan@empresa.com" />
+            </div>
+            <div>
+              <Label>Teléfono</Label>
+              <Input value={contactForm.phone} onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))} placeholder="+54 9 11 1234-5678" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isPrimary"
+                checked={contactForm.isPrimary}
+                onChange={e => setContactForm(f => ({ ...f, isPrimary: e.target.checked }))}
+                className="accent-primary"
+              />
+              <Label htmlFor="isPrimary" className="cursor-pointer">Contacto principal</Label>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" size="sm" onClick={() => setContactOpen(false)}>
+                <X className="h-4 w-4 mr-1" />Cancelar
+              </Button>
+              <Button size="sm" onClick={saveContact} disabled={savingContact || !contactForm.firstName.trim()}>
+                <Save className="h-4 w-4 mr-1" />{savingContact ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
