@@ -324,6 +324,7 @@ export default function Clients() {
         <Table>
           <TableHeader className="bg-white/5">
             <TableRow>
+              <TableHead className="w-24">Nro.</TableHead>
               <TableHead>Empresa</TableHead>
               <TableHead>Emails</TableHead>
               <TableHead>Industria</TableHead>
@@ -334,10 +335,10 @@ export default function Clients() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando...</TableCell></TableRow>
             ) : !response?.data?.length ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p>No hay clientes todavía.</p>
                   <p className="text-sm mt-1">Hacé clic en "Nuevo Cliente" para crear el primero.</p>
@@ -347,6 +348,9 @@ export default function Clients() {
               const emails: string[] = Array.isArray(client.clientEmails) ? client.clientEmails : [];
               return (
                 <TableRow key={client.id} className="border-border/50 hover:bg-white/5 cursor-pointer" onClick={() => setLocation(`/clients/${client.id}`)}>
+                  <TableCell>
+                    <span className="font-mono text-sm font-semibold text-primary/80">{client.externalId || client.id}</span>
+                  </TableCell>
                   <TableCell>
                     <p className="font-medium">{client.companyName}</p>
                     <p className="text-xs text-muted-foreground">{client.taxId || client.website || ''}</p>
