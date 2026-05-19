@@ -12,13 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter } from "lucide-react";
+import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2 } from "lucide-react";
 import { DuplicateWarning } from "@/components/duplicate-warning";
 
 const API = import.meta.env.VITE_API_URL || "";
 
 // ─── Status config ──────────────────────────────────────────────────────────
-export const CLIENT_STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
+const CLIENT_STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
   prospect:  { label: "Prospecto",         badge: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
   potential: { label: "Cliente Potencial", badge: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
   inactive:  { label: "Inactivo",          badge: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },
@@ -438,11 +438,49 @@ export default function Clients() {
   const { data: salespeopleRes } = useGetSalespeople();
   const salespeople = salespeopleRes?.data || [];
 
+  const { toast } = useToast();
+
   const toggleStatus = (s: string) =>
     setStatusFilter(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
 
   const openNew = () => { setEditClient(null); setOpen(true); };
   const openEdit = (e: React.MouseEvent, client: any) => { e.stopPropagation(); setEditClient(client); setOpen(true); };
+
+  // ── Nuevo Contacto standalone ──
+  const BLANK_CONTACT = { clientId: "", firstName: "", lastName: "", position: "", email: "", phone: "", isPrimary: false };
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactForm, setContactForm] = useState(BLANK_CONTACT);
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactClientSearch, setContactClientSearch] = useState("");
+
+  const allClients: any[] = (response as any)?.data || [];
+  const filteredForPicker = contactClientSearch.trim()
+    ? allClients.filter((c: any) =>
+        (c.company_name || c.companyName || "").toLowerCase().includes(contactClientSearch.toLowerCase())
+      )
+    : allClients.slice(0, 20);
+
+  const saveNewContact = async () => {
+    if (!contactForm.firstName.trim() || !contactForm.clientId) return;
+    setSavingContact(true);
+    try {
+      const r = await fetch(`${API}/api/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...contactForm, clientId: Number(contactForm.clientId) }),
+      });
+      if (!r.ok) throw new Error();
+      toast({ title: "Contacto creado" });
+      setContactOpen(false);
+      setContactForm(BLANK_CONTACT);
+      setContactClientSearch("");
+    } catch {
+      toast({ title: "Error al crear contacto", variant: "destructive" });
+    } finally {
+      setSavingContact(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -453,6 +491,9 @@ export default function Clients() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <ImportClientsDialog onDone={refetch} />
+          <Button variant="outline" onClick={() => { setContactForm(BLANK_CONTACT); setContactClientSearch(""); setContactOpen(true); }}>
+            <Contact2 className="w-4 h-4 mr-2" />Nuevo Contacto
+          </Button>
           <Button onClick={openNew}><Plus className="w-4 h-4 mr-2" />Nuevo Cliente</Button>
         </div>
       </div>
@@ -552,6 +593,83 @@ export default function Clients() {
         salespeople={salespeople}
         onSaved={refetch}
       />
+
+      {/* ── Dialog: Nuevo Contacto ── */}
+      <Dialog open={contactOpen} onOpenChange={setContactOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Contact2 className="w-4 h-4" />Nuevo Contacto
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-1">
+            {/* Selector de empresa */}
+            <div>
+              <Label>Empresa <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="Buscar empresa..."
+                value={contactClientSearch}
+                onChange={e => { setContactClientSearch(e.target.value); setContactForm(f => ({ ...f, clientId: "" })); }}
+                className="mb-1"
+              />
+              {!contactForm.clientId && (
+                <div className="border rounded-md max-h-36 overflow-y-auto">
+                  {filteredForPicker.length === 0
+                    ? <p className="text-xs text-muted-foreground p-2">Sin resultados</p>
+                    : filteredForPicker.map((c: any) => (
+                      <button key={c.id} type="button"
+                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                        onClick={() => { setContactForm(f => ({ ...f, clientId: String(c.id) })); setContactClientSearch(c.company_name || c.companyName || ""); }}>
+                        {c.company_name || c.companyName}
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
+              {contactForm.clientId && (
+                <p className="text-xs text-green-400 mt-0.5">✓ {contactClientSearch}</p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Nombre <span className="text-destructive">*</span></Label>
+                <Input value={contactForm.firstName} onChange={e => setContactForm(f => ({ ...f, firstName: e.target.value }))} placeholder="Juan" />
+              </div>
+              <div>
+                <Label>Apellido</Label>
+                <Input value={contactForm.lastName} onChange={e => setContactForm(f => ({ ...f, lastName: e.target.value }))} placeholder="García" />
+              </div>
+            </div>
+            <div>
+              <Label>Cargo / Puesto</Label>
+              <Input value={contactForm.position} onChange={e => setContactForm(f => ({ ...f, position: e.target.value }))} placeholder="Comprador, Gerente de Planta..." />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input type="email" value={contactForm.email} onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))} placeholder="juan@empresa.com" />
+            </div>
+            <div>
+              <Label>Teléfono</Label>
+              <Input value={contactForm.phone} onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))} placeholder="+54 9 11 1234-5678" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="cp-primary" checked={contactForm.isPrimary}
+                onChange={e => setContactForm(f => ({ ...f, isPrimary: e.target.checked }))}
+                className="accent-primary" />
+              <Label htmlFor="cp-primary" className="cursor-pointer">Contacto principal</Label>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" size="sm" onClick={() => setContactOpen(false)}>
+                <X className="h-4 w-4 mr-1" />Cancelar
+              </Button>
+              <Button size="sm" onClick={saveNewContact}
+                disabled={savingContact || !contactForm.firstName.trim() || !contactForm.clientId}>
+                {savingContact ? "Guardando..." : "Guardar contacto"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
