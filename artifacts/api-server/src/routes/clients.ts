@@ -52,7 +52,7 @@ router.get("/clients", async (req, res) => {
     else if (conditions.length > 1) base = base.where(and(...conditions));
 
     const [data, countResult] = await Promise.all([
-      base.limit(limit).offset(offset),
+      base.orderBy(desc(clientsTable.id)).limit(limit).offset(offset),
       db.select({ count: sql<number>`count(*)` }).from(clientsTable),
     ]);
 

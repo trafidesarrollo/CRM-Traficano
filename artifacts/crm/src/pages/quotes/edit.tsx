@@ -242,22 +242,22 @@ export default function QuoteEdit() {
       setClientSearchResults(clients.slice(0, 20));
       return;
     }
-    const lower = term.toLowerCase();
-    const timer = setTimeout(() => {
-      setClientSearchResults(
-        clients
-          .filter(
-            (c: any) =>
-              String(c.companyName || "")
-                .toLowerCase()
-                .includes(lower) ||
-              String(c.taxId || "")
-                .toLowerCase()
-                .includes(lower),
-          )
-          .slice(0, 20),
-      );
-    }, 150);
+    const timer = setTimeout(async () => {
+      try {
+        const r = await fetch(`${API}/api/clients?search=${encodeURIComponent(term)}&limit=20`, { credentials: "include" });
+        const res = await r.json();
+        setClientSearchResults(res.data || res || []);
+      } catch {
+        // fallback to local filter
+        const lower = term.toLowerCase();
+        setClientSearchResults(
+          clients.filter((c: any) =>
+            String(c.companyName || "").toLowerCase().includes(lower) ||
+            String(c.taxId || "").toLowerCase().includes(lower)
+          ).slice(0, 20)
+        );
+      }
+    }, 200);
     return () => clearTimeout(timer);
   }, [clientSearch, clients]);
 
