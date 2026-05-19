@@ -352,19 +352,6 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
 
           <EmailManager emails={form.clientEmails} onChange={emails => setForm(p => ({ ...p, clientEmails: emails }))} />
 
-          {/* ── Vendedor asignado ── */}
-          <div>
-            <Label>Vendedor Asignado</Label>
-            <Select value={form.assignedSalespersonId?.toString() || "none"}
-              onValueChange={v => setForm(p => ({ ...p, assignedSalespersonId: v === "none" ? undefined : parseInt(v) }))}>
-              <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin asignar</SelectItem>
-                {salespeople.map((sp: any) => <SelectItem key={sp.id} value={sp.id.toString()}>{sp.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* ── Escala de consumo (solo visible si ready for potential) ── */}
           {(ready || (editClient && ["potential", "inactive", "final"].includes(editClient.status))) && (
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
@@ -534,7 +521,7 @@ export default function Clients() {
   const statusQuery = statusFilter.length ? statusFilter.join(",") : undefined;
   const { data: response, isLoading, refetch } = useGetClients({ search: search || undefined, status: statusQuery } as any);
   const { data: salespeopleRes } = useGetSalespeople();
-  const salespeople = salespeopleRes?.data || [];
+  const salespeople = (salespeopleRes as any) || [];
 
   const { toast } = useToast();
 
