@@ -491,10 +491,10 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label className="text-xs">Asignar a vendedor</Label>
-                  <Select value={taskForm.assignedToUserId} onValueChange={v => setTaskForm(p => ({ ...p, assignedToUserId: v }))}>
+                  <Select value={taskForm.assignedToUserId || "none"} onValueChange={v => setTaskForm(p => ({ ...p, assignedToUserId: v === "none" ? "" : v }))}>
                     <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin asignar</SelectItem>
+                      <SelectItem value="none">Sin asignar</SelectItem>
                       {salespeople.filter((sp: any) => sp.userId).map((sp: any) => (
                         <SelectItem key={sp.userId} value={String(sp.userId)}>{sp.name}</SelectItem>
                       ))}
