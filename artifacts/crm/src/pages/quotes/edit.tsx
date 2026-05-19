@@ -136,6 +136,10 @@ export default function QuoteEdit() {
 
   useEffect(() => {
     const term = clientSearch.trim();
+    if (!term) {
+      setClientSearchResults(clients.slice(0, 20));
+      return;
+    }
     if (term.length < 2) {
       setClientSearchResults([]);
       return;
@@ -386,41 +390,32 @@ export default function QuoteEdit() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Cliente *</Label>
-              <div className="space-y-2">
+              <div className="relative">
                 <Input
                   value={clientSearch}
                   onChange={e => setClientSearch(e.target.value)}
-                  placeholder="Tipeá para buscar cliente..."
+                  onFocus={() => setClientSearchResults(clients.slice(0, 20))}
+                  placeholder="Buscar cliente..."
                 />
                 {!!clientSearchResults.length && (
-                  <div className="border rounded-md bg-background max-h-56 overflow-auto">
+                  <div className="absolute z-20 mt-1 w-full border rounded-md bg-background max-h-56 overflow-auto shadow">
                     {clientSearchResults.map((c: any) => (
                       <button
                         key={c.id}
                         type="button"
                         className="w-full text-left px-3 py-2 hover:bg-muted"
                         onClick={() => {
-                          setForm((prev: any) => ({ ...prev, clientId: String(c.id), cuit: c.sub || c.taxId || "" }));
-                          setClientSearch(c.title || c.companyName || "");
+                          setForm((prev: any) => ({ ...prev, clientId: String(c.id), cuit: c.taxId || "" }));
+                          setClientSearch(c.companyName || c.title || "");
                           setClientSearchResults([]);
                         }}
                       >
-                        <div className="font-medium">{c.title || c.companyName}</div>
-                        <div className="text-xs text-muted-foreground">{c.sub || c.taxId || "Sin CUIT"}</div>
+                        <div className="font-medium">{c.companyName || c.title}</div>
+                        <div className="text-xs text-muted-foreground">{c.taxId || "Sin CUIT"}</div>
                       </button>
                     ))}
                   </div>
                 )}
-                <Select value={form.clientId} onValueChange={v => {
-                  const client = clients.find((c: any) => String(c.id) === v);
-                  setForm({ ...form, clientId: v, cuit: client?.taxId || "" });
-                  setClientSearch(client?.companyName || "");
-                }}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar cliente..." /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
             <div><Label>CUIT *</Label><Input value={form.cuit} onChange={e => setForm({ ...form, cuit: e.target.value })} /></div>
