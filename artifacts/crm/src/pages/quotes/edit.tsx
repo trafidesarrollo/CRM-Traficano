@@ -678,7 +678,7 @@ export default function QuoteEdit() {
           {!isNew && (
             <Button variant="outline" onClick={convertToOrder}>
               <ShoppingCart className="w-4 h-4 mr-2" />
-              Convertir a pedido
+              Confirmar pedido
             </Button>
           )}
           <Button onClick={save}>
@@ -1517,7 +1517,7 @@ export default function QuoteEdit() {
               </Button>
               <Button onClick={doConvertToOrder} disabled={converting}>
                 <ShoppingCart className="w-4 h-4 mr-1" />
-                {converting ? "Convirtiendo..." : "Confirmar pedido"}
+                {converting ? "Creando pedido..." : "Crear pedido"}
               </Button>
             </div>
           </div>
