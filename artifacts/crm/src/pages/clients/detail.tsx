@@ -318,6 +318,15 @@ export default function ClientDetail() {
                         <Phone className="h-3.5 w-3.5 text-muted-foreground" /><span>{c.phone}</span>
                       </div>
                     )}
+                    {c.address && (
+                      <div className="text-xs text-muted-foreground">Dirección: {c.address}</div>
+                    )}
+                    {c.city && (
+                      <div className="text-xs text-muted-foreground">Ciudad: {c.city}</div>
+                    )}
+                    {c.email && (
+                      <div className="text-xs text-muted-foreground">Email: {c.email}</div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

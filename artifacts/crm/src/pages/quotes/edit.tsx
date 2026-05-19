@@ -139,8 +139,8 @@ export default function QuoteEdit() {
   }, [form.clientId]);
 
   const createContact = async () => {
-    if (!form.clientId || !newContactForm.firstName.trim()) {
-      toast({ title: "Seleccioná empresa y nombre", variant: "destructive" });
+    if (!form.clientId || !newContactForm.firstName.trim() || !newContactForm.lastName.trim() || !newContactForm.email.trim() || !newContactForm.phone.trim() || !newContactForm.address.trim() || !newContactForm.city.trim() || !newContactForm.position.trim()) {
+      toast({ title: "Completa todos los campos del contacto", variant: "destructive" });
       return;
     }
     setCreatingContact(true);
@@ -511,17 +511,17 @@ export default function QuoteEdit() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Nombre *</Label><Input value={newContactForm.firstName} onChange={(e) => setNewContactForm((f) => ({ ...f, firstName: e.target.value }))} /></div>
-              <div><Label>Apellido</Label><Input value={newContactForm.lastName} onChange={(e) => setNewContactForm((f) => ({ ...f, lastName: e.target.value }))} /></div>
+              <div><Label>Apellido *</Label><Input value={newContactForm.lastName} onChange={(e) => setNewContactForm((f) => ({ ...f, lastName: e.target.value }))} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><Label>TELEFONO</Label><Input value={newContactForm.phone} onChange={(e) => setNewContactForm((f) => ({ ...f, phone: e.target.value }))} /></div>
-              <div><Label>EMAIL</Label><Input type="email" value={newContactForm.email} onChange={(e) => setNewContactForm((f) => ({ ...f, email: e.target.value }))} /></div>
+              <div><Label>TELEFONO *</Label><Input value={newContactForm.phone} onChange={(e) => setNewContactForm((f) => ({ ...f, phone: e.target.value }))} /></div>
+              <div><Label>EMAIL *</Label><Input type="email" value={newContactForm.email} onChange={(e) => setNewContactForm((f) => ({ ...f, email: e.target.value }))} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><Label>DIRECCION</Label><Input value={newContactForm.address} onChange={(e) => setNewContactForm((f) => ({ ...f, address: e.target.value }))} /></div>
-              <div><Label>CIUDAD</Label><Input value={newContactForm.city} onChange={(e) => setNewContactForm((f) => ({ ...f, city: e.target.value }))} /></div>
+              <div><Label>DIRECCION *</Label><Input value={newContactForm.address} onChange={(e) => setNewContactForm((f) => ({ ...f, address: e.target.value }))} /></div>
+              <div><Label>CIUDAD *</Label><Input value={newContactForm.city} onChange={(e) => setNewContactForm((f) => ({ ...f, city: e.target.value }))} /></div>
             </div>
-            <div><Label>ROL</Label><Input value={newContactForm.position} onChange={(e) => setNewContactForm((f) => ({ ...f, position: e.target.value }))} /></div>
+            <div><Label>ROL *</Label><Input value={newContactForm.position} onChange={(e) => setNewContactForm((f) => ({ ...f, position: e.target.value }))} /></div>
             <Button className="w-full" type="button" onClick={createContact} disabled={creatingContact}>{creatingContact ? "Creando..." : "Crear y asignar"}</Button>
           </div>
         </DialogContent>

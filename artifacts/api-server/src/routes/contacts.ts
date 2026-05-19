@@ -47,8 +47,8 @@ router.post("/contacts", async (req, res) => {
       res.status(400).json({ error: "Empresa/cliente requerido" });
       return;
     }
-    if (!payload.firstName.trim()) {
-      res.status(400).json({ error: "Nombre requerido" });
+    if (!payload.firstName.trim() || !payload.lastName.trim() || !payload.email?.trim() || !payload.phone?.trim() || !payload.address?.trim() || !payload.city?.trim() || !payload.position?.trim()) {
+      res.status(400).json({ error: "Todos los campos del contacto son obligatorios" });
       return;
     }
     const [contact] = await db.insert(contactsTable).values(payload).returning();

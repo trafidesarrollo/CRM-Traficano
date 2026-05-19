@@ -47,7 +47,7 @@ export default function ContactEdit() {
   }, [id, isNew]);
 
   const save = async () => {
-    if (!form.firstName || !form.lastName || !form.clientId) return toast({ title: "Nombre, apellido y cliente requeridos", variant: "destructive" });
+    if (!form.firstName || !form.lastName || !form.email || !form.phone || !form.position || !form.clientId || !form.linkedinUrl || !form.photoUrl || !form.notes) return toast({ title: "Completa todos los campos", variant: "destructive" });
     const body = {
       ...form,
       clientId: parseInt(form.clientId),
