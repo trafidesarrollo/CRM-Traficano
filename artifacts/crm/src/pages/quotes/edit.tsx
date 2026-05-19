@@ -170,7 +170,7 @@ export default function QuoteEdit() {
         { data: [] },
       ),
       safe(
-        fetch(`${API}/api/salespeople`, { credentials: "include" }).then((r) =>
+        fetch(`${API}/api/salespeople`, { credentials: "include", cache: "no-store" }).then((r) =>
           r.json(),
         ),
         [],
@@ -200,8 +200,9 @@ export default function QuoteEdit() {
         { data: [] },
       ),
     ]).then(([cl, sp, pr, pl, sc, op]) => {
+      const spData: any[] = Array.isArray(sp) ? sp : [];
       setClients(cl.data || cl || []);
-      setSalespeople(Array.isArray(sp) ? sp : []);
+      setSalespeople(spData);
       setProducts(Array.isArray(pr) ? pr : pr.data || []);
       setPriceLists(pl || []);
       setSaleConditions(sc || []);
@@ -209,6 +210,15 @@ export default function QuoteEdit() {
       const def = (pl || []).find((x: any) => x.isDefault);
       if (def && isNew)
         setForm((f: any) => ({ ...f, priceListId: String(def.id) }));
+      // Intentar auto-asignación si el usuario ya está disponible al momento del fetch
+      if (isNew && user?.id) {
+        const mySp = spData.find((s: any) => Number(s.userId) === Number(user.id));
+        if (mySp) {
+          setForm((prev: any) =>
+            prev.salespersonId ? prev : { ...prev, salespersonId: String(mySp.id) }
+          );
+        }
+      }
     });
   }, []);
 

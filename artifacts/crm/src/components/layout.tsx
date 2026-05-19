@@ -522,12 +522,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto min-w-0">
         <div className="hidden md:flex items-center justify-end gap-2 p-4 border-b border-border/50 sticky top-0 z-40 bg-background/80 backdrop-blur">
           <NotificationBell />
         </div>
-        <div className="p-4 md:p-8">
-          <div className="max-w-7xl mx-auto">{children}</div>
+        <div className="p-3 md:p-5">
+          <div className="max-w-none">{children}</div>
         </div>
       </main>
 
