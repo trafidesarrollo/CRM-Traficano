@@ -6,7 +6,7 @@ import {
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
   Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo,
   CalendarDays, BarChart3, Workflow, Sliders, MailOpen, GitBranch, CalendarClock, ShieldCheck, Factory, Kanban, Upload,
-  FileUp, CheckCircle2, AlertCircle, X
+  FileUp, CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -395,8 +395,19 @@ function QuickActivityFAB() {
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
+  });
 
-  const NavLinks = () => {
+  const toggleCollapsed = () => {
+    setCollapsed((v) => {
+      const next = !v;
+      try { localStorage.setItem("sidebar-collapsed", String(next)); } catch {}
+      return next;
+    });
+  };
+
+  const NavLinks = ({ mini }: { mini?: boolean }) => {
     const role = user?.role || "";
     const isPrivileged = PRIVILEGED_ROLES.includes(role);
     const modulePerms: string[] | null = isPrivileged ? null : ((user as any)?.modulePermissions ?? null);
@@ -417,16 +428,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
+              title={mini ? item.label : undefined}
               className={`
-                flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
+                flex items-center gap-3 rounded-xl transition-all duration-200 group
+                ${mini ? "justify-center px-2 py-3" : "px-4 py-3"}
                 ${isActive
                   ? 'bg-primary/10 text-primary font-medium'
                   : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
                 }
               `}
             >
-              <item.icon className={`w-5 h-5 transition-colors ${isActive ? 'text-primary' : 'group-hover:text-foreground'}`} />
-              {item.label}
+              <item.icon className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? 'text-primary' : 'group-hover:text-foreground'}`} />
+              {!mini && <span>{item.label}</span>}
             </Link>
           );
         })}
@@ -436,24 +449,47 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      <aside className="hidden md:flex w-72 flex-col bg-card border-r border-border/50 p-4 sticky top-0 h-screen overflow-y-auto">
-        <div className="flex items-center gap-3 px-2 py-4">
-          <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-8 h-8 rounded-lg" />
-          <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">CRM</span>
+      <aside className={`hidden md:flex flex-col bg-card border-r border-border/50 p-4 sticky top-0 h-screen overflow-y-auto transition-all duration-200 ${collapsed ? "w-16" : "w-72"}`}>
+        <div className={`flex items-center py-4 ${collapsed ? "justify-center px-0" : "gap-3 px-2"}`}>
+          <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-8 h-8 rounded-lg flex-shrink-0" />
+          {!collapsed && <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">CRM</span>}
         </div>
-        <div className="flex-1"><NavLinks /></div>
-        <div className="mt-auto pt-4 border-t border-border/50">
-          <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-xl bg-white/5">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-              {user?.fullName.charAt(0)}
+        <div className="flex-1"><NavLinks mini={collapsed} /></div>
+        <div className="mt-auto pt-4 border-t border-border/50 space-y-2">
+          {!collapsed && (
+            <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-xl bg-white/5">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold flex-shrink-0">
+                {user?.fullName.charAt(0)}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-sm font-medium truncate">{user?.fullName}</p>
+                <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+              </div>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium truncate">{user?.fullName}</p>
-              <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+          )}
+          {collapsed && (
+            <div className="flex justify-center py-2">
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm" title={user?.fullName}>
+                {user?.fullName.charAt(0)}
+              </div>
             </div>
-          </div>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={logout}>
-            <LogOut className="w-4 h-4 mr-2" />Cerrar Sesión
+          )}
+          <Button variant="ghost" size="icon" className={`text-muted-foreground hover:text-destructive hover:bg-destructive/10 ${collapsed ? "w-full" : "hidden"}`} onClick={logout} title="Cerrar Sesión">
+            <LogOut className="w-4 h-4" />
+          </Button>
+          {!collapsed && (
+            <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={logout}>
+              <LogOut className="w-4 h-4 mr-2" />Cerrar Sesión
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`w-full text-muted-foreground hover:text-foreground hover:bg-white/5 ${collapsed ? "justify-center px-0" : "justify-start"}`}
+            onClick={toggleCollapsed}
+            title={collapsed ? "Expandir menú" : "Colapsar menú"}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <><ChevronLeft className="w-4 h-4 mr-2" /><span className="text-xs">Colapsar</span></>}
           </Button>
         </div>
       </aside>

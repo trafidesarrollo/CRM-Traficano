@@ -92,6 +92,7 @@ export default function QuoteEdit() {
   });
   const [creatingContact, setCreatingContact] = useState(false);
   const [salespeople, setSalespeople] = useState<any[]>([]);
+  const isPrivilegedUser = user?.role === "admin" || user?.role === "gerente_comercial";
   const currentSalesperson =
     salespeople.find(
       (s: any) => user?.id && Number(s.userId) === Number(user.id),
@@ -865,20 +866,27 @@ export default function QuoteEdit() {
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {currentSalesperson ? (
-                    <SelectItem
-                      key={currentSalesperson.id}
-                      value={String(currentSalesperson.id)}
-                    >
-                      {currentSalesperson.name}
-                    </SelectItem>
-                  ) : (
-                    salespeople.map((s: any) => (
-                      <SelectItem key={s.id} value={String(s.id)}>
-                        {s.name}
-                      </SelectItem>
-                    ))
-                  )}
+                  {isPrivilegedUser
+                    ? salespeople.map((s: any) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.name}
+                        </SelectItem>
+                      ))
+                    : currentSalesperson
+                      ? (
+                          <SelectItem
+                            key={currentSalesperson.id}
+                            value={String(currentSalesperson.id)}
+                          >
+                            {currentSalesperson.name}
+                          </SelectItem>
+                        )
+                      : salespeople.map((s: any) => (
+                          <SelectItem key={s.id} value={String(s.id)}>
+                            {s.name}
+                          </SelectItem>
+                        ))
+                  }
                 </SelectContent>
               </Select>
             </div>
