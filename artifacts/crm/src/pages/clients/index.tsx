@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2 } from "lucide-react";
+import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2, ListTodo } from "lucide-react";
 import { DuplicateWarning } from "@/components/duplicate-warning";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -176,6 +176,11 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
   const [savingBuyer, setSavingBuyer] = useState(false);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
+  // Task inline creation
+  const BLANK_TASK = { title: "", type: "task", priority: "medium", dueDate: "", assignedToUserId: "" };
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [taskForm, setTaskForm] = useState(BLANK_TASK);
+
   useEffect(() => {
     if (open) {
       if (editClient) {
@@ -195,6 +200,8 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
       }
       setShowBuyerForm(false);
       setCreatedClientId(null);
+      setShowTaskForm(false);
+      setTaskForm(BLANK_TASK);
     }
   }, [open, editClient]);
 
@@ -244,6 +251,29 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         toast({ title: "Cliente creado" });
       }
 
+      // Create linked task if requested
+      if (showTaskForm && taskForm.title.trim() && savedId) {
+        try {
+          await fetch(`${API}/api/tasks`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              title: taskForm.title.trim(),
+              type: taskForm.type,
+              priority: taskForm.priority,
+              status: "pending",
+              clientId: savedId,
+              assignedTo: taskForm.assignedToUserId ? Number(taskForm.assignedToUserId) : undefined,
+              dueDate: taskForm.dueDate || undefined,
+            }),
+          });
+          toast({ title: "Tarea asignada correctamente" });
+        } catch {
+          toast({ title: "Cliente guardado, pero no se pudo crear la tarea", variant: "destructive" });
+        }
+      }
+
       if (showBuyerForm && buyerForm.firstName.trim() && savedId) {
         await saveBuyer(savedId);
       } else {
@@ -277,15 +307,17 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             <Building2 className="w-5 h-5" />
             {editClient ? "Editar Cliente" : "Nuevo Cliente"}
           </DialogTitle>
-          <DialogDescription>
-            Estado actual: {statusBadge(previewStatus)}
-            {!editClient && (
-              <span className="ml-2 text-xs text-muted-foreground">
-                {ready ? "— campos completos" : "— completá todos los campos para pasar a Potencial"}
-              </span>
-            )}
-          </DialogDescription>
+          <DialogDescription className="sr-only">Formulario de cliente</DialogDescription>
         </DialogHeader>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Estado:</span>
+          {statusBadge(previewStatus)}
+          {!editClient && (
+            <span className="text-xs text-muted-foreground">
+              {ready ? "— campos completos" : "— completá todos los campos para pasar a Potencial"}
+            </span>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-1">
           {/* ── Datos empresa ── */}
@@ -408,6 +440,72 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
                   {savingBuyer ? "Guardando..." : "Guardar comprador"}
                 </Button>
               )}
+            </div>
+          )}
+
+          {/* ── Tarea inline ── */}
+          {!showTaskForm ? (
+            <button type="button" onClick={() => setShowTaskForm(true)}
+              className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border border-dashed border-border/50 rounded-lg px-3 py-2 hover:border-border transition-colors">
+              <ListTodo className="w-4 h-4" />
+              Asignar tarea a un vendedor (opcional)
+            </button>
+          ) : (
+            <div className="rounded-lg border border-border/50 p-3 space-y-3 bg-muted/10">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium flex items-center gap-1.5"><ListTodo className="w-4 h-4" />Nueva Tarea</p>
+                <button type="button" onClick={() => setShowTaskForm(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+              </div>
+              <div>
+                <Label className="text-xs">Descripción de la tarea *</Label>
+                <Input value={taskForm.title} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} placeholder="Ej: Llamar para seguimiento inicial" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Tipo</Label>
+                  <Select value={taskForm.type} onValueChange={v => setTaskForm(p => ({ ...p, type: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="task">Tarea</SelectItem>
+                      <SelectItem value="call">Llamada</SelectItem>
+                      <SelectItem value="meeting">Reunión</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="followup">Seguimiento</SelectItem>
+                      <SelectItem value="reminder">Recordatorio</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Prioridad</Label>
+                  <Select value={taskForm.priority} onValueChange={v => setTaskForm(p => ({ ...p, priority: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baja</SelectItem>
+                      <SelectItem value="medium">Media</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Asignar a vendedor</Label>
+                  <Select value={taskForm.assignedToUserId} onValueChange={v => setTaskForm(p => ({ ...p, assignedToUserId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sin asignar</SelectItem>
+                      {salespeople.filter((sp: any) => sp.userId).map((sp: any) => (
+                        <SelectItem key={sp.userId} value={String(sp.userId)}>{sp.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Fecha límite</Label>
+                  <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm(p => ({ ...p, dueDate: e.target.value }))} />
+                </div>
+              </div>
             </div>
           )}
 
