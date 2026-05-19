@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Plus, Users, CalendarDays, Package, Clock, CheckCircle2, Send, ListTodo, AlertCircle } from "lucide-react";
+import { ProspectsNearPotential } from "@/components/prospects-near-potential";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -116,6 +117,11 @@ export default function DashboardVendedor() {
             </CardContent>
           </Card>
         </Link>
+      </div>
+
+      {/* ── Prospectos a un paso ── */}
+      <div className="mb-6">
+        <ProspectsNearPotential salespersonId={undefined} maxItems={5} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">

@@ -12,6 +12,7 @@ import { es } from "date-fns/locale";
 import { getOppStatusLabel } from "@/lib/translations";
 import { ManagerTasksTab } from "@/components/manager-tasks-tab";
 import { useAuth } from "@/hooks/use-auth";
+import { ProspectsNearPotential } from "@/components/prospects-near-potential";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -98,6 +99,11 @@ export default function Dashboard() {
         <StatCard title="Oportunidades Abiertas" value={metrics.openOpportunities} icon={<Briefcase className="w-6 h-6" />} delay={0.2} description={`${metrics.wonOpportunities} ganadas históricamente`} />
         <StatCard title="Emails Pendientes" value={metrics.pendingEmails} icon={<Inbox className="w-6 h-6" />} delay={0.3} description={`De un total de ${metrics.totalEmails}`} />
         <StatCard title="Pedidos de Cotización" value={metrics.quoteRequests} icon={<AlertCircle className="w-6 h-6" />} delay={0.4} />
+      </div>
+
+      {/* ── Prospectos a un paso ── */}
+      <div className="mb-8">
+        <ProspectsNearPotential maxItems={6} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
