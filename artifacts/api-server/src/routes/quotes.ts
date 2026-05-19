@@ -208,6 +208,7 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const userId = (req as any).session?.userId;
+    const { purchaseOrder: bodyPurchaseOrder } = req.body || {};
     const result = await db.transaction(async (tx) => {
       const [quote] = await tx.select().from(quotesTable).where(eq(quotesTable.id, id));
       if (!quote) throw new Error("NOT_FOUND");
@@ -221,7 +222,7 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
         netAmount: quote.netAmount, total: quote.total, totalKg: quote.totalKg,
         avgPricePerKg: quote.avgPricePerKg, orderType: quote.orderType,
         description: quote.description, internalNote: quote.internalNote,
-        purchaseOrder: quote.purchaseOrder, createdBy: userId,
+        purchaseOrder: bodyPurchaseOrder || quote.purchaseOrder, createdBy: userId,
       }).returning();
 
       const number = `PED-${String(order.id).padStart(5, "0")}`;

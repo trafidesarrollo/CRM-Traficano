@@ -138,6 +138,10 @@ export default function QuoteEdit() {
   const [followupForm, setFollowupForm] = useState({ date: "", time: "09:00", type: "call", notes: "" });
   const [savingFollowup, setSavingFollowup] = useState(false);
 
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [convertForm, setConvertForm] = useState({ purchaseOrder: "", ocFile: null as File | null });
+  const [converting, setConverting] = useState(false);
+
   const followupDateDefault = new Date(Date.now() + 3 * 86400000)
     .toISOString()
     .slice(0, 10);
@@ -257,10 +261,19 @@ export default function QuoteEdit() {
     return () => clearTimeout(timer);
   }, [clientSearch, clients]);
 
+  // Auto-fill CUIT only for NEW quotes (editing preserves the saved value)
   useEffect(() => {
+    if (!isNew) return;
     const client = clients.find((c: any) => String(c.id) === form.clientId);
     if (client?.taxId)
       setForm((prev: any) => ({ ...prev, cuit: client.taxId || "" }));
+  }, [form.clientId, clients]);
+
+  // Initialize client search text when editing an existing quote
+  useEffect(() => {
+    if (isNew || !form.clientId || clientSearch || clients.length === 0) return;
+    const client = clients.find((c: any) => String(c.id) === form.clientId);
+    if (client) setClientSearch(client.companyName || "");
   }, [form.clientId, clients]);
 
   useEffect(() => {
@@ -561,17 +574,74 @@ export default function QuoteEdit() {
     if (savedQuote) setLocation(`/quotes/${savedQuote.id}`);
   };
 
-  const convertToOrder = async () => {
-    if (!confirm("¿Convertir esta cotización en pedido de cliente?")) return;
-    const r = await fetch(`${API}/api/quotes/${id}/convert-to-order`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (r.ok) {
+  const convertToOrder = () => {
+    setConvertForm({ purchaseOrder: "", ocFile: null });
+    setShowConvertModal(true);
+  };
+
+  const doConvertToOrder = async () => {
+    if (!convertForm.purchaseOrder.trim()) {
+      toast({ title: "El número de OC es obligatorio", variant: "destructive" });
+      return;
+    }
+    if (!convertForm.ocFile) {
+      toast({ title: "El PDF de la OC es obligatorio", variant: "destructive" });
+      return;
+    }
+    setConverting(true);
+    try {
+      // 1. Convert the quote to order
+      const r = await fetch(`${API}/api/quotes/${id}/convert-to-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ purchaseOrder: convertForm.purchaseOrder.trim() }),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e.error || "Error al convertir");
+      }
       const j = await r.json();
-      toast({ title: `Pedido ${j.orderNumber} creado` });
+
+      // 2. Upload the OC PDF and link it to the new order
+      try {
+        const file = convertForm.ocFile;
+        const urlReq = await fetch(`${API}/api/storage/uploads/request-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        });
+        if (urlReq.ok) {
+          const { uploadURL, objectPath } = await urlReq.json();
+          await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+          await fetch(`${API}/api/documents`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              entityType: "order", entityId: j.orderId,
+              fileName: file.name, mimeType: file.type,
+              sizeBytes: file.size, storageKey: objectPath,
+            }),
+          });
+        }
+      } catch {
+        // PDF upload failed but order was created — inform the user
+        toast({ title: `Pedido ${j.orderNumber} creado (el PDF no se pudo subir)`, variant: "destructive" });
+        setShowConvertModal(false);
+        setLocation(`/orders/${j.orderId}`);
+        return;
+      }
+
+      toast({ title: `Pedido ${j.orderNumber} creado con OC adjunta` });
+      setShowConvertModal(false);
       setLocation(`/orders/${j.orderId}`);
-    } else toast({ title: "Error al convertir", variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: e.message || "Error al convertir", variant: "destructive" });
+    } finally {
+      setConverting(false);
+    }
   };
 
   return (
@@ -1391,6 +1461,70 @@ export default function QuoteEdit() {
         </div>
       )}
 
+      {/* ── Modal: Convertir a Pedido ── */}
+      <Dialog open={showConvertModal} onOpenChange={setShowConvertModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5" />
+              Convertir a Pedido
+            </DialogTitle>
+            <DialogDescription>
+              Ingresá el número de Orden de Compra y adjuntá el PDF. Ambos son obligatorios.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label className="text-sm font-medium mb-1.5">
+                Número de OC <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                placeholder="Ej: OC-2024-00123"
+                value={convertForm.purchaseOrder}
+                onChange={(e) => setConvertForm((p) => ({ ...p, purchaseOrder: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium mb-1.5">
+                PDF de la OC <span className="text-destructive">*</span>
+              </Label>
+              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/40 transition-colors">
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setConvertForm((p) => ({ ...p, ocFile: f }));
+                  }}
+                />
+                {convertForm.ocFile ? (
+                  <div className="flex items-center gap-2 text-sm text-primary">
+                    <FileText className="w-5 h-5" />
+                    <span className="truncate max-w-[220px]">{convertForm.ocFile.name}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-muted-foreground text-sm">
+                    <FileText className="w-6 h-6" />
+                    <span>Hacé click para seleccionar el PDF</span>
+                  </div>
+                )}
+              </label>
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <Button variant="outline" onClick={() => setShowConvertModal(false)} disabled={converting}>
+                Cancelar
+              </Button>
+              <Button onClick={doConvertToOrder} disabled={converting}>
+                <ShoppingCart className="w-4 h-4 mr-1" />
+                {converting ? "Convirtiendo..." : "Confirmar pedido"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Agendar Seguimiento ── */}
       <Dialog open={showFollowup} onOpenChange={setShowFollowup}>
         <DialogContent>
           <DialogHeader>
