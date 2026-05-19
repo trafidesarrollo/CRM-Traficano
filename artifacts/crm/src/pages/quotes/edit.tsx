@@ -140,21 +140,17 @@ export default function QuoteEdit() {
       setClientSearchResults(clients.slice(0, 20));
       return;
     }
-    if (term.length < 2) {
-      setClientSearchResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const r = await fetch(`${API}/api/search?q=${encodeURIComponent(term)}`, { credentials: "include" });
-        const data = await r.json();
-        setClientSearchResults((Array.isArray(data?.results) ? data.results : []).filter((r: any) => r.kind === "client"));
-      } catch {
-        setClientSearchResults([]);
-      }
-    }, 250);
+    const lower = term.toLowerCase();
+    const timer = setTimeout(() => {
+      setClientSearchResults(
+        clients.filter((c: any) =>
+          String(c.companyName || "").toLowerCase().includes(lower) ||
+          String(c.taxId || "").toLowerCase().includes(lower)
+        ).slice(0, 20)
+      );
+    }, 150);
     return () => clearTimeout(timer);
-  }, [clientSearch]);
+  }, [clientSearch, clients]);
 
   useEffect(() => {
     const client = clients.find((c: any) => String(c.id) === form.clientId);
