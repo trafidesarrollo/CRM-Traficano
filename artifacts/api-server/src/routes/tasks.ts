@@ -48,6 +48,26 @@ router.get("/tasks", async (req, res) => {
   }
 });
 
+router.get("/tasks/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [row] = await db
+      .select({
+        t: tasksTable,
+        assigneeName: sql<string>`coalesce(${usersTable.fullName}, '')`,
+        clientName: sql<string>`coalesce(${clientsTable.companyName}, '')`,
+      })
+      .from(tasksTable)
+      .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
+      .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
+      .where(eq(tasksTable.id, id));
+    if (!row) { res.status(404).json({ error: "Tarea no encontrada" }); return; }
+    res.json({ ...row.t, assigneeName: row.assigneeName, clientName: row.clientName });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/tasks", async (req, res) => {
   try {
     const userId = (req as any).session?.userId;
