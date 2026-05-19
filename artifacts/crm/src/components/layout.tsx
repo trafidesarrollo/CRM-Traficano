@@ -293,8 +293,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <span className="font-display font-bold text-lg">CRM</span>
         </div>
         <div className="flex items-center gap-1">
+          <Button asChild variant="ghost" size="icon" className="text-primary">
+            <Link href="/csv" aria-label="Import/Export CSV">
+              <UploadCloud className="w-5 h-5" />
+            </Link>
+          </Button>
           <NotificationBell />
-        <Sheet>
+          <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon"><Menu className="w-6 h-6" /></Button>
           </SheetTrigger>
@@ -306,12 +311,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </Button>
             </div>
           </SheetContent>
-        </Sheet>
+          </Sheet>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto">
         <div className="hidden md:flex items-center justify-end gap-2 p-4 border-b border-border/50 sticky top-0 z-40 bg-background/80 backdrop-blur">
+          <Button asChild variant="outline" className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/20">
+            <Link href="/csv">
+              <UploadCloud className="w-4 h-4 mr-2" />
+              Import/Export CSV
+            </Link>
+          </Button>
           <NotificationBell />
         </div>
         <div className="p-4 md:p-8">
