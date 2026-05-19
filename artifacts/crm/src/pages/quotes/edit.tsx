@@ -72,6 +72,8 @@ export default function QuoteEdit() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const userRef = useRef<any>(undefined);
+  useEffect(() => { userRef.current = user; });
   const isNew = !params || params.id === "new";
   const id = isNew ? null : parseInt(params!.id);
 
@@ -210,13 +212,16 @@ export default function QuoteEdit() {
       const def = (pl || []).find((x: any) => x.isDefault);
       if (def && isNew)
         setForm((f: any) => ({ ...f, priceListId: String(def.id) }));
-      // Intentar auto-asignación si el usuario ya está disponible al momento del fetch
-      if (isNew && user?.id) {
-        const mySp = spData.find((s: any) => Number(s.userId) === Number(user.id));
-        if (mySp) {
-          setForm((prev: any) =>
-            prev.salespersonId ? prev : { ...prev, salespersonId: String(mySp.id) }
-          );
+      // Auto-asignación: usar ref para tener siempre el valor más actual del usuario
+      if (isNew) {
+        const latestUser = userRef.current;
+        if (latestUser?.id) {
+          const mySp = spData.find((s: any) => Number(s.userId) === Number(latestUser.id));
+          if (mySp) {
+            setForm((prev: any) =>
+              prev.salespersonId ? prev : { ...prev, salespersonId: String(mySp.id) }
+            );
+          }
         }
       }
     });
