@@ -180,6 +180,14 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
   const BLANK_TASK = { title: "", type: "task", priority: "medium", dueDate: "", assignedToUserId: "" };
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [taskForm, setTaskForm] = useState(BLANK_TASK);
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/api/users", { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(setUsers)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -466,8 +474,8 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
                     <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sin asignar</SelectItem>
-                      {salespeople.filter((sp: any) => sp.userId).map((sp: any) => (
-                        <SelectItem key={sp.userId} value={String(sp.userId)}>{sp.name}</SelectItem>
+                      {users.map((u: any) => (
+                        <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
