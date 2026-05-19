@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Upload, FileText, FileSpreadsheet } from "lucide-react";
+import { Download, Upload, FileText, FileSpreadsheet, DownloadCloud } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -28,9 +28,13 @@ export default function CsvPage() {
   const [entities, setEntities] = useState<{ key: string; fields: string[]; required: string[] }[]>([]);
   const [entity, setEntity] = useState("clients");
   const [mode, setMode] = useState<"upsert" | "insert">("upsert");
+  const [massiveText, setMassiveText] = useState("");
+  const [massiveLoading, setMassiveLoading] = useState(false);
+  const [massiveResult, setMassiveResult] = useState<any>(null);
   const [csvText, setCsvText] = useState("");
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [separator, setSeparator] = useState<"," | ";">(",");
 
   useEffect(() => {
     fetch(`${API}/api/csv/entities`, { credentials: "include" })
@@ -66,6 +70,31 @@ export default function CsvPage() {
     } finally { setLoading(false); }
   }
 
+  async function importMassiveCsv() {
+    if (!massiveText.trim()) {
+      toast({ title: "Pegá o subí un CSV primero", variant: "destructive" });
+      return;
+    }
+    setMassiveLoading(true);
+    setMassiveResult(null);
+    try {
+      const r = await fetch(`${API}/api/csv/import/client-followups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ csv: massiveText, separator }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error de importación");
+      setMassiveResult(data);
+      toast({ title: "Carga masiva finalizada", description: `${data.createdTasks} tareas, ${data.createdActivities} bitácoras y ${data.createdFollowups} seguimientos` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setMassiveLoading(false);
+    }
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6 p-4 md:p-6 max-w-5xl">
@@ -73,6 +102,74 @@ export default function CsvPage() {
           <FileSpreadsheet className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Importar / Exportar CSV</h1>
         </div>
+
+        <Card className="border-cyan-500/20 bg-cyan-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DownloadCloud className="h-5 w-5 text-cyan-400" />
+              Carga masiva de novedades
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Pegá o subí un CSV con el resumen de lo hablado con cada cliente. Por cada fila se crea una tarea, un seguimiento y la bitácora del cliente.
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <Label className="text-xs">Separador</Label>
+                <Select value={separator} onValueChange={v => setSeparator(v as "," | ";")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value=",">Coma (,)</SelectItem>
+                    <SelectItem value=";">Punto y coma (;)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Subir archivo CSV</Label>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setMassiveText(await file.text());
+                  }}
+                  className="block text-sm file:mr-3 file:rounded-md file:border-0 file:bg-cyan-500 file:px-3 file:py-1.5 file:text-white"
+                />
+              </div>
+            </div>
+            <Textarea
+              value={massiveText}
+              onChange={e => setMassiveText(e.target.value)}
+              rows={8}
+              className="font-mono text-xs"
+              placeholder="nro_cliente,customer_name,fecha,fecha_seguimiento,urgencia,titulo,novedad,accion"
+            />
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>Obligatorios: nro_cliente, description/novedad.</p>
+              <p>Si fecha_seguimiento viene vacía, se completa con +3 días.</p>
+              <p>Campos soportados: customer_name/cliente, movementdate/fecha, tracingdate/fecha_seguimiento, urgencia/prioritytype_id, title/titulo, action/accion.</p>
+            </div>
+            <Button onClick={importMassiveCsv} disabled={massiveLoading}>
+              <Upload className="h-4 w-4 mr-2" />
+              {massiveLoading ? "Importando..." : "Importar carga masiva"}
+            </Button>
+            {massiveResult && (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+                <div>Procesadas: <b>{massiveResult.total}</b> · Tareas: <b>{massiveResult.createdTasks}</b> · Seguimientos: <b>{massiveResult.createdFollowups}</b> · Bitácoras: <b>{massiveResult.createdActivities}</b></div>
+                {massiveResult.errors?.length > 0 && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-red-400">{massiveResult.errors.length} errores</summary>
+                    <ul className="mt-1 space-y-0.5">
+                      {massiveResult.errors.map((e: any, i: number) => <li key={i}>Línea {e.line}: {e.error}</li>)}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader><CardTitle>1. Seleccioná la entidad</CardTitle></CardHeader>

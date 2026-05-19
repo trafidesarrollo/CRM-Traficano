@@ -7,14 +7,35 @@ import {
   opportunitiesTable,
   salespeopleTable,
   tasksTable,
+  activitiesTable,
+  followupRulesTable,
+  scheduledFollowupsTable,
   pipelinesTable,
   pipelineStagesTable,
   quotesTable,
   ordersTable,
 } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+const DEFAULT_MASSIVE_HEADERS = new Set([
+  "nro_cliente",
+  "customer_name",
+  "cliente",
+  "movementdate",
+  "fecha",
+  "tracingdate",
+  "fecha_seguimiento",
+  "urgencia",
+  "prioritytype_id",
+  "title",
+  "titulo",
+  "description",
+  "novedad",
+  "action",
+  "accion",
+]);
 
 type EntityDef = {
   table: any;
@@ -150,6 +171,26 @@ function coerceValue(def: EntityDef, key: string, raw: string): any {
   return raw;
 }
 
+function parseFlexibleCsv(text: string, forcedSeparator?: string): { headers: string[]; rows: Record<string, string>[] } {
+  const separator = forcedSeparator || (text.includes(";") && !text.includes(",") ? ";" : ",");
+  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return { headers: [], rows: [] };
+  const headers = lines[0].split(separator).map(h => h.trim());
+  const rows = lines.slice(1).map(line => {
+    const values = line.split(separator);
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => { row[h] = (values[i] ?? "").trim(); });
+    return row;
+  });
+  return { headers, rows };
+}
+
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 router.get("/csv/entities", (_req, res) => {
   res.json({ entities: Object.keys(ENTITIES).map(k => ({ key: k, fields: ENTITIES[k].fields, required: ENTITIES[k].required || [] })) });
 });
@@ -211,6 +252,122 @@ router.post("/csv/import/:entity", async (req: Request, res: Response) => {
     }
     res.json({ ok: true, total: rows.length, inserted, updated, skipped, unknownColumns: unknown, errors: errors.slice(0, 50) });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post("/csv/import/client-followups", async (req: Request, res: Response) => {
+  try {
+    const { csv, separator } = req.body || {};
+    if (typeof csv !== "string" || !csv.trim()) {
+      res.status(400).json({ error: "csv requerido" });
+      return;
+    }
+
+    const { headers, rows } = parseFlexibleCsv(csv, separator);
+    if (!headers.length) {
+      res.status(400).json({ error: "CSV vacío" });
+      return;
+    }
+
+    const lowerHeaders = headers.map(h => h.trim().toLowerCase());
+    const hasRequired = lowerHeaders.includes("nro_cliente") && (lowerHeaders.includes("description") || lowerHeaders.includes("novedad"));
+    if (!hasRequired) {
+      res.status(400).json({ error: "El CSV debe incluir nro_cliente y description/novedad" });
+      return;
+    }
+
+    const createdTasks: any[] = [];
+    const createdActivities: any[] = [];
+    const createdFollowups: any[] = [];
+    const errors: { line: number; error: string }[] = [];
+
+    const headerMap = (name: string) => {
+      const idx = lowerHeaders.indexOf(name);
+      return idx >= 0 ? headers[idx] : null;
+    };
+
+    const hNro = headerMap("nro_cliente");
+    const hName = headerMap("customer_name") || headerMap("cliente");
+    const hMovement = headerMap("movementdate") || headerMap("fecha");
+    const hTracing = headerMap("tracingdate") || headerMap("fecha_seguimiento");
+    const hUrgencia = headerMap("urgencia") || headerMap("prioritytype_id");
+    const hTitle = headerMap("title") || headerMap("titulo");
+    const hDesc = headerMap("description") || headerMap("novedad");
+    const hAction = headerMap("action") || headerMap("accion");
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const nro = (row[hNro!] || "").trim();
+        const description = (row[hDesc!] || "").trim();
+        if (!nro || !description) {
+          errors.push({ line: i + 2, error: "Faltan nro_cliente o description/novedad" });
+          continue;
+        }
+
+        const client = await db.select().from(clientsTable).where(
+          sql`${clientsTable.id}::text = ${nro} OR ${clientsTable.companyName} ILIKE ${nro} OR ${clientsTable.taxId} = ${nro} OR ${clientsTable.externalId} = ${nro}`
+        ).limit(1);
+        if (!client[0]) {
+          errors.push({ line: i + 2, error: `Cliente no encontrado: ${nro}` });
+          continue;
+        }
+
+        const baseDate = row[hMovement!] ? new Date(row[hMovement!]) : new Date();
+        const followDate = row[hTracing!] ? new Date(row[hTracing!]) : addDays(new Date(), 3);
+        const taskTitle = (row[hTitle!] || `Seguimiento cliente ${client[0].companyName}`).trim();
+        const priority = /alta/i.test(row[hUrgencia!] || "") ? "urgent" : /media/i.test(row[hUrgencia!] || "") ? "medium" : "low";
+        const taskDescription = row[hAction!] ? `${description}\n\nPróxima acción: ${row[hAction!]}` : description;
+
+        const [task] = await db.insert(tasksTable).values({
+          title: taskTitle,
+          description: taskDescription,
+          type: "followup",
+          status: "pending",
+          priority,
+          clientId: client[0].id,
+          dueDate: baseDate,
+        }).returning();
+
+        const [activity] = await db.insert(activitiesTable).values({
+          type: "follow_up",
+          title: taskTitle,
+          description: row[hAction!] ? `${description}\n\nPróxima acción: ${row[hAction!]}` : description,
+          clientId: client[0].id,
+          completedAt: baseDate,
+        }).returning();
+
+        const [rule] = await db.select().from(followupRulesTable).where(eq(followupRulesTable.isActive, true)).limit(1);
+        const [followup] = await db.insert(scheduledFollowupsTable).values({
+          ruleId: rule?.id || null,
+          opportunityId: null,
+          clientId: client[0].id,
+          contactId: null,
+          scheduledDate: followDate,
+          status: "pending",
+          attemptNumber: 1,
+          generatedSubject: taskTitle,
+        }).returning();
+
+        createdTasks.push(task);
+        createdActivities.push(activity);
+        createdFollowups.push(followup);
+      } catch (e: any) {
+        errors.push({ line: i + 2, error: e.message });
+      }
+    }
+
+    res.json({
+      ok: true,
+      total: rows.length,
+      createdTasks: createdTasks.length,
+      createdActivities: createdActivities.length,
+      createdFollowups: createdFollowups.length,
+      errors: errors.slice(0, 100),
+      acceptedHeaders: [...DEFAULT_MASSIVE_HEADERS],
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;
