@@ -224,7 +224,6 @@ function QuickActivityFAB() {
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const [bulkOpen, setBulkOpen] = useState(false);
 
   const NavLinks = () => {
     const role = user?.role || "";
@@ -320,29 +319,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </main>
 
-      <QuickActivityFAB />
-      <button
-        onClick={() => setBulkOpen(true)}
-        className="fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full bg-cyan-500 text-white shadow-lg hover:bg-cyan-400 transition-all flex items-center justify-center hover:scale-105"
-        aria-label="Carga masiva CSV"
-      >
-        <Upload className="w-6 h-6" />
-      </button>
-      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Carga masiva CSV</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Usá la sección de importación CSV para cargar el resumen de lo hablado con cada cliente, generar la tarea, crear el seguimiento y dejar la bitácora.
-            </p>
-            <Link href="/csv">
-              <Button className="w-full">Abrir importador</Button>
-            </Link>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
