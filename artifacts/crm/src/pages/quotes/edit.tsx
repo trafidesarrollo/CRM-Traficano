@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Save, ArrowLeft, Plus, Trash2, FileText, ShoppingCart, CalendarDays, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -42,6 +43,7 @@ export default function QuoteEdit() {
   const [, params] = useRoute("/quotes/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const isNew = !params || params.id === "new";
   const id = isNew ? null : parseInt(params!.id);
 
@@ -75,7 +77,7 @@ export default function QuoteEdit() {
     cuit: "", date: today, deliveryDate: "", dueDate: dueDefault, followupDate: "",
     currency: "USD", exchangeRate: "0", exchangeRateType: "DIVISA VENTA BNA",
     quoteStatus: "EN PROCESO", priority: "", quoteType: "", orderType: "",
-    description: "", reference: "",
+    reference: "",
     status: "draft",
   });
   const [lines, setLines] = useState<Line[]>([blankLine()]);
@@ -148,6 +150,11 @@ export default function QuoteEdit() {
   }, [form.clientId, clients]);
 
   useEffect(() => {
+    if (!isNew || !user?.salespersonId) return;
+    setForm((prev: any) => prev.salespersonId ? prev : { ...prev, salespersonId: String(user.salespersonId) });
+  }, [isNew, user]);
+
+  useEffect(() => {
     if (!form.clientId) { setContacts([]); return; }
     fetch(`${API}/api/contacts?clientId=${form.clientId}`, { credentials: "include" })
       .then(r => r.json()).then(d => setContacts(Array.isArray(d) ? d : (d.data || [])));
@@ -202,7 +209,6 @@ export default function QuoteEdit() {
         priority: q.priority || "",
         quoteType: q.quoteType || "",
         orderType: q.orderType || "",
-        description: q.description || "",
         reference: q.reference || "",
         status: q.status || "draft",
       });
@@ -533,7 +539,6 @@ export default function QuoteEdit() {
               </Select>
             </div>
 
-            <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
             <div><Label>Referencia de Cliente</Label><Input value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} /></div>
           </div>
         </CardContent>
