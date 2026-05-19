@@ -30,9 +30,10 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const CLIENT_STATUS: Record<string, { label: string; color: string }> = {
-  prospect: { label: "Prospecto", color: "bg-yellow-500/20 text-yellow-300" },
-  active:   { label: "Activo",    color: "bg-green-500/20 text-green-300" },
-  inactive: { label: "Inactivo",  color: "bg-gray-500/20 text-gray-300" },
+  prospect:  { label: "Prospecto",         color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  potential: { label: "Cliente Potencial", color: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  inactive:  { label: "Inactivo",          color: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },
+  final:     { label: "Cliente Final",     color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
 };
 
 const ACTIVITY_ICONS: Record<string, string> = {
@@ -95,13 +96,11 @@ export default function ClientDetail() {
       companyName: c.company_name || c.companyName || "",
       taxId: c.tax_id || c.taxId || "",
       industry: c.industry || "",
-      website: c.website || "",
       phone: c.phone || "",
-      address: c.address || "",
       city: c.city || "",
-      country: c.country || "Argentina",
       status: c.status || "prospect",
       notes: c.notes || "",
+      consumptionScale: c.consumption_scale != null ? String(c.consumption_scale) : (c.consumptionScale != null ? String(c.consumptionScale) : ""),
     });
     setEditOpen(true);
   };
@@ -207,6 +206,14 @@ export default function ClientDetail() {
                       <span key={i} className="text-xs bg-blue-500/10 text-blue-400 rounded-full px-2 py-0.5">{e}</span>
                     ))}
                   </div>
+                </div>
+              )}
+              {(client.consumption_scale != null || client.consumptionScale != null) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-20 shrink-0">Escala USD</span>
+                  <span className="font-mono text-amber-400">
+                    u$s {Number(client.consumption_scale ?? client.consumptionScale).toLocaleString("es-AR")}
+                  </span>
                 </div>
               )}
               {client.notes && (
@@ -400,57 +407,71 @@ export default function ClientDetail() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-4 w-4" />Editar cliente
             </DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-2">
-            <div className="col-span-2 space-y-1">
-              <Label>Razón social</Label>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label>Razón social <span className="text-destructive">*</span></Label>
               <Input value={editForm.companyName || ""} onChange={e => setEditForm((f: any) => ({ ...f, companyName: e.target.value }))} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>CUIT <span className="text-destructive">*</span></Label>
+                <Input value={editForm.taxId || ""} onChange={e => setEditForm((f: any) => ({ ...f, taxId: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Industria <span className="text-destructive">*</span></Label>
+                <Input value={editForm.industry || ""} onChange={e => setEditForm((f: any) => ({ ...f, industry: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Teléfono <span className="text-destructive">*</span></Label>
+                <Input value={editForm.phone || ""} onChange={e => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Ciudad <span className="text-destructive">*</span></Label>
+                <Input value={editForm.city || ""} onChange={e => setEditForm((f: any) => ({ ...f, city: e.target.value }))} />
+              </div>
+            </div>
+
+            {/* Admin-only status override */}
+            {canEdit && (
+              <div className="space-y-1">
+                <Label>Estado (override manual)</Label>
+                <Select value={editForm.status || "prospect"} onValueChange={v => setEditForm((f: any) => ({ ...f, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="prospect">Prospecto</SelectItem>
+                    <SelectItem value="potential">Cliente Potencial</SelectItem>
+                    <SelectItem value="inactive">Inactivo</SelectItem>
+                    <SelectItem value="final">Cliente Final</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">El estado también se recalcula automáticamente según los campos completos y la Escala.</p>
+              </div>
+            )}
+
+            {/* Escala de consumo — visible siempre en edit */}
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+              <Label className="flex items-center gap-1.5 text-amber-400 text-sm">
+                Escala de Consumo (USD/año proyectado)
+              </Label>
+              <Input
+                type="number" min="0" step="any"
+                value={editForm.consumptionScale || ""}
+                onChange={e => setEditForm((f: any) => ({ ...f, consumptionScale: e.target.value }))}
+                placeholder="Ej: 50000"
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">0 = Inactivo · &gt;0 = Potencial · Solo OC convierte en Cliente Final</p>
+            </div>
+
             <div className="space-y-1">
-              <Label>CUIT / RUT</Label>
-              <Input value={editForm.taxId || ""} onChange={e => setEditForm((f: any) => ({ ...f, taxId: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Estado</Label>
-              <Select value={editForm.status || "prospect"} onValueChange={v => setEditForm((f: any) => ({ ...f, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="prospect">Prospecto</SelectItem>
-                  <SelectItem value="active">Activo</SelectItem>
-                  <SelectItem value="inactive">Inactivo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Industria</Label>
-              <Input value={editForm.industry || ""} onChange={e => setEditForm((f: any) => ({ ...f, industry: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Teléfono</Label>
-              <Input value={editForm.phone || ""} onChange={e => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} />
-            </div>
-            <div className="col-span-2 space-y-1">
-              <Label>Sitio web</Label>
-              <Input value={editForm.website || ""} onChange={e => setEditForm((f: any) => ({ ...f, website: e.target.value }))} />
-            </div>
-            <div className="col-span-2 space-y-1">
-              <Label>Dirección</Label>
-              <Input value={editForm.address || ""} onChange={e => setEditForm((f: any) => ({ ...f, address: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Ciudad</Label>
-              <Input value={editForm.city || ""} onChange={e => setEditForm((f: any) => ({ ...f, city: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>País</Label>
-              <Input value={editForm.country || ""} onChange={e => setEditForm((f: any) => ({ ...f, country: e.target.value }))} />
-            </div>
-            <div className="col-span-2 space-y-1">
               <Label>Notas internas</Label>
               <Textarea rows={3} value={editForm.notes || ""} onChange={e => setEditForm((f: any) => ({ ...f, notes: e.target.value }))} />
             </div>

@@ -239,6 +239,12 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
         })));
       }
       await tx.update(quotesTable).set({ status: "approved", approvedAt: new Date() }).where(eq(quotesTable.id, id));
+
+      // Promote client to "final" upon first OC
+      if (quote.clientId) {
+        await tx.update(clientsTable).set({ status: "final" }).where(eq(clientsTable.id, quote.clientId));
+      }
+
       return { orderId: order.id, orderNumber: number };
     });
     res.json(result);

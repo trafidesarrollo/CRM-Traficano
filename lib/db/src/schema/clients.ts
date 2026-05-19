@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, json, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -12,12 +12,13 @@ export const clientsTable = pgTable("clients", {
   address: text("address"),
   city: text("city"),
   country: text("country"),
-  status: text("status", { enum: ["active", "inactive", "prospect"] }).notNull().default("prospect"),
+  // prospect → potential → final (by OC). inactive if scale=0. Admin can override.
+  status: text("status", { enum: ["prospect", "potential", "inactive", "final"] }).notNull().default("prospect"),
   assignedSalespersonId: integer("assigned_salesperson_id"),
   clientEmails: json("client_emails").$type<string[]>().default([]),
   notes: text("notes"),
-  // ID original del cliente en el ERP Traficaño ("Número de cliente").
-  // Sirve para trazabilidad ERP→CRM y futura sincronización bidireccional.
+  // Proyección de consumo anual en USD (solo visible cuando status >= potential)
+  consumptionScale: numeric("consumption_scale"),
   externalId: text("external_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

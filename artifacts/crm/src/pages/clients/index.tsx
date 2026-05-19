@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useGetClients, useCreateClient, useUpdateClient, useGetSalespeople } from "@workspace/api-client-react";
+import { useGetClients, useGetSalespeople } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,40 +9,48 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter } from "lucide-react";
 import { DuplicateWarning } from "@/components/duplicate-warning";
 
 const API = import.meta.env.VITE_API_URL || "";
 
+// ─── Status config ──────────────────────────────────────────────────────────
+export const CLIENT_STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
+  prospect:  { label: "Prospecto",         badge: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  potential: { label: "Cliente Potencial", badge: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  inactive:  { label: "Inactivo",          badge: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },
+  final:     { label: "Cliente Final",     badge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+};
+
+const REQUIRED_FOR_POTENTIAL = ["companyName", "taxId", "industry", "phone", "city"] as const;
+
+function isReadyForPotential(form: any): boolean {
+  return REQUIRED_FOR_POTENTIAL.every(f => form[f]?.trim()) && (form.clientEmails?.length > 0);
+}
+
+// ─── Email manager ────────────────────────────────────────────────────────────
 function EmailManager({ emails, onChange }: { emails: string[]; onChange: (emails: string[]) => void }) {
   const [input, setInput] = useState("");
-
   const addEmail = () => {
     const email = input.trim().toLowerCase();
-    if (!email) return;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
-    if (emails.includes(email)) return;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || emails.includes(email)) return;
     onChange([...emails, email]);
     setInput("");
   };
-
-  const removeEmail = (idx: number) => {
-    onChange(emails.filter((_, i) => i !== idx));
-  };
-
   return (
     <div className="space-y-2">
-      <Label className="flex items-center gap-1.5">
-        <Mail className="w-3.5 h-3.5" />Emails de la empresa
+      <Label className="flex items-center gap-1.5 text-sm">
+        <Mail className="w-3.5 h-3.5" />Email(s) corporativo(s) <span className="text-destructive">*</span>
       </Label>
       {emails.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {emails.map((email, idx) => (
             <span key={idx} className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full px-2.5 py-0.5 text-xs font-mono">
               {email}
-              <button type="button" onClick={() => removeEmail(idx)} className="hover:text-red-400 transition-colors">
+              <button type="button" onClick={() => onChange(emails.filter((_, i) => i !== idx))} className="hover:text-red-400 transition-colors">
                 <X className="w-3 h-3" />
               </button>
             </span>
@@ -50,127 +58,15 @@ function EmailManager({ emails, onChange }: { emails: string[]; onChange: (email
         </div>
       )}
       <div className="flex gap-2">
-        <Input
-          type="email"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder="ventas@empresa.com"
-          className="text-sm"
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEmail(); } }}
-        />
-        <Button type="button" size="sm" variant="outline" onClick={addEmail} disabled={!input.trim()}>
-          <Plus className="w-3.5 h-3.5 mr-1" />Agregar
-        </Button>
+        <Input type="email" value={input} onChange={e => setInput(e.target.value)} placeholder="ventas@empresa.com" className="text-sm"
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEmail(); } }} />
+        <Button type="button" size="sm" variant="outline" onClick={addEmail} disabled={!input.trim()}><Plus className="w-3.5 h-3.5 mr-1" />Agregar</Button>
       </div>
-      <p className="text-xs text-muted-foreground">Podés agregar varios emails corporativos (ej: ventas@, compras@, gerencia@).</p>
     </div>
   );
 }
 
-const INITIAL_FORM = {
-  companyName: "",
-  taxId: "",
-  industry: "",
-  website: "",
-  phone: "",
-  address: "",
-  city: "",
-  country: "Argentina",
-  status: "prospect" as "prospect" | "active" | "inactive",
-  assignedSalespersonId: undefined as number | undefined,
-  clientEmails: [] as string[],
-  notes: "",
-};
-
-const CONTACT_INITIAL = {
-  clientId: "",
-  firstName: "",
-  lastName: "",
-  email: "",
-  phone: "",
-  address: "",
-  city: "",
-  position: "",
-};
-
-function ContactDialog({ onDone }: { onDone: () => void }) {
-  const { toast } = useToast();
-  const { data: clientsRes } = useGetClients({ limit: 500 });
-  const clients = useMemo(() => clientsRes?.data || [], [clientsRes]);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ ...CONTACT_INITIAL });
-  const [saving, setSaving] = useState(false);
-
-  const reset = () => setForm({ ...CONTACT_INITIAL });
-
-  const submit = async () => {
-    if (!form.clientId || !form.firstName.trim()) {
-      toast({ title: "Empresa y nombre son obligatorios", variant: "destructive" });
-      return;
-    }
-    setSaving(true);
-    try {
-      const r = await fetch(`${API}/api/contacts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          ...form,
-          clientId: parseInt(form.clientId),
-        }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Error al crear contacto");
-      toast({ title: "Contacto creado" });
-      onDone();
-      setOpen(false);
-      reset();
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-      <DialogTrigger asChild>
-        <Button variant="outline"><Plus className="w-4 h-4 mr-2" />Nuevo Contacto</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Nuevo Contacto</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label>Empresa / Cliente *</Label>
-            <Select value={form.clientId} onValueChange={(v) => setForm((f) => ({ ...f, clientId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar empresa..." /></SelectTrigger>
-              <SelectContent>
-                {clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Nombre *</Label><Input value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} /></div>
-            <div><Label>Apellido</Label><Input value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>TELEFONO</Label><Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></div>
-            <div><Label>EMAIL</Label><Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>DIRECCION</Label><Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} /></div>
-            <div><Label>CIUDAD</Label><Input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} /></div>
-          </div>
-          <div><Label>ROL</Label><Input value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} /></div>
-          <Button className="w-full" onClick={submit} disabled={saving}>{saving ? "Guardando..." : "Crear contacto"}</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
+// ─── Import CSV ───────────────────────────────────────────────────────────────
 function ImportClientsDialog({ onDone }: { onDone: () => void }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -178,125 +74,63 @@ function ImportClientsDialog({ onDone }: { onDone: () => void }) {
   const [separator, setSeparator] = useState<"," | ";">(";");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
-
   const reset = () => { setCsvText(""); setResult(null); };
-
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setCsvText(await file.text());
-    e.target.value = "";
+    const file = e.target.files?.[0]; if (!file) return;
+    setCsvText(await file.text()); e.target.value = "";
   }
-
   async function doImport() {
     if (!csvText.trim()) { toast({ title: "Pegá o subí un CSV primero", variant: "destructive" }); return; }
     setLoading(true); setResult(null);
     try {
-      const r = await fetch(`${API}/api/csv/import/clients-bulk`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ csv: csvText, separator }),
-      });
+      const r = await fetch(`${API}/api/csv/import/clients-bulk`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ csv: csvText, separator }) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Error de importación");
-      setResult(data);
-      toast({ title: "Importación finalizada", description: `${data.inserted} nuevos, ${data.updated} actualizados` });
-      onDone();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally { setLoading(false); }
+      setResult(data); toast({ title: "Importación finalizada", description: `${data.inserted} nuevos, ${data.updated} actualizados` }); onDone();
+    } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
+    finally { setLoading(false); }
   }
-
   return (
     <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset(); }}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20">
-          <FileUp className="w-4 h-4 mr-2" />Importar CSV
-        </Button>
-      </DialogTrigger>
+      <Button variant="outline" className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20" onClick={() => setOpen(true)}>
+        <FileUp className="w-4 h-4 mr-2" />Importar CSV
+      </Button>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileUp className="w-5 h-5 text-cyan-400" />
-            Importar Clientes desde CSV
-          </DialogTitle>
-        </DialogHeader>
-
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><FileUp className="w-5 h-5 text-cyan-400" />Importar Clientes desde CSV</DialogTitle></DialogHeader>
         {!result ? (
           <div className="space-y-4 mt-2">
-            <p className="text-sm text-muted-foreground">
-              El CSV debe tener columnas como <span className="font-mono text-xs text-foreground/80">Número de cliente, Razón social, Número de documento, Telefono, Correo, Localidad, Provincia, Rubro, Responsable 1</span>. Se hace upsert por número de cliente.
-            </p>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Separador</Label>
-              <div className="flex gap-2">
-                {([";", ","] as const).map(s => (
-                  <button key={s} onClick={() => setSeparator(s)}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-mono border transition-colors ${separator === s ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300" : "border-border/50 text-muted-foreground hover:border-border"}`}>
-                    {s === ";" ? 'Punto y coma  ";"' : 'Coma  ","'}
-                  </button>
-                ))}
-              </div>
+            <p className="text-sm text-muted-foreground">Columnas: <span className="font-mono text-xs">Número de cliente, Razón social, Número de documento, Telefono, Correo, Localidad, Rubro, Responsable 1</span></p>
+            <div className="flex gap-2">
+              {([";", ","] as const).map(s => (
+                <button key={s} onClick={() => setSeparator(s)} className={`px-4 py-1.5 rounded-lg text-sm font-mono border transition-colors ${separator === s ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300" : "border-border/50 text-muted-foreground hover:border-border"}`}>
+                  {s === ";" ? 'Punto y coma ";"' : 'Coma ","'}
+                </button>
+              ))}
             </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Subir archivo CSV</Label>
-              <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border/60 rounded-lg px-4 py-3 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-colors text-sm text-muted-foreground">
-                <Upload className="w-4 h-4" />
-                {csvText ? "Archivo cargado — clic para reemplazar" : "Seleccioná un archivo .csv"}
-                <input type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
-              </label>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">O pegá el CSV aquí</Label>
-              <Textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={5} className="font-mono text-xs"
-                placeholder={`"Número de cliente"${separator}"Razón social"${separator}"Número de documento"${separator}"Correo"\n"10039"${separator}"Empresa SA"${separator}"30566613766"${separator}"ventas@empresa.com"`} />
-            </div>
-
+            <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border/60 rounded-lg px-4 py-3 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-colors text-sm text-muted-foreground">
+              <Upload className="w-4 h-4" />{csvText ? "Archivo cargado — clic para reemplazar" : "Seleccioná un archivo .csv"}
+              <input type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
+            </label>
+            <Textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={4} className="font-mono text-xs" placeholder={`Razón social${separator}Número de documento${separator}Correo`} />
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-white" disabled={loading || !csvText.trim()} onClick={doImport}>
-                {loading ? "Importando..." : "Importar"}
-              </Button>
+              <Button className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-white" disabled={loading || !csvText.trim()} onClick={doImport}>{loading ? "Importando..." : "Importar"}</Button>
             </div>
           </div>
         ) : (
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                <p className="text-2xl font-bold text-green-400">{result.inserted}</p>
-                <p className="text-xs text-muted-foreground mt-1">Nuevos</p>
-              </div>
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                <p className="text-2xl font-bold text-blue-400">{result.updated}</p>
-                <p className="text-xs text-muted-foreground mt-1">Actualizados</p>
-              </div>
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                <p className="text-2xl font-bold text-yellow-400">{result.skipped}</p>
-                <p className="text-xs text-muted-foreground mt-1">Omitidos</p>
-              </div>
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3"><p className="text-2xl font-bold text-green-400">{result.inserted}</p><p className="text-xs text-muted-foreground mt-1">Nuevos</p></div>
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3"><p className="text-2xl font-bold text-blue-400">{result.updated}</p><p className="text-xs text-muted-foreground mt-1">Actualizados</p></div>
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3"><p className="text-2xl font-bold text-yellow-400">{result.skipped}</p><p className="text-xs text-muted-foreground mt-1">Omitidos</p></div>
             </div>
-
+            {result.errors?.length === 0 && <div className="flex items-center gap-2 text-green-400 text-sm"><CheckCircle2 className="w-4 h-4" />Sin errores</div>}
             {result.errors?.length > 0 && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-1 max-h-40 overflow-y-auto">
-                <p className="text-xs font-medium text-red-400 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> {result.errors.length} fila(s) con error
-                </p>
-                {result.errors.map((e: any, i: number) => (
-                  <p key={i} className="text-xs text-muted-foreground">Línea {e.line}: {e.error}</p>
-                ))}
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 max-h-32 overflow-y-auto space-y-1">
+                <p className="text-xs font-medium text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{result.errors.length} error(es)</p>
+                {result.errors.map((e: any, i: number) => <p key={i} className="text-xs text-muted-foreground">L{e.line}: {e.error}</p>)}
               </div>
             )}
-
-            {result.errors?.length === 0 && (
-              <div className="flex items-center gap-2 text-green-400 text-sm">
-                <CheckCircle2 className="w-4 h-4" />Todas las filas procesadas sin errores
-              </div>
-            )}
-
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={reset}>Nueva importación</Button>
               <Button className="flex-1" onClick={() => setOpen(false)}>Cerrar</Button>
@@ -308,250 +142,348 @@ function ImportClientsDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
-export default function Clients() {
-  const [, setLocation] = useLocation();
-  const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [editClient, setEditClient] = useState<any>(null);
+// ─── Client form (create/edit) ────────────────────────────────────────────────
+const BLANK_FORM = {
+  companyName: "", taxId: "", industry: "", phone: "", city: "",
+  clientEmails: [] as string[], notes: "", consumptionScale: "",
+  assignedSalespersonId: undefined as number | undefined,
+};
+
+type ClientForm = typeof BLANK_FORM;
+
+function statusBadge(status: string) {
+  const cfg = CLIENT_STATUS_CONFIG[status] || { label: status, badge: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" };
+  return <Badge variant="outline" className={cfg.badge}>{cfg.label}</Badge>;
+}
+
+interface ClientDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  editClient?: any;
+  salespeople: any[];
+  onSaved: () => void;
+}
+
+function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: ClientDialogProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = (user as any)?.role === "admin" || (user as any)?.role === "gerente" || (user as any)?.role === "gerente_comercial";
+  const [form, setForm] = useState<ClientForm>({ ...BLANK_FORM });
+  const [saving, setSaving] = useState(false);
+  // Buyer inline creation
+  const [showBuyerForm, setShowBuyerForm] = useState(false);
+  const [buyerForm, setBuyerForm] = useState({ firstName: "", lastName: "", email: "", phone: "", position: "" });
+  const [savingBuyer, setSavingBuyer] = useState(false);
+  const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
-  const { data: response, isLoading, refetch } = useGetClients({ search: search || undefined });
-  const { data: salespeopleRes } = useGetSalespeople();
-  const createClient = useCreateClient();
-  const updateClient = useUpdateClient();
+  useEffect(() => {
+    if (open) {
+      if (editClient) {
+        setForm({
+          companyName: editClient.companyName || "",
+          taxId: editClient.taxId || "",
+          industry: editClient.industry || "",
+          phone: editClient.phone || "",
+          city: editClient.city || "",
+          clientEmails: Array.isArray(editClient.clientEmails) ? editClient.clientEmails : [],
+          notes: editClient.notes || "",
+          consumptionScale: editClient.consumptionScale != null ? String(editClient.consumptionScale) : "",
+          assignedSalespersonId: editClient.assignedSalespersonId || undefined,
+        });
+      } else {
+        setForm({ ...BLANK_FORM });
+      }
+      setShowBuyerForm(false);
+      setCreatedClientId(null);
+    }
+  }, [open, editClient]);
 
-  const [form, setForm] = useState({ ...INITIAL_FORM });
+  const ready = isReadyForPotential(form);
+  const scale = parseFloat(form.consumptionScale);
+  let previewStatus = "prospect";
+  if (editClient?.status === "final") {
+    previewStatus = "final";
+  } else if (ready) {
+    previewStatus = isNaN(scale) ? "potential" : scale === 0 ? "inactive" : "potential";
+  }
 
-  const resetForm = () => {
-    setForm({ ...INITIAL_FORM });
-    setEditClient(null);
-  };
-
-  const openEdit = (client: any) => {
-    setForm({
-      companyName: client.companyName || "",
-      taxId: client.taxId || "",
-      industry: client.industry || "",
-      website: client.website || "",
-      phone: client.phone || "",
-      address: client.address || "",
-      city: client.city || "",
-      country: client.country || "Argentina",
-      status: client.status || "prospect",
-      assignedSalespersonId: client.assignedSalespersonId || undefined,
-      clientEmails: Array.isArray(client.clientEmails) ? client.clientEmails : [],
-      notes: client.notes || "",
-    });
-    setEditClient(client);
-    setOpen(true);
-  };
+  const f = (key: keyof ClientForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm(prev => ({ ...prev, [key]: e.target.value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.companyName.trim()) {
-      toast({ title: "El nombre de empresa es obligatorio", variant: "destructive" });
-      return;
-    }
+    if (!form.companyName.trim()) { toast({ title: "El nombre de empresa es obligatorio", variant: "destructive" }); return; }
+    setSaving(true);
     try {
-      const payload: any = { companyName: form.companyName.trim() };
-      if (form.taxId.trim()) payload.taxId = form.taxId.trim();
-      if (form.industry.trim()) payload.industry = form.industry.trim();
-      if (form.website.trim()) payload.website = form.website.trim();
-      if (form.phone.trim()) payload.phone = form.phone.trim();
-      if (form.address.trim()) payload.address = form.address.trim();
-      if (form.city.trim()) payload.city = form.city.trim();
-      if (form.country.trim()) payload.country = form.country.trim();
-      if (form.status) payload.status = form.status;
-      if (form.assignedSalespersonId) payload.assignedSalespersonId = form.assignedSalespersonId;
-      payload.clientEmails = form.clientEmails;
-      if (form.notes.trim()) payload.notes = form.notes.trim();
+      const payload: any = {
+        companyName: form.companyName.trim(),
+        taxId: form.taxId.trim() || undefined,
+        industry: form.industry.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        city: form.city.trim() || undefined,
+        clientEmails: form.clientEmails,
+        notes: form.notes.trim() || undefined,
+        assignedSalespersonId: form.assignedSalespersonId || undefined,
+      };
+      if (form.consumptionScale.trim() !== "") payload.consumptionScale = form.consumptionScale.trim();
+      // Admin explicit status override
+      if (isAdmin && editClient?.status === "final") payload.status = "final";
 
+      let savedId: number;
       if (editClient) {
-        await updateClient.mutateAsync({ id: editClient.id, data: payload });
+        const r = await fetch(`${API}/api/clients/${editClient.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
+        if (!r.ok) throw new Error((await r.json()).error || "Error");
+        savedId = editClient.id;
         toast({ title: "Cliente actualizado" });
       } else {
-        await createClient.mutateAsync({ data: payload });
-        toast({ title: "Cliente creado exitosamente" });
+        const r = await fetch(`${API}/api/clients`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
+        if (!r.ok) throw new Error((await r.json()).error || "Error");
+        const created = await r.json();
+        savedId = created.id;
+        setCreatedClientId(savedId);
+        toast({ title: "Cliente creado" });
       }
-      setOpen(false);
-      resetForm();
-      refetch();
-    } catch {
-      toast({ title: editClient ? "Error al actualizar" : "Error al crear cliente", variant: "destructive" });
+
+      if (showBuyerForm && buyerForm.firstName.trim() && savedId) {
+        await saveBuyer(savedId);
+      } else {
+        onSaved();
+        onOpenChange(false);
+      }
+    } catch (e: any) {
+      toast({ title: e.message || "Error al guardar", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
+  const saveBuyer = async (clientId: number) => {
+    if (!buyerForm.firstName.trim()) return;
+    setSavingBuyer(true);
+    try {
+      const r = await fetch(`${API}/api/contacts`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ clientId, firstName: buyerForm.firstName.trim(), lastName: buyerForm.lastName.trim(), email: buyerForm.email.trim(), phone: buyerForm.phone.trim(), position: buyerForm.position.trim() || "Comprador" }) });
+      if (!r.ok) throw new Error("Error al crear comprador");
+      toast({ title: "Comprador creado" });
+    } catch { toast({ title: "Comprador no guardado — podés agregarlo luego desde la ficha", variant: "destructive" }); }
+    finally { setSavingBuyer(false); onSaved(); onOpenChange(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Building2 className="w-5 h-5" />
+            {editClient ? "Editar Cliente" : "Nuevo Cliente"}
+          </DialogTitle>
+          <DialogDescription>
+            Estado actual: {statusBadge(previewStatus)}
+            {!editClient && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                {ready ? "— campos completos" : "— completá todos los campos para pasar a Potencial"}
+              </span>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-1">
+          {/* ── Datos empresa ── */}
+          <div>
+            <Label>Empresa <span className="text-destructive">*</span></Label>
+            <Input value={form.companyName} onChange={f("companyName")} placeholder="Razón social" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>CUIT <span className="text-destructive">*</span></Label>
+              <Input value={form.taxId} onChange={f("taxId")} placeholder="30-12345678-9" />
+            </div>
+            <div>
+              <Label>Industria <span className="text-destructive">*</span></Label>
+              <Input value={form.industry} onChange={f("industry")} placeholder="Ej: Metalúrgica" />
+            </div>
+          </div>
+
+          <DuplicateWarning entity="clients" params={{ taxId: form.taxId, companyName: form.companyName }} />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Teléfono <span className="text-destructive">*</span></Label>
+              <Input value={form.phone} onChange={f("phone")} placeholder="+54 11 1234-5678" />
+            </div>
+            <div>
+              <Label>Ciudad <span className="text-destructive">*</span></Label>
+              <Input value={form.city} onChange={f("city")} placeholder="Buenos Aires" />
+            </div>
+          </div>
+
+          <EmailManager emails={form.clientEmails} onChange={emails => setForm(p => ({ ...p, clientEmails: emails }))} />
+
+          {/* ── Vendedor asignado ── */}
+          <div>
+            <Label>Vendedor Asignado</Label>
+            <Select value={form.assignedSalespersonId?.toString() || "none"}
+              onValueChange={v => setForm(p => ({ ...p, assignedSalespersonId: v === "none" ? undefined : parseInt(v) }))}>
+              <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin asignar</SelectItem>
+                {salespeople.map((sp: any) => <SelectItem key={sp.id} value={sp.id.toString()}>{sp.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* ── Escala de consumo (solo visible si ready for potential) ── */}
+          {(ready || (editClient && ["potential", "inactive", "final"].includes(editClient.status))) && (
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+              <Label className="flex items-center gap-1.5 text-amber-400">
+                <DollarSign className="w-4 h-4" />Escala de Consumo (USD/año proyectado)
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={form.consumptionScale}
+                onChange={f("consumptionScale")}
+                placeholder="Ej: 50000"
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Proyección del vendedor. Si es <strong>0</strong> el cliente pasa a <strong>Inactivo</strong>. Si es {">"} 0 queda como <strong>Potencial</strong>.
+              </p>
+              {!isNaN(parseFloat(form.consumptionScale)) && (
+                <p className="text-xs font-medium">
+                  Estado resultante: {statusBadge(parseFloat(form.consumptionScale) === 0 ? "inactive" : "potential")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Admin override for final ── */}
+          {isAdmin && editClient?.status === "final" && (
+            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 space-y-2">
+              <Label className="text-sm text-muted-foreground">Cambio manual de estado (Admin)</Label>
+              <Select value={editClient.status} onValueChange={() => {}}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CLIENT_STATUS_CONFIG).map(([v, cfg]) => <SelectItem key={v} value={v}>{cfg.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div>
+            <Label>Notas</Label>
+            <Textarea value={form.notes} onChange={f("notes")} placeholder="Observaciones..." rows={2} />
+          </div>
+
+          {/* ── Comprador inline ── */}
+          {!showBuyerForm ? (
+            <button type="button" onClick={() => setShowBuyerForm(true)}
+              className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border border-dashed border-border/50 rounded-lg px-3 py-2 hover:border-border transition-colors">
+              <UserPlus className="w-4 h-4" />
+              {editClient ? "Agregar comprador a esta empresa" : "Agregar comprador (opcional)"}
+            </button>
+          ) : (
+            <div className="rounded-lg border border-border/50 p-3 space-y-3 bg-muted/10">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium flex items-center gap-1.5"><UserPlus className="w-4 h-4" />Datos del Comprador</p>
+                <button type="button" onClick={() => setShowBuyerForm(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+              </div>
+              {editClient && (
+                <p className="text-xs text-amber-400 bg-amber-500/10 rounded px-2 py-1">El comprador se vincula a la empresa ya guardada.</p>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">Nombre *</Label><Input value={buyerForm.firstName} onChange={e => setBuyerForm(p => ({ ...p, firstName: e.target.value }))} placeholder="Juan" /></div>
+                <div><Label className="text-xs">Apellido</Label><Input value={buyerForm.lastName} onChange={e => setBuyerForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Pérez" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">Email</Label><Input type="email" value={buyerForm.email} onChange={e => setBuyerForm(p => ({ ...p, email: e.target.value }))} placeholder="juan@empresa.com" /></div>
+                <div><Label className="text-xs">Teléfono</Label><Input value={buyerForm.phone} onChange={e => setBuyerForm(p => ({ ...p, phone: e.target.value }))} /></div>
+              </div>
+              <div><Label className="text-xs">Rol / Puesto</Label><Input value={buyerForm.position} onChange={e => setBuyerForm(p => ({ ...p, position: e.target.value }))} placeholder="Comprador, Gerente de compras..." /></div>
+              {editClient && (
+                <Button type="button" size="sm" className="w-full" disabled={savingBuyer || !buyerForm.firstName.trim()}
+                  onClick={async () => { await saveBuyer(editClient.id); onSaved(); onOpenChange(false); }}>
+                  {savingBuyer ? "Guardando..." : "Guardar comprador"}
+                </Button>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-1">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Guardando..." : editClient ? "Guardar cambios" : "Crear cliente"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+const ALL_STATUSES = ["prospect", "potential", "inactive", "final"] as const;
+
+export default function Clients() {
+  const [, setLocation] = useLocation();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const [editClient, setEditClient] = useState<any>(null);
+
+  const statusQuery = statusFilter.length ? statusFilter.join(",") : undefined;
+  const { data: response, isLoading, refetch } = useGetClients({ search: search || undefined, status: statusQuery } as any);
+  const { data: salespeopleRes } = useGetSalespeople();
   const salespeople = salespeopleRes?.data || [];
-  const isSubmitting = createClient.isPending || updateClient.isPending;
+
+  const toggleStatus = (s: string) =>
+    setStatusFilter(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+
+  const openNew = () => { setEditClient(null); setOpen(true); };
+  const openEdit = (e: React.MouseEvent, client: any) => { e.stopPropagation(); setEditClient(client); setOpen(true); };
 
   return (
     <AppLayout>
-      <div className="mb-8 flex justify-between items-center">
+      <div className="mb-6 flex justify-between items-start flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-display font-bold">Clientes</h1>
           <p className="text-muted-foreground mt-1">Directorio de empresas.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <ContactDialog onDone={refetch} />
+        <div className="flex items-center gap-2 flex-wrap">
           <ImportClientsDialog onDone={refetch} />
-          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />Nuevo Cliente
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Building2 className="w-5 h-5" />{editClient ? "Editar Cliente" : "Nuevo Cliente"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-              <div>
-                <Label>Empresa *</Label>
-                <Input
-                  value={form.companyName}
-                  onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))}
-                  placeholder="Nombre de la empresa"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>CUIT / Tax ID</Label>
-                  <Input
-                    value={form.taxId}
-                    onChange={e => setForm(f => ({ ...f, taxId: e.target.value }))}
-                    placeholder="30-12345678-9"
-                  />
-                </div>
-                <div>
-                  <Label>Industria</Label>
-                  <Input
-                    value={form.industry}
-                    onChange={e => setForm(f => ({ ...f, industry: e.target.value }))}
-                    placeholder="Ej: Metalúrgica"
-                  />
-                </div>
-              </div>
-              <DuplicateWarning entity="clients" params={{ taxId: form.taxId, companyName: form.companyName }} />
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Teléfono</Label>
-                  <Input
-                    value={form.phone}
-                    onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                    placeholder="+54 11 1234-5678"
-                  />
-                </div>
-                <div>
-                  <Label>Sitio Web</Label>
-                  <Input
-                    value={form.website}
-                    onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
-                    placeholder="www.empresa.com"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Dirección</Label>
-                <Input
-                  value={form.address}
-                  onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                  placeholder="Av. Industrial 1234"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Ciudad</Label>
-                  <Input
-                    value={form.city}
-                    onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                    placeholder="Buenos Aires"
-                  />
-                </div>
-                <div>
-                  <Label>País</Label>
-                  <Input
-                    value={form.country}
-                    onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                    placeholder="Argentina"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Estado</Label>
-                  <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as any }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prospect">Prospecto</SelectItem>
-                      <SelectItem value="active">Activo</SelectItem>
-                      <SelectItem value="inactive">Inactivo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Vendedor Asignado</Label>
-                  <Select
-                    value={form.assignedSalespersonId?.toString() || "none"}
-                    onValueChange={v => setForm(f => ({ ...f, assignedSalespersonId: v === "none" ? undefined : parseInt(v) }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sin asignar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin asignar</SelectItem>
-                      {salespeople.map((sp: any) => (
-                        <SelectItem key={sp.id} value={sp.id.toString()}>{sp.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <EmailManager
-                emails={form.clientEmails}
-                onChange={emails => setForm(f => ({ ...f, clientEmails: emails }))}
-              />
-
-              <div>
-                <Label>Notas</Label>
-                <Textarea
-                  value={form.notes}
-                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Observaciones sobre el cliente..."
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => { setOpen(false); resetForm(); }}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Guardando..." : editClient ? "Guardar Cambios" : "Crear Cliente"}
-                </Button>
-              </div>
-            </form>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={openNew}><Plus className="w-4 h-4 mr-2" />Nuevo Cliente</Button>
         </div>
       </div>
 
-      <div className="mb-4">
-        <div className="relative max-w-sm">
+      {/* ── Filtros ── */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar empresa..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Buscar empresa..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 w-56" />
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          {ALL_STATUSES.map(s => {
+            const cfg = CLIENT_STATUS_CONFIG[s];
+            const active = statusFilter.includes(s);
+            return (
+              <button key={s} onClick={() => toggleStatus(s)}
+                className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${active ? cfg.badge : "border-border/40 text-muted-foreground hover:border-border/70"}`}>
+                {cfg.label}
+              </button>
+            );
+          })}
+          {statusFilter.length > 0 && (
+            <button onClick={() => setStatusFilter([])} className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
+              <X className="w-3 h-3 inline" /> Limpiar
+            </button>
+          )}
         </div>
       </div>
 
+      {/* ── Tabla ── */}
       <div className="bg-card rounded-2xl border border-border/50 overflow-hidden shadow-lg">
         <Table>
           <TableHeader className="bg-white/5">
@@ -560,57 +492,49 @@ export default function Clients() {
               <TableHead>Empresa</TableHead>
               <TableHead>Emails</TableHead>
               <TableHead>Industria</TableHead>
-              <TableHead>Ubicación</TableHead>
+              <TableHead>Ciudad</TableHead>
+              <TableHead>Escala USD</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando...</TableCell></TableRow>
             ) : !response?.data?.length ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p>No hay clientes todavía.</p>
-                  <p className="text-sm mt-1">Hacé clic en "Nuevo Cliente" para crear el primero.</p>
+                  <p>No hay clientes{statusFilter.length ? " con ese filtro" : " todavía"}.</p>
                 </TableCell>
               </TableRow>
             ) : response.data.map((client: any) => {
               const emails: string[] = Array.isArray(client.clientEmails) ? client.clientEmails : [];
+              const cfg = CLIENT_STATUS_CONFIG[client.status] || CLIENT_STATUS_CONFIG.prospect;
               return (
                 <TableRow key={client.id} className="border-border/50 hover:bg-white/5 cursor-pointer" onClick={() => setLocation(`/clients/${client.id}`)}>
-                  <TableCell>
-                    <span className="font-mono text-sm font-semibold text-primary/80">{client.externalId || client.id}</span>
-                  </TableCell>
+                  <TableCell><span className="font-mono text-sm font-semibold text-primary/80">{client.externalId || client.id}</span></TableCell>
                   <TableCell>
                     <p className="font-medium">{client.companyName}</p>
-                    <p className="text-xs text-muted-foreground">{client.taxId || client.website || ''}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{client.taxId || ""}</p>
                   </TableCell>
                   <TableCell>
                     {emails.length > 0 ? (
-                      <div className="flex flex-col gap-0.5">
-                        {emails.map((em, i) => (
-                          <span key={i} className="text-xs font-mono text-blue-400">{em}</span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
+                      <div className="flex flex-col gap-0.5">{emails.slice(0, 2).map((em, i) => <span key={i} className="text-xs font-mono text-blue-400">{em}</span>)}</div>
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{client.industry || '-'}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{client.city ? `${client.city}, ${client.country}` : '-'}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={
-                      client.status === 'active' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' :
-                      client.status === 'prospect' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' :
-                      'text-zinc-400 bg-zinc-500/10 border-zinc-500/20'
-                    }>
-                      {client.status === 'active' ? 'Activo' : client.status === 'prospect' ? 'Prospecto' : 'Inactivo'}
-                    </Badge>
+                  <TableCell className="text-muted-foreground text-sm">{client.industry || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{client.city || "—"}</TableCell>
+                  <TableCell className="text-sm font-mono">
+                    {client.consumptionScale != null ? (
+                      <span className="text-amber-400">u$s {Number(client.consumptionScale).toLocaleString("es-AR")}</span>
+                    ) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(client)}>
+                    <Badge variant="outline" className={cfg.badge}>{cfg.label}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => openEdit(e, client)}>
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                   </TableCell>
@@ -620,6 +544,14 @@ export default function Clients() {
           </TableBody>
         </Table>
       </div>
+
+      <ClientDialog
+        open={open}
+        onOpenChange={setOpen}
+        editClient={editClient}
+        salespeople={salespeople}
+        onSaved={refetch}
+      />
     </AppLayout>
   );
 }

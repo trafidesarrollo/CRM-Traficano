@@ -1,23 +1,58 @@
 import { Router, type IRouter } from "express";
 import { db, clientsTable, quotesTable, ordersTable, contactsTable, activitiesTable, salespeopleTable, tasksTable } from "@workspace/db";
-import { eq, ilike, sql, desc } from "drizzle-orm";
+import { eq, ilike, sql, desc, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+// Compute the automatic status based on filled fields + consumptionScale.
+// Rules:
+//   prospect  → default, any client with incomplete required fields
+//   potential → required fields filled AND consumptionScale > 0
+//   inactive  → required fields filled AND consumptionScale === 0
+//   final     → set automatically when client makes a first OC (convert-to-order)
+//               or manually by admin (never auto-downgraded from final)
+function computeStatus(data: any, existingStatus?: string): string {
+  // final can only be set explicitly
+  if (existingStatus === "final") return "final";
+
+  const requiredFilled =
+    data.companyName?.trim() &&
+    data.taxId?.trim() &&
+    data.industry?.trim() &&
+    data.phone?.trim() &&
+    (data.clientEmails?.length > 0) &&
+    data.city?.trim();
+
+  if (!requiredFilled) return "prospect";
+
+  const scale = parseFloat(data.consumptionScale ?? "");
+  if (isNaN(scale)) return "potential"; // scale not set yet → potential with no scale
+  if (scale === 0) return "inactive";
+  return "potential";
+}
 
 router.get("/clients", async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const limit = parseInt(req.query.limit as string) || 200;
     const search = req.query.search as string;
+    const statusFilter = req.query.status as string; // comma-separated
     const offset = (page - 1) * limit;
 
-    let query = db.select().from(clientsTable);
-    if (search) {
-      query = query.where(ilike(clientsTable.companyName, `%${search}%`)) as any;
+    let base = db.select().from(clientsTable).$dynamic();
+
+    const conditions: any[] = [];
+    if (search) conditions.push(ilike(clientsTable.companyName, `%${search}%`));
+    if (statusFilter) {
+      const statuses = statusFilter.split(",").map(s => s.trim()).filter(Boolean);
+      if (statuses.length) conditions.push(inArray(clientsTable.status, statuses as any));
     }
 
+    if (conditions.length === 1) base = base.where(conditions[0]);
+    else if (conditions.length > 1) base = base.where(sql`${conditions[0]} AND ${conditions[1]}`);
+
     const [data, countResult] = await Promise.all([
-      query.limit(limit).offset(offset),
+      base.limit(limit).offset(offset),
       db.select({ count: sql<number>`count(*)` }).from(clientsTable),
     ]);
 
@@ -30,7 +65,10 @@ router.get("/clients", async (req, res) => {
 
 router.post("/clients", async (req, res) => {
   try {
-    const [client] = await db.insert(clientsTable).values(req.body).returning();
+    const body = req.body;
+    // Auto-compute status unless admin is explicitly setting it to a specific value
+    const status = computeStatus(body, undefined);
+    const [client] = await db.insert(clientsTable).values({ ...body, status }).returning();
     res.status(201).json(client);
   } catch (err) {
     req.log.error(err);
@@ -113,11 +151,28 @@ router.get("/clients/:id/overview", async (req, res) => {
 router.patch("/clients/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [updated] = await db.update(clientsTable).set(req.body).where(eq(clientsTable.id, id)).returning();
-    if (!updated) {
-      res.status(404).json({ error: "Cliente no encontrado" });
-      return;
+    const body = req.body;
+
+    // Load existing to preserve final status
+    const [existing] = await db.select().from(clientsTable).where(eq(clientsTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
+
+    const merged = { ...existing, ...body };
+
+    // Only auto-compute status if caller didn't explicitly pass one
+    let newStatus: string;
+    if (body.status && body.status !== existing.status) {
+      // Explicit override (admin)
+      newStatus = body.status;
+    } else {
+      newStatus = computeStatus(merged, existing.status);
     }
+
+    const [updated] = await db.update(clientsTable)
+      .set({ ...body, status: newStatus })
+      .where(eq(clientsTable.id, id))
+      .returning();
+
     res.json(updated);
   } catch (err) {
     req.log.error(err);
