@@ -64,6 +64,7 @@ export default function QuoteEdit() {
   });
   const [creatingContact, setCreatingContact] = useState(false);
   const [salespeople, setSalespeople] = useState<any[]>([]);
+  const currentSalesperson = salespeople.find((s: any) => user?.id && Number(s.userId) === Number(user.id)) || null;
   const [products, setProducts] = useState<any[]>([]);
   const [priceLists, setPriceLists] = useState<any[]>([]);
   const [saleConditions, setSaleConditions] = useState<any[]>([]);
@@ -526,7 +527,11 @@ export default function QuoteEdit() {
               <Select value={form.salespersonId} onValueChange={v => setForm({ ...form, salespersonId: v })}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                 <SelectContent>
-                  {salespeople.map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                  {currentSalesperson ? (
+                    <SelectItem key={currentSalesperson.id} value={String(currentSalesperson.id)}>{currentSalesperson.name}</SelectItem>
+                  ) : (
+                    salespeople.map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -547,10 +552,10 @@ export default function QuoteEdit() {
       </Card>
 
       <Dialog open={newContactOpen} onOpenChange={setNewContactOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="new-contact-description">
           <DialogHeader>
             <DialogTitle>Nuevo contacto</DialogTitle>
-            <DialogDescription>Se creará para la empresa seleccionada.</DialogDescription>
+            <DialogDescription id="new-contact-description">Se creará para la empresa seleccionada.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
