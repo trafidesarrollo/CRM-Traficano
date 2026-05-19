@@ -1400,34 +1400,13 @@ export default function QuoteEdit() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs mb-1">Fecha</Label>
-                <Input
-                  type="date"
-                  value={followupForm.date}
-                  onChange={(e) => setFollowupForm((p) => ({ ...p, date: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-xs mb-1">Hora</Label>
-                <Input
-                  type="time"
-                  value={followupForm.time}
-                  onChange={(e) => setFollowupForm((p) => ({ ...p, time: e.target.value }))}
-                />
-              </div>
-            </div>
             <div>
-              <Label className="text-xs mb-1">Tipo</Label>
-              <Select value={followupForm.type} onValueChange={(v) => setFollowupForm((p) => ({ ...p, type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="call">Llamada</SelectItem>
-                  <SelectItem value="visit">Visita</SelectItem>
-                  <SelectItem value="meeting">Reunión</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label className="text-xs mb-1">Fecha</Label>
+              <Input
+                type="date"
+                value={followupForm.date}
+                onChange={(e) => setFollowupForm((p) => ({ ...p, date: e.target.value }))}
+              />
             </div>
             <div>
               <Label className="text-xs mb-1">Notas (opcional)</Label>
