@@ -239,7 +239,7 @@ router.use(requireMinRole("vendedor"), quotePdfRouter);
 router.use(requireMinRole("vendedor"), orderPdfRouter);
 router.use(requireMinRole("vendedor"), reportsExportRouter);
 router.use(gcalRouter);
-router.use(requireMinRole("gerente"), csvRouter);
+router.use(requireMinRole("vendedor"), csvRouter);
 router.use(requireMinRole("vendedor"), searchRouter);
 router.use(requireMinRole("gerente"), bulkRouter);
 router.use(requireMinRole("vendedor"), duplicatesRouter);

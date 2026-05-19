@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Download, Upload, FileText, FileSpreadsheet, DownloadCloud } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -25,6 +26,7 @@ const LABELS: Record<string, string> = {
 
 export default function CsvPage() {
   const { toast } = useToast();
+  const { user, isLoading } = useAuth();
   const [entities, setEntities] = useState<{ key: string; fields: string[]; required: string[] }[]>([]);
   const [entity, setEntity] = useState("clients");
   const [mode, setMode] = useState<"upsert" | "insert">("upsert");
@@ -37,9 +39,10 @@ export default function CsvPage() {
   const [separator, setSeparator] = useState<"," | ";">(",");
 
   useEffect(() => {
+    if (!user && !isLoading) return;
     fetch(`${API}/api/csv/entities`, { credentials: "include" })
       .then(r => r.json()).then(d => setEntities(d.entities || [])).catch(() => {});
-  }, []);
+  }, [user, isLoading]);
 
   const def = entities.find(e => e.key === entity);
 
@@ -97,6 +100,7 @@ export default function CsvPage() {
 
   return (
     <AppLayout>
+      {!user && !isLoading ? null : null}
       <div className="space-y-6 p-4 md:p-6 max-w-5xl">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="h-6 w-6" />
