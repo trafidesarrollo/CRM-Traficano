@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, clientsTable, quotesTable, ordersTable, contactsTable, activitiesTable, salespeopleTable, tasksTable } from "@workspace/db";
-import { eq, ilike, sql, desc, inArray } from "drizzle-orm";
+import { eq, ilike, sql, desc, inArray, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -49,7 +49,7 @@ router.get("/clients", async (req, res) => {
     }
 
     if (conditions.length === 1) base = base.where(conditions[0]);
-    else if (conditions.length > 1) base = base.where(sql`${conditions[0]} AND ${conditions[1]}`);
+    else if (conditions.length > 1) base = base.where(and(...conditions));
 
     const [data, countResult] = await Promise.all([
       base.limit(limit).offset(offset),
