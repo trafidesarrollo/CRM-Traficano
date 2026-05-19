@@ -150,9 +150,11 @@ export default function QuoteEdit() {
   }, [form.clientId, clients]);
 
   useEffect(() => {
-    if (!isNew || !user?.salespersonId) return;
-    setForm((prev: any) => prev.salespersonId ? prev : { ...prev, salespersonId: String(user.salespersonId) });
-  }, [isNew, user]);
+    if (!isNew || !user?.id || salespeople.length === 0) return;
+    const sp = salespeople.find((s: any) => Number(s.userId) === Number(user.id));
+    if (!sp) return;
+    setForm((prev: any) => prev.salespersonId ? prev : { ...prev, salespersonId: String(sp.id) });
+  }, [isNew, user, salespeople]);
 
   useEffect(() => {
     if (!form.clientId) { setContacts([]); return; }
@@ -458,7 +460,7 @@ export default function QuoteEdit() {
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Tasa de cambio</Label><Input type="number" step="0.0001" value={form.exchangeRate} onChange={e => setForm({ ...form, exchangeRate: e.target.value })} /></div>
+            <div><Label>Tasa de cambio *</Label><Input type="number" step="0.0001" value={form.exchangeRate} onChange={e => setForm({ ...form, exchangeRate: e.target.value })} /></div>
 
             <div className="col-span-2">
               <Label>Tipo de cambio</Label>
