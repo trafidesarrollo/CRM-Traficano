@@ -46,6 +46,8 @@ export default function QuoteEdit() {
   const id = isNew ? null : parseInt(params!.id);
 
   const [clients, setClients] = useState<any[]>([]);
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientSearchResults, setClientSearchResults] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [newContactOpen, setNewContactOpen] = useState(false);
   const [newContactForm, setNewContactForm] = useState({
@@ -131,6 +133,29 @@ export default function QuoteEdit() {
       if (def && isNew) setForm((f: any) => ({ ...f, priceListId: String(def.id) }));
     });
   }, []);
+
+  useEffect(() => {
+    const term = clientSearch.trim();
+    if (term.length < 2) {
+      setClientSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const r = await fetch(`${API}/api/search?q=${encodeURIComponent(term)}`, { credentials: "include" });
+        const data = await r.json();
+        setClientSearchResults((Array.isArray(data?.results) ? data.results : []).filter((r: any) => r.kind === "client"));
+      } catch {
+        setClientSearchResults([]);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [clientSearch]);
+
+  useEffect(() => {
+    const client = clients.find((c: any) => String(c.id) === form.clientId);
+    if (client?.taxId) setForm((prev: any) => ({ ...prev, cuit: client.taxId || "" }));
+  }, [form.clientId, clients]);
 
   useEffect(() => {
     if (!form.clientId) { setContacts([]); return; }
@@ -247,7 +272,22 @@ export default function QuoteEdit() {
   };
 
   const save = async () => {
-    if (!form.clientId) { toast({ title: "Cliente requerido", variant: "destructive" }); return; }
+    const required = [
+      ["clientId", "Cliente"],
+      ["cuit", "CUIT"],
+      ["saleConditionId", "Condición de venta"],
+      ["contactId", "Contacto Asignado"],
+      ["date", "Fecha"],
+      ["exchangeRate", "Tasa de cambio"],
+      ["quoteStatus", "Estado de cotización"],
+      ["status", "Estado"],
+      ["priority", "Prioridad"],
+      ["quoteType", "Tipo de cotización"],
+      ["salespersonId", "Vendedor"],
+      ["orderType", "Tipo de orden"],
+    ] as const;
+    const missing = required.find(([key]) => !String(form[key] || "").trim());
+    if (missing) { toast({ title: `${missing[1]} requerido`, variant: "destructive" }); return; }
     const body: any = {
       ...form,
       clientId: parseInt(form.clientId),
@@ -346,14 +386,44 @@ export default function QuoteEdit() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Cliente *</Label>
-              <Select value={form.clientId} onValueChange={v => setForm({ ...form, clientId: v })}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar cliente..." /></SelectTrigger>
-                <SelectContent>
-                  {clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Input
+                  value={clientSearch}
+                  onChange={e => setClientSearch(e.target.value)}
+                  placeholder="Tipeá para buscar cliente..."
+                />
+                {!!clientSearchResults.length && (
+                  <div className="border rounded-md bg-background max-h-56 overflow-auto">
+                    {clientSearchResults.map((c: any) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-muted"
+                        onClick={() => {
+                          setForm((prev: any) => ({ ...prev, clientId: String(c.id), cuit: c.sub || c.taxId || "" }));
+                          setClientSearch(c.title || c.companyName || "");
+                          setClientSearchResults([]);
+                        }}
+                      >
+                        <div className="font-medium">{c.title || c.companyName}</div>
+                        <div className="text-xs text-muted-foreground">{c.sub || c.taxId || "Sin CUIT"}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <Select value={form.clientId} onValueChange={v => {
+                  const client = clients.find((c: any) => String(c.id) === v);
+                  setForm({ ...form, clientId: v, cuit: client?.taxId || "" });
+                  setClientSearch(client?.companyName || "");
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar cliente..." /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div><Label>CUIT</Label><Input value={form.cuit} onChange={e => setForm({ ...form, cuit: e.target.value })} /></div>
+            <div><Label>CUIT *</Label><Input value={form.cuit} onChange={e => setForm({ ...form, cuit: e.target.value })} /></div>
 
             <div>
               <Label>Condición de venta *</Label>
@@ -425,11 +495,11 @@ export default function QuoteEdit() {
             <div><Label>Total</Label><Input value={totals.net.toFixed(2)} disabled className="font-bold text-lg" /></div>
 
             <div>
-              <Label>Estado de cotización</Label>
+              <Label>Estado de cotización *</Label>
               <Input value={form.quoteStatus} onChange={e => setForm({ ...form, quoteStatus: e.target.value })} />
             </div>
             <div>
-              <Label>Estado</Label>
+              <Label>Estado *</Label>
               <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -466,7 +536,7 @@ export default function QuoteEdit() {
             </div>
 
             <div>
-              <Label>Vendedor</Label>
+              <Label>Vendedor *</Label>
               <Select value={form.salespersonId} onValueChange={v => setForm({ ...form, salespersonId: v })}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                 <SelectContent>
