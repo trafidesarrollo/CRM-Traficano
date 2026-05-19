@@ -5,7 +5,8 @@ import {
   LayoutDashboard, Inbox, Briefcase, Users, Contact2, UserSquare, 
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
   Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo,
-  CalendarDays, BarChart3, Workflow, Sliders, MailOpen, GitBranch, CalendarClock, ShieldCheck, Factory, Kanban, Upload
+  CalendarDays, BarChart3, Workflow, Sliders, MailOpen, GitBranch, CalendarClock, ShieldCheck, Factory, Kanban, Upload,
+  FileUp, CheckCircle2, AlertCircle, X
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,176 @@ const navItems = [
   { href: "/production",       label: "Producción (MES)",      icon: Factory,         module: "produccion",        hiddenFromRoles: ["vendedor"] },
   { href: "/users",            label: "Usuarios",              icon: Settings,        module: "usuarios",          roles: ["admin", "gerente_comercial"] },
 ];
+
+function BulkFollowupFAB() {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [separator, setSeparator] = useState<"," | ";">(";");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const reset = () => { setCsvText(""); setResult(null); };
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    setCsvText(text);
+    e.target.value = "";
+  }
+
+  async function doImport() {
+    if (!csvText.trim()) {
+      toast({ title: "Pegá o subí un CSV primero", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    setResult(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/csv/import/client-followups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ csv: csvText, separator }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error de importación");
+      setResult(data);
+      toast({
+        title: "Carga masiva finalizada",
+        description: `${data.createdTasks} tareas y ${data.createdFollowups} seguimientos creados`,
+      });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => { setOpen(true); reset(); }}
+        className="fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full bg-cyan-500 text-white shadow-lg hover:bg-cyan-400 transition-all flex items-center justify-center hover:scale-105"
+        title="Carga masiva de novedades"
+      >
+        <FileUp className="w-6 h-6" />
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileUp className="w-5 h-5 text-cyan-400" />
+              Carga masiva de novedades
+            </DialogTitle>
+          </DialogHeader>
+
+          {!result ? (
+            <div className="space-y-4 mt-2">
+              <p className="text-sm text-muted-foreground">
+                Importá el resumen de lo hablado con cada cliente. Por cada fila se crea una tarea en el calendario y un seguimiento programado.
+              </p>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Separador</Label>
+                <div className="flex gap-2">
+                  {([";", ","] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setSeparator(s)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-mono border transition-colors ${separator === s ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300" : "border-border/50 text-muted-foreground hover:border-border"}`}
+                    >
+                      {s === ";" ? 'Punto y coma  ";"' : 'Coma  ","'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Subir archivo CSV</Label>
+                <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border/60 rounded-lg px-4 py-3 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-colors text-sm text-muted-foreground">
+                  <Upload className="w-4 h-4" />
+                  {csvText ? "Archivo cargado — clic para reemplazar" : "Seleccioná un archivo .csv"}
+                  <input type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
+                </label>
+              </div>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">O pegá el CSV aquí</Label>
+                <Textarea
+                  value={csvText}
+                  onChange={e => setCsvText(e.target.value)}
+                  rows={6}
+                  placeholder={`nro_cliente${separator}customer_name${separator}fecha${separator}fecha_seguimiento${separator}urgencia${separator}titulo${separator}novedad${separator}accion\n10013${separator}OPS S.A.${separator}2026-03-20${separator}2026-03-23${separator}Media${separator}Reunión comercial${separator}Cliente evalúa precios${separator}Enviar cotización`}
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              <div className="text-xs text-muted-foreground bg-white/5 rounded-lg p-3 space-y-1">
+                <p><span className="text-foreground font-medium">Obligatorios:</span> nro_cliente, novedad</p>
+                <p><span className="text-foreground font-medium">Opcionales:</span> customer_name, fecha, fecha_seguimiento, urgencia, titulo, accion</p>
+                <p className="text-cyan-400/80">Si no hay fecha_seguimiento, se programa automáticamente a 3 días.</p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
+                <Button className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-white" disabled={loading || !csvText.trim()} onClick={doImport}>
+                  {loading ? "Importando..." : "Importar"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 mt-2">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-green-400">{result.createdTasks}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Tareas / Calendario</p>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-blue-400">{result.createdActivities}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Bitácoras</p>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-purple-400">{result.createdFollowups}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Seguimientos</p>
+                </div>
+              </div>
+
+              {result.errors?.length > 0 && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-1 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-medium text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {result.errors.length} fila(s) con error
+                  </p>
+                  {result.errors.map((e: any, i: number) => (
+                    <p key={i} className="text-xs text-muted-foreground">Línea {e.line}: {e.error}</p>
+                  ))}
+                </div>
+              )}
+
+              {result.errors?.length === 0 && (
+                <div className="flex items-center gap-2 text-green-400 text-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Todas las filas importadas correctamente
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={reset}>
+                  Nueva importación
+                </Button>
+                <Button className="flex-1" onClick={() => setOpen(false)}>
+                  Cerrar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 function QuickActivityFAB() {
   const { toast } = useToast();
@@ -317,12 +488,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       <main className="flex-1 overflow-y-auto">
         <div className="hidden md:flex items-center justify-end gap-2 p-4 border-b border-border/50 sticky top-0 z-40 bg-background/80 backdrop-blur">
-          <Button asChild variant="outline" className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/20">
-            <Link href="/csv">
-              <UploadCloud className="w-4 h-4 mr-2" />
-              Import/Export CSV
-            </Link>
-          </Button>
           <NotificationBell />
         </div>
         <div className="p-4 md:p-8">
@@ -330,6 +495,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </main>
 
+      <BulkFollowupFAB />
+      <QuickActivityFAB />
     </div>
   );
 }

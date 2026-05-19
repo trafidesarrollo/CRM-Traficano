@@ -216,44 +216,6 @@ router.get("/csv/export/:entity", async (req: Request, res: Response) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-router.post("/csv/import/:entity", async (req: Request, res: Response) => {
-  const def = ENTITIES[req.params.entity];
-  if (!def) { res.status(404).json({ error: "Entidad no soportada" }); return; }
-  try {
-    const { csv, mode = "upsert" } = req.body || {};
-    if (typeof csv !== "string" || !csv.trim()) { res.status(400).json({ error: "csv requerido" }); return; }
-    const { headers, rows } = parseCsv(csv);
-    if (!headers.length) { res.status(400).json({ error: "CSV vacío" }); return; }
-    const allowed = new Set(def.fields);
-    const unknown = headers.filter(h => !allowed.has(h));
-    let inserted = 0, updated = 0, skipped = 0;
-    const errors: { line: number; error: string }[] = [];
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const data: any = {};
-      for (const h of headers) {
-        if (!allowed.has(h)) continue;
-        data[h] = coerceValue(def, h, row[h]);
-      }
-      const missing = (def.required || []).filter(r => data[r] === null || data[r] === undefined || data[r] === "");
-      if (missing.length) { errors.push({ line: i + 2, error: `Faltan campos: ${missing.join(", ")}` }); skipped++; continue; }
-      try {
-        if (data.id && mode === "upsert") {
-          const id = Number(data.id); delete data.id;
-          const upd = await db.update(def.table).set(data).where(sql`id = ${id}`).returning();
-          if (upd.length) updated++;
-          else { await db.insert(def.table).values({ ...data, id }); inserted++; }
-        } else {
-          delete data.id;
-          await db.insert(def.table).values(data);
-          inserted++;
-        }
-      } catch (e: any) { errors.push({ line: i + 2, error: e.message }); skipped++; }
-    }
-    res.json({ ok: true, total: rows.length, inserted, updated, skipped, unknownColumns: unknown, errors: errors.slice(0, 50) });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
-});
-
 router.post("/csv/import/client-followups", async (req: Request, res: Response) => {
   try {
     const { csv, separator } = req.body || {};
@@ -325,7 +287,7 @@ router.post("/csv/import/client-followups", async (req: Request, res: Response) 
           status: "pending",
           priority,
           clientId: client[0].id,
-          dueDate: baseDate,
+          dueDate: followDate,
         }).returning();
 
         const [activity] = await db.insert(activitiesTable).values({
@@ -368,6 +330,44 @@ router.post("/csv/import/client-followups", async (req: Request, res: Response) 
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+router.post("/csv/import/:entity", async (req: Request, res: Response) => {
+  const def = ENTITIES[req.params.entity];
+  if (!def) { res.status(404).json({ error: "Entidad no soportada" }); return; }
+  try {
+    const { csv, mode = "upsert" } = req.body || {};
+    if (typeof csv !== "string" || !csv.trim()) { res.status(400).json({ error: "csv requerido" }); return; }
+    const { headers, rows } = parseCsv(csv);
+    if (!headers.length) { res.status(400).json({ error: "CSV vacío" }); return; }
+    const allowed = new Set(def.fields);
+    const unknown = headers.filter(h => !allowed.has(h));
+    let inserted = 0, updated = 0, skipped = 0;
+    const errors: { line: number; error: string }[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const data: any = {};
+      for (const h of headers) {
+        if (!allowed.has(h)) continue;
+        data[h] = coerceValue(def, h, row[h]);
+      }
+      const missing = (def.required || []).filter(r => data[r] === null || data[r] === undefined || data[r] === "");
+      if (missing.length) { errors.push({ line: i + 2, error: `Faltan campos: ${missing.join(", ")}` }); skipped++; continue; }
+      try {
+        if (data.id && mode === "upsert") {
+          const id = Number(data.id); delete data.id;
+          const upd = await db.update(def.table).set(data).where(sql`id = ${id}`).returning();
+          if (upd.length) updated++;
+          else { await db.insert(def.table).values({ ...data, id }); inserted++; }
+        } else {
+          delete data.id;
+          await db.insert(def.table).values(data);
+          inserted++;
+        }
+      } catch (e: any) { errors.push({ line: i + 2, error: e.message }); skipped++; }
+    }
+    res.json({ ok: true, total: rows.length, inserted, updated, skipped, unknownColumns: unknown, errors: errors.slice(0, 50) });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 export default router;
