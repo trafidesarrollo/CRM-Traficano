@@ -69,6 +69,37 @@ export default function ClientDetail() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Task reminder from URL param
+  const taskId = new URLSearchParams(window.location.search).get("taskId");
+  const [reminderTask, setReminderTask] = useState<any>(null);
+  const [reminderDismissed, setReminderDismissed] = useState(false);
+  const [completingTask, setCompletingTask] = useState(false);
+
+  useEffect(() => {
+    if (!taskId) return;
+    fetch(`${API}/api/tasks/${taskId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(t => { if (t) setReminderTask(t); })
+      .catch(() => {});
+  }, [taskId]);
+
+  const completeTask = async () => {
+    if (!reminderTask) return;
+    setCompletingTask(true);
+    try {
+      const r = await fetch(`${API}/api/tasks/${reminderTask.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (r.ok) {
+        toast({ title: "Tarea completada" });
+        setReminderTask((t: any) => ({ ...t, status: "completed" }));
+      }
+    } finally { setCompletingTask(false); }
+  };
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
@@ -189,6 +220,35 @@ export default function ClientDetail() {
             </Button>
           )}
         </div>
+
+        {/* ── Task reminder banner ── */}
+        {reminderTask && !reminderDismissed && (
+          <div className={`flex items-start gap-3 rounded-lg border px-4 py-3 ${reminderTask.status === "completed" ? "border-green-500/30 bg-green-500/10" : "border-amber-500/30 bg-amber-500/10"}`}>
+            {reminderTask.status === "completed"
+              ? <CheckCircle2 className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+              : <ListTodo className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">{reminderTask.status === "completed" ? "Tarea completada" : "Tarea pendiente"}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{reminderTask.title}</p>
+              {reminderTask.description && <p className="text-xs text-muted-foreground mt-0.5">{reminderTask.description}</p>}
+              {reminderTask.dueDate && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Vence: {new Date(reminderTask.dueDate).toLocaleDateString("es-AR")}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {reminderTask.status !== "completed" && (
+                <Button size="sm" variant="outline" className="border-green-500/40 text-green-400 hover:bg-green-500/10" onClick={completeTask} disabled={completingTask}>
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />{completingTask ? "..." : "Completar"}
+                </Button>
+              )}
+              <button onClick={() => setReminderDismissed(true)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>

@@ -273,7 +273,7 @@ export default function Tasks() {
 
   const openDetail = (task: any) => {
     if (task.clientId) {
-      window.open(`/clients/${task.clientId}`, "_blank");
+      window.open(`/clients/${task.clientId}?taskId=${task.id}`, "_blank");
       return;
     }
     setSelected(task); setDetailOpen(true);
