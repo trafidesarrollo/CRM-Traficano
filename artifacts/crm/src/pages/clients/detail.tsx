@@ -214,11 +214,9 @@ export default function ClientDetail() {
             <h1 className="text-xl font-bold">{client.company_name || client.companyName}</h1>
             <Badge className={cs.color}>{cs.label}</Badge>
           </div>
-          {canEdit && (
-            <Button size="sm" variant="outline" onClick={openEdit}>
-              <Pencil className="h-4 w-4 mr-1.5" />Editar cliente
-            </Button>
-          )}
+          <Button size="sm" variant="outline" onClick={openEdit}>
+            <Pencil className="h-4 w-4 mr-1.5" />Editar cliente
+          </Button>
         </div>
 
         {/* ── Task reminder banner ── */}
