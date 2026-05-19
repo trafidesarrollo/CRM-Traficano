@@ -272,6 +272,10 @@ export default function Tasks() {
   };
 
   const openDetail = (task: any) => {
+    if (task.clientId) {
+      window.open(`/clients/${task.clientId}`, "_blank");
+      return;
+    }
     setSelected(task); setDetailOpen(true);
     setShowFollowupForm(false); setFollowupDate(""); setFollowupNote("");
     setShowCloseForm(false); setCloseNote("");
