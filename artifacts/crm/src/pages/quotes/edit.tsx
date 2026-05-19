@@ -133,6 +133,11 @@ export default function QuoteEdit() {
   });
   const [lines, setLines] = useState<Line[]>([blankLine()]);
 
+  const [savedQuote, setSavedQuote] = useState<{ id: number; number: string; clientId: number | null } | null>(null);
+  const [showFollowup, setShowFollowup] = useState(false);
+  const [followupForm, setFollowupForm] = useState({ date: "", time: "09:00", type: "call", notes: "" });
+  const [savingFollowup, setSavingFollowup] = useState(false);
+
   const followupDateDefault = new Date(Date.now() + 3 * 86400000)
     .toISOString()
     .slice(0, 10);
@@ -424,7 +429,6 @@ export default function QuoteEdit() {
       ["clientId", "Cliente"],
       ["cuit", "CUIT"],
       ["saleConditionId", "Condición de venta"],
-      ["contactId", "Contacto Asignado"],
       ["date", "Fecha"],
       ["exchangeRate", "Tasa de cambio"],
       ["quoteStatus", "Estado de cotización"],
@@ -436,25 +440,46 @@ export default function QuoteEdit() {
     ] as const;
     const missing = required.find(([key]) => !String(form[key] || "").trim());
     if (missing) {
-      toast({ title: `${missing[1]} requerido`, variant: "destructive" });
+      toast({ title: `${missing[1]} es requerido`, variant: "destructive" });
       return;
     }
     const body: any = {
-      ...form,
       clientId: parseInt(form.clientId),
       contactId: form.contactId ? parseInt(form.contactId) : null,
       opportunityId: form.opportunityId ? parseInt(form.opportunityId) : null,
       salespersonId: form.salespersonId ? parseInt(form.salespersonId) : null,
       priceListId: form.priceListId ? parseInt(form.priceListId) : null,
-      saleConditionId: form.saleConditionId
-        ? parseInt(form.saleConditionId)
-        : null,
+      saleConditionId: form.saleConditionId ? parseInt(form.saleConditionId) : null,
+      cuit: form.cuit,
+      date: form.date,
+      deliveryDate: form.deliveryDate || null,
+      dueDate: form.dueDate || null,
+      followupDate: form.followupDate || null,
+      currency: form.currency,
+      exchangeRate: form.exchangeRate,
+      exchangeRateType: form.exchangeRateType,
+      quoteStatus: form.quoteStatus,
+      status: form.status,
+      priority: form.priority,
+      quoteType: form.quoteType,
+      orderType: form.orderType,
+      reference: form.reference || null,
       lines: lines
         .filter((l) => l.productName)
         .map((l, idx) => ({
-          ...l,
           lineNumber: idx + 1,
+          productType: l.productType || null,
           productId: l.productId || null,
+          productName: l.productName,
+          productCode: l.productCode || null,
+          unit: l.unit || null,
+          quantity: l.quantity,
+          quantityKg: l.quantityKg,
+          unitPrice: l.unitPrice,
+          unitPriceUm: l.unitPriceUm,
+          netTotal: l.netTotal,
+          deliveryTime: l.deliveryTime || null,
+          notes: l.notes || null,
         })),
     };
     const url = isNew ? `${API}/api/quotes` : `${API}/api/quotes/${id}`;
@@ -476,7 +501,12 @@ export default function QuoteEdit() {
         setShowFollowup(true);
       }
     } else {
-      toast({ title: "Error al guardar", variant: "destructive" });
+      let errMsg = "Error al guardar";
+      try {
+        const errData = await r.json();
+        if (errData?.error) errMsg = errData.error;
+      } catch {}
+      toast({ title: errMsg, variant: "destructive" });
     }
   };
 
@@ -1048,17 +1078,16 @@ export default function QuoteEdit() {
             <table className="w-full text-sm">
               <thead className="border-b border-border/50">
                 <tr className="text-left text-xs text-muted-foreground uppercase">
-                  <th className="p-2 w-12">#</th>
-                  <th className="p-2">Tipo</th>
-                  <th className="p-2 min-w-[200px]">Producto</th>
-                  <th className="p-2">UM</th>
-                  <th className="p-2 w-24">Cantidad</th>
-                  <th className="p-2 w-24">Cant. Kg</th>
-                  <th className="p-2 w-28">Precio</th>
-                  <th className="p-2 w-28 text-right">Total neto</th>
-                  <th className="p-2">Plazo</th>
-                  <th className="p-2">Cod. cliente</th>
-                  <th className="p-2 w-12"></th>
+                  <th className="p-2 w-10">#</th>
+                  <th className="p-2 min-w-[110px]">Tipo</th>
+                  <th className="p-2 min-w-[280px]">Producto</th>
+                  <th className="p-2 w-20">UM</th>
+                  <th className="p-2 w-28">Cantidad</th>
+                  <th className="p-2 w-28">Cant. Kg</th>
+                  <th className="p-2 w-32">Precio</th>
+                  <th className="p-2 w-32 text-right">Total neto</th>
+                  <th className="p-2 w-28">Plazo</th>
+                  <th className="p-2 w-10"></th>
                 </tr>
               </thead>
               <tbody>
@@ -1312,19 +1341,10 @@ export default function QuoteEdit() {
                     </td>
                     <td className="p-2">
                       <Input
-                        className="h-8 text-xs w-20"
+                        className="h-8 text-xs w-full"
                         value={l.deliveryTime || ""}
                         onChange={(e) =>
                           updateLine(i, { deliveryTime: e.target.value })
-                        }
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        className="h-8 text-xs w-20"
-                        value={l.clientCode || ""}
-                        onChange={(e) =>
-                          updateLine(i, { clientCode: e.target.value })
                         }
                       />
                     </td>
@@ -1342,7 +1362,7 @@ export default function QuoteEdit() {
                 {lines.length === 0 && (
                   <tr>
                     <td
-                      colSpan={11}
+                      colSpan={10}
                       className="p-6 text-center text-muted-foreground"
                     >
                       Sin líneas. Agregá una línea.
@@ -1358,7 +1378,7 @@ export default function QuoteEdit() {
                   <td className="p-2 text-right text-lg">
                     {totals.net.toFixed(2)} {form.currency}
                   </td>
-                  <td colSpan={3}></td>
+                  <td colSpan={2}></td>
                 </tr>
               </tfoot>
             </table>
@@ -1370,6 +1390,64 @@ export default function QuoteEdit() {
           <DocumentUploader entityType="quote" entityId={id} />
         </div>
       )}
+
+      <Dialog open={showFollowup} onOpenChange={setShowFollowup}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Agendar seguimiento?</DialogTitle>
+            <DialogDescription>
+              Cotización guardada. Podés agendar un recordatorio de seguimiento o saltearlo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1">Fecha</Label>
+                <Input
+                  type="date"
+                  value={followupForm.date}
+                  onChange={(e) => setFollowupForm((p) => ({ ...p, date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs mb-1">Hora</Label>
+                <Input
+                  type="time"
+                  value={followupForm.time}
+                  onChange={(e) => setFollowupForm((p) => ({ ...p, time: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs mb-1">Tipo</Label>
+              <Select value={followupForm.type} onValueChange={(v) => setFollowupForm((p) => ({ ...p, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call">Llamada</SelectItem>
+                  <SelectItem value="visit">Visita</SelectItem>
+                  <SelectItem value="meeting">Reunión</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs mb-1">Notas (opcional)</Label>
+              <Textarea
+                rows={2}
+                value={followupForm.notes}
+                onChange={(e) => setFollowupForm((p) => ({ ...p, notes: e.target.value }))}
+                placeholder="Detalles del seguimiento..."
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <Button variant="outline" onClick={skipFollowup}>Saltear</Button>
+              <Button onClick={scheduleFollowup} disabled={savingFollowup}>
+                <CalendarDays className="w-4 h-4 mr-1" />
+                {savingFollowup ? "Agendando..." : "Agendar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
