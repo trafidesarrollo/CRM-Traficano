@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGetClients, useCreateClient, useUpdateClient, useGetSalespeople } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout";
@@ -81,6 +81,95 @@ const INITIAL_FORM = {
   clientEmails: [] as string[],
   notes: "",
 };
+
+const CONTACT_INITIAL = {
+  clientId: "",
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  address: "",
+  city: "",
+  position: "",
+};
+
+function ContactDialog({ onDone }: { onDone: () => void }) {
+  const { toast } = useToast();
+  const { data: clientsRes } = useGetClients({ limit: 500 });
+  const clients = useMemo(() => clientsRes?.data || [], [clientsRes]);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ ...CONTACT_INITIAL });
+  const [saving, setSaving] = useState(false);
+
+  const reset = () => setForm({ ...CONTACT_INITIAL });
+
+  const submit = async () => {
+    if (!form.clientId || !form.firstName.trim()) {
+      toast({ title: "Empresa y nombre son obligatorios", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/api/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          ...form,
+          clientId: parseInt(form.clientId),
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error al crear contacto");
+      toast({ title: "Contacto creado" });
+      onDone();
+      setOpen(false);
+      reset();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline"><Plus className="w-4 h-4 mr-2" />Nuevo Contacto</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Nuevo Contacto</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Empresa / Cliente *</Label>
+            <Select value={form.clientId} onValueChange={(v) => setForm((f) => ({ ...f, clientId: v }))}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar empresa..." /></SelectTrigger>
+              <SelectContent>
+                {clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Nombre *</Label><Input value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} /></div>
+            <div><Label>Apellido</Label><Input value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>TELEFONO</Label><Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></div>
+            <div><Label>EMAIL</Label><Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>DIRECCION</Label><Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} /></div>
+            <div><Label>CIUDAD</Label><Input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} /></div>
+          </div>
+          <div><Label>ROL</Label><Input value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} /></div>
+          <Button className="w-full" onClick={submit} disabled={saving}>{saving ? "Guardando..." : "Crear contacto"}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function ImportClientsDialog({ onDone }: { onDone: () => void }) {
   const { toast } = useToast();
@@ -303,6 +392,7 @@ export default function Clients() {
           <p className="text-muted-foreground mt-1">Directorio de empresas.</p>
         </div>
         <div className="flex items-center gap-2">
+          <ContactDialog onDone={refetch} />
           <ImportClientsDialog onDone={refetch} />
           <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
             <DialogTrigger asChild>

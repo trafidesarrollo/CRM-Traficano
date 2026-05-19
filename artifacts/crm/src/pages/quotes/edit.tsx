@@ -47,6 +47,18 @@ export default function QuoteEdit() {
 
   const [clients, setClients] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
+  const [newContactOpen, setNewContactOpen] = useState(false);
+  const [newContactForm, setNewContactForm] = useState({
+    clientId: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    position: "",
+  });
+  const [creatingContact, setCreatingContact] = useState(false);
   const [salespeople, setSalespeople] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [priceLists, setPriceLists] = useState<any[]>([]);
@@ -125,6 +137,33 @@ export default function QuoteEdit() {
     fetch(`${API}/api/contacts?clientId=${form.clientId}`, { credentials: "include" })
       .then(r => r.json()).then(d => setContacts(Array.isArray(d) ? d : (d.data || [])));
   }, [form.clientId]);
+
+  const createContact = async () => {
+    if (!form.clientId || !newContactForm.firstName.trim()) {
+      toast({ title: "Seleccioná empresa y nombre", variant: "destructive" });
+      return;
+    }
+    setCreatingContact(true);
+    try {
+      const r = await fetch(`${API}/api/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...newContactForm, clientId: parseInt(form.clientId) }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error al crear contacto");
+      setContacts((prev) => [...prev, data]);
+      setForm((prev) => ({ ...prev, contactId: String(data.id) }));
+      setNewContactOpen(false);
+      setNewContactForm({ clientId: form.clientId, firstName: "", lastName: "", email: "", phone: "", address: "", city: "", position: "" });
+      toast({ title: "Contacto creado" });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setCreatingContact(false);
+    }
+  };
 
   useEffect(() => {
     if (isNew || !id) return;
@@ -325,10 +364,15 @@ export default function QuoteEdit() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Contacto</Label>
-              <Select value={form.contactId} onValueChange={v => setForm({ ...form, contactId: v })}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar contacto..." /></SelectTrigger>
+            <div className="col-span-2">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <Label>Contacto Asignado</Label>
+                <Button type="button" variant="outline" size="sm" onClick={() => setNewContactOpen(true)} disabled={!form.clientId}>
+                  <Plus className="w-4 h-4 mr-1" />Nuevo contacto
+                </Button>
+              </div>
+              <Select value={form.contactId} onValueChange={v => setForm({ ...form, contactId: v })} disabled={!form.clientId}>
+                <SelectTrigger><SelectValue placeholder={form.clientId ? "Seleccionar contacto..." : "Primero elegí cliente"} /></SelectTrigger>
                 <SelectContent>
                   {contacts.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.fullName || c.name}</SelectItem>)}
                 </SelectContent>
@@ -457,6 +501,31 @@ export default function QuoteEdit() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={newContactOpen} onOpenChange={setNewContactOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo contacto</DialogTitle>
+            <DialogDescription>Se creará para la empresa seleccionada.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>Nombre *</Label><Input value={newContactForm.firstName} onChange={(e) => setNewContactForm((f) => ({ ...f, firstName: e.target.value }))} /></div>
+              <div><Label>Apellido</Label><Input value={newContactForm.lastName} onChange={(e) => setNewContactForm((f) => ({ ...f, lastName: e.target.value }))} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>TELEFONO</Label><Input value={newContactForm.phone} onChange={(e) => setNewContactForm((f) => ({ ...f, phone: e.target.value }))} /></div>
+              <div><Label>EMAIL</Label><Input type="email" value={newContactForm.email} onChange={(e) => setNewContactForm((f) => ({ ...f, email: e.target.value }))} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>DIRECCION</Label><Input value={newContactForm.address} onChange={(e) => setNewContactForm((f) => ({ ...f, address: e.target.value }))} /></div>
+              <div><Label>CIUDAD</Label><Input value={newContactForm.city} onChange={(e) => setNewContactForm((f) => ({ ...f, city: e.target.value }))} /></div>
+            </div>
+            <div><Label>ROL</Label><Input value={newContactForm.position} onChange={(e) => setNewContactForm((f) => ({ ...f, position: e.target.value }))} /></div>
+            <Button className="w-full" type="button" onClick={createContact} disabled={creatingContact}>{creatingContact ? "Creando..." : "Crear y asignar"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="p-6">
