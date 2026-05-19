@@ -150,9 +150,14 @@ export default function Tasks() {
   }, [isVendedor]);
 
   const create = async () => {
-    if (!form.title) { toast({ title: "Título requerido", variant: "destructive" }); return; }
+    const clientName = clients.find((c: any) => String(c.id) === String(form.clientId))?.companyName;
+    const autoTitle = clientName
+      ? `Seguimiento – ${clientName}`
+      : form.description || "Nueva tarea";
     const body: any = {
       ...form,
+      title: autoTitle,
+      type: "task",
       assignedTo: isVendedor ? (user?.id || null) : (form.assignedTo ? parseInt(form.assignedTo) : null),
       clientId: form.clientId ? parseInt(form.clientId) : null,
       dueDate: form.dueDate || null,
@@ -308,41 +313,32 @@ export default function Tasks() {
                 <DialogDescription>Completá los datos de la nueva tarea.</DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
-                <div><Label>Título *</Label><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
-                <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Tipo</Label>
-                    <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{Object.entries(TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div><Label>Prioridad</Label>
-                    <Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Baja</SelectItem>
-                        <SelectItem value="medium">Media</SelectItem>
-                        <SelectItem value="high">Alta</SelectItem>
-                        <SelectItem value="urgent">Urgente</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div><Label>Vencimiento</Label><Input type="datetime-local" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
-                {!isVendedor && (
-                  <div><Label>Asignar a</Label>
-                    <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
-                      <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
-                      <SelectContent>{users.map((u: any) => <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                )}
                 {!isVendedor && (
                   <div><Label>Cliente relacionado</Label>
                     <Select value={form.clientId} onValueChange={v => setForm({ ...form, clientId: v })}>
                       <SelectTrigger><SelectValue placeholder="Sin cliente" /></SelectTrigger>
                       <SelectContent>{clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
+                <div><Label>Prioridad</Label>
+                  <Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baja</SelectItem>
+                      <SelectItem value="medium">Media</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Vencimiento</Label><Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
+                {!isVendedor && (
+                  <div><Label>Asignar a</Label>
+                    <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
+                      <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
+                      <SelectContent>{users.map((u: any) => <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 )}
