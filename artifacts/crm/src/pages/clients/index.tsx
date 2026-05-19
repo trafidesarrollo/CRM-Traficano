@@ -11,8 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Building2, Search, Mail, X, Pencil } from "lucide-react";
+import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { DuplicateWarning } from "@/components/duplicate-warning";
+
+const API = import.meta.env.VITE_API_URL || "";
 
 function EmailManager({ emails, onChange }: { emails: string[]; onChange: (emails: string[]) => void }) {
   const [input, setInput] = useState("");
@@ -79,6 +81,143 @@ const INITIAL_FORM = {
   clientEmails: [] as string[],
   notes: "",
 };
+
+function ImportClientsDialog({ onDone }: { onDone: () => void }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [separator, setSeparator] = useState<"," | ";">(";");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const reset = () => { setCsvText(""); setResult(null); };
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvText(await file.text());
+    e.target.value = "";
+  }
+
+  async function doImport() {
+    if (!csvText.trim()) { toast({ title: "Pegá o subí un CSV primero", variant: "destructive" }); return; }
+    setLoading(true); setResult(null);
+    try {
+      const r = await fetch(`${API}/api/csv/import/clients-bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ csv: csvText, separator }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error de importación");
+      setResult(data);
+      toast({ title: "Importación finalizada", description: `${data.inserted} nuevos, ${data.updated} actualizados` });
+      onDone();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20">
+          <FileUp className="w-4 h-4 mr-2" />Importar CSV
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileUp className="w-5 h-5 text-cyan-400" />
+            Importar Clientes desde CSV
+          </DialogTitle>
+        </DialogHeader>
+
+        {!result ? (
+          <div className="space-y-4 mt-2">
+            <p className="text-sm text-muted-foreground">
+              El CSV debe tener columnas como <span className="font-mono text-xs text-foreground/80">Número de cliente, Razón social, Número de documento, Telefono, Correo, Localidad, Provincia, Rubro, Responsable 1</span>. Se hace upsert por número de cliente.
+            </p>
+
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Separador</Label>
+              <div className="flex gap-2">
+                {([";", ","] as const).map(s => (
+                  <button key={s} onClick={() => setSeparator(s)}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-mono border transition-colors ${separator === s ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300" : "border-border/50 text-muted-foreground hover:border-border"}`}>
+                    {s === ";" ? 'Punto y coma  ";"' : 'Coma  ","'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Subir archivo CSV</Label>
+              <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border/60 rounded-lg px-4 py-3 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-colors text-sm text-muted-foreground">
+                <Upload className="w-4 h-4" />
+                {csvText ? "Archivo cargado — clic para reemplazar" : "Seleccioná un archivo .csv"}
+                <input type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
+              </label>
+            </div>
+
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">O pegá el CSV aquí</Label>
+              <Textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={5} className="font-mono text-xs"
+                placeholder={`"Número de cliente"${separator}"Razón social"${separator}"Número de documento"${separator}"Correo"\n"10039"${separator}"Empresa SA"${separator}"30566613766"${separator}"ventas@empresa.com"`} />
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-white" disabled={loading || !csvText.trim()} onClick={doImport}>
+                {loading ? "Importando..." : "Importar"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                <p className="text-2xl font-bold text-green-400">{result.inserted}</p>
+                <p className="text-xs text-muted-foreground mt-1">Nuevos</p>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-2xl font-bold text-blue-400">{result.updated}</p>
+                <p className="text-xs text-muted-foreground mt-1">Actualizados</p>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                <p className="text-2xl font-bold text-yellow-400">{result.skipped}</p>
+                <p className="text-xs text-muted-foreground mt-1">Omitidos</p>
+              </div>
+            </div>
+
+            {result.errors?.length > 0 && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-1 max-h-40 overflow-y-auto">
+                <p className="text-xs font-medium text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> {result.errors.length} fila(s) con error
+                </p>
+                {result.errors.map((e: any, i: number) => (
+                  <p key={i} className="text-xs text-muted-foreground">Línea {e.line}: {e.error}</p>
+                ))}
+              </div>
+            )}
+
+            {result.errors?.length === 0 && (
+              <div className="flex items-center gap-2 text-green-400 text-sm">
+                <CheckCircle2 className="w-4 h-4" />Todas las filas procesadas sin errores
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={reset}>Nueva importación</Button>
+              <Button className="flex-1" onClick={() => setOpen(false)}>Cerrar</Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function Clients() {
   const [, setLocation] = useLocation();
@@ -163,7 +302,9 @@ export default function Clients() {
           <h1 className="text-3xl font-display font-bold">Clientes</h1>
           <p className="text-muted-foreground mt-1">Directorio de empresas.</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
+        <div className="flex items-center gap-2">
+          <ImportClientsDialog onDone={refetch} />
+          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />Nuevo Cliente
@@ -306,6 +447,7 @@ export default function Clients() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="mb-4">

@@ -332,6 +332,152 @@ router.post("/csv/import/client-followups", async (req: Request, res: Response) 
   }
 });
 
+router.post("/csv/import/clients-bulk", async (req: Request, res: Response) => {
+  try {
+    const { csv, separator } = req.body || {};
+    if (typeof csv !== "string" || !csv.trim()) {
+      res.status(400).json({ error: "csv requerido" });
+      return;
+    }
+
+    const { headers, rows } = parseFlexibleCsv(csv, separator);
+    if (!headers.length) {
+      res.status(400).json({ error: "CSV vacío" });
+      return;
+    }
+
+    const lowerHeaders = headers.map(h => h.trim().toLowerCase().replace(/[^a-záéíóúüñ0-9]/gi, ""));
+
+    const colIdx = (candidates: string[]) => {
+      for (const c of candidates) {
+        const norm = c.toLowerCase().replace(/[^a-záéíóúüñ0-9]/gi, "");
+        const i = lowerHeaders.indexOf(norm);
+        if (i >= 0) return headers[i];
+      }
+      return null;
+    };
+
+    const hNro       = colIdx(["Número de cliente", "nrocliente", "numerodecliente", "nro", "id"]);
+    const hRazon     = colIdx(["Razón social", "razonsocial", "empresa", "companyName", "companyname"]);
+    const hDoc       = colIdx(["Número de documento", "numerodedocumento", "cuit", "taxId", "taxid"]);
+    const hTel       = colIdx(["Telefono", "teléfono", "telefono", "phone"]);
+    const hEmail     = colIdx(["Correo", "email", "correoelectronico", "mail"]);
+    const hLocalidad = colIdx(["Localidad", "localidad", "city", "ciudad"]);
+    const hProvincia = colIdx(["Provincia", "provincia"]);
+    const hPartido   = colIdx(["Partido", "partido"]);
+    const hImport    = colIdx(["Importancia", "importancia"]);
+    const hRubro     = colIdx(["Rubro", "rubro", "industry"]);
+    const hZona      = colIdx(["Zona", "zona"]);
+    const hResp1     = colIdx(["Responsable 1", "responsable1", "responsable"]);
+    const hResp2     = colIdx(["Responsable 2", "responsable2"]);
+
+    const allSalespeople = await db.select().from(salespeopleTable);
+
+    const findSalesperson = (name: string) => {
+      if (!name || !name.trim()) return null;
+      const n = name.trim().toLowerCase();
+      return allSalespeople.find(s =>
+        s.name.toLowerCase().includes(n) || n.includes(s.name.toLowerCase().split(" ")[0])
+      ) || null;
+    };
+
+    let inserted = 0, updated = 0, skipped = 0;
+    const errors: { line: number; error: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const companyName = (hRazon ? row[hRazon] : "").trim();
+        if (!companyName) {
+          errors.push({ line: i + 2, error: "Razón social vacía" });
+          skipped++;
+          continue;
+        }
+
+        const externalId  = hNro       ? row[hNro].trim()       : null;
+        const taxId       = hDoc       ? row[hDoc].trim()       : null;
+        const phone       = hTel       ? row[hTel].trim()       : null;
+        const emailRaw    = hEmail     ? row[hEmail].trim()     : "";
+        const city        = hLocalidad ? row[hLocalidad].trim() : null;
+        const provincia   = hProvincia ? row[hProvincia].trim() : null;
+        const partido     = hPartido   ? row[hPartido].trim()   : null;
+        const importancia = hImport    ? row[hImport].trim()    : "";
+        const industry    = hRubro     ? row[hRubro].trim()     : null;
+        const zona        = hZona      ? row[hZona].trim()      : null;
+        const resp1       = hResp1     ? row[hResp1].trim()     : "";
+        const resp2       = hResp2     ? row[hResp2].trim()     : "";
+
+        const clientEmails: string[] = emailRaw && emailRaw !== "[]"
+          ? emailRaw.split(/[;,]/).map((e: string) => e.trim()).filter((e: string) => e.includes("@"))
+          : [];
+
+        const status: "active" | "inactive" | "prospect" =
+          /alta/i.test(importancia) ? "active" :
+          /baja/i.test(importancia) ? "inactive" : "prospect";
+
+        const sp = findSalesperson(resp1);
+
+        const notesParts: string[] = [];
+        if (zona) notesParts.push(`Zona: ${zona}`);
+        if (partido) notesParts.push(`Partido: ${partido}`);
+        if (resp2) notesParts.push(`Responsable 2: ${resp2}`);
+        const notes = notesParts.length ? notesParts.join(" | ") : null;
+
+        const address = partido && city ? `${city}, ${partido}` : (partido || null);
+        const country = provincia || "Argentina";
+
+        const data: any = {
+          companyName,
+          taxId: taxId || null,
+          phone: phone || null,
+          clientEmails,
+          city: city || null,
+          address: address || null,
+          country,
+          industry: industry || null,
+          status,
+          notes: notes || null,
+          assignedSalespersonId: sp?.id || null,
+        };
+        if (externalId) data.externalId = externalId;
+
+        if (externalId) {
+          const existing = await db.select({ id: clientsTable.id })
+            .from(clientsTable)
+            .where(sql`${clientsTable.externalId} = ${externalId}`)
+            .limit(1);
+          if (existing[0]) {
+            await db.update(clientsTable).set(data).where(sql`id = ${existing[0].id}`);
+            updated++;
+          } else {
+            await db.insert(clientsTable).values(data);
+            inserted++;
+          }
+        } else {
+          const existing = await db.select({ id: clientsTable.id })
+            .from(clientsTable)
+            .where(sql`lower(${clientsTable.companyName}) = lower(${companyName})`)
+            .limit(1);
+          if (existing[0]) {
+            await db.update(clientsTable).set(data).where(sql`id = ${existing[0].id}`);
+            updated++;
+          } else {
+            await db.insert(clientsTable).values(data);
+            inserted++;
+          }
+        }
+      } catch (e: any) {
+        errors.push({ line: i + 2, error: e.message });
+        skipped++;
+      }
+    }
+
+    res.json({ ok: true, total: rows.length, inserted, updated, skipped, errors: errors.slice(0, 100) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/csv/import/:entity", async (req: Request, res: Response) => {
   const def = ENTITIES[req.params.entity];
   if (!def) { res.status(404).json({ error: "Entidad no soportada" }); return; }
