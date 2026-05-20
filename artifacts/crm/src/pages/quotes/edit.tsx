@@ -32,6 +32,7 @@ import {
   CalendarDays,
   AlertCircle,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
