@@ -23,6 +23,27 @@ function urgenciaToPriority(urgencia: string | null): string {
   return "medium";
 }
 
+// Supports dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd, yyyy/mm/dd
+function parseDate(raw: string): Date | null {
+  if (!raw || !raw.trim()) return null;
+  const s = raw.trim();
+  // Try dd/mm/yyyy or dd-mm-yyyy
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 12, 0, 0, 0);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  // Try yyyy-mm-dd or yyyy/mm/dd
+  const ymd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (ymd) {
+    const [, y, m, d] = ymd;
+    const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 12, 0, 0, 0);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
 async function createFollowupTask(
   clientId: number,
   clientName: string,
@@ -32,9 +53,8 @@ async function createFollowupTask(
   urgencia: string | null,
   assignedTo: number
 ) {
-  const due = new Date(fechaSeguimiento);
-  if (isNaN(due.getTime())) return null;
-  due.setHours(9, 0, 0, 0);
+  const due = parseDate(fechaSeguimiento);
+  if (!due) return null;
   const [task] = await db.insert(tasksTable).values({
     title: titulo ? `Seguimiento: ${titulo}` : `Seguimiento - ${clientName}`,
     description: novedad,
@@ -136,7 +156,7 @@ router.post("/bulk-activities/process", async (req, res) => {
         clientId: row.clientId,
         description: row.novedad + (row.accion ? `\nAcción: ${row.accion}` : ""),
         outcome: row.accion || undefined,
-        completedAt: row.fecha ? new Date(row.fecha) : new Date(),
+        completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
       }).returning();
       savedDirect++;
 
@@ -209,7 +229,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         clientId: row.clientId,
         description,
         outcome: row.accion || undefined,
-        completedAt: row.fecha ? new Date(row.fecha) : new Date(),
+        completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
       }).returning();
       saved++;
 
