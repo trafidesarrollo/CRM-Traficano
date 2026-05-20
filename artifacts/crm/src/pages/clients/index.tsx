@@ -184,7 +184,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
   const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch("/api/users", { credentials: "include" })
+    fetch(`${API}/api/users/assignable`, { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
       .then(setUsers)
       .catch(() => {});
@@ -470,7 +470,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-xs">Asignar a vendedor</Label>
+                  <Label className="text-xs">Asignar a</Label>
                   <Select value={taskForm.assignedToUserId || "none"} onValueChange={v => setTaskForm(p => ({ ...p, assignedToUserId: v === "none" ? "" : v }))}>
                     <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
                     <SelectContent>
