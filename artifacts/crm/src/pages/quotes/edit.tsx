@@ -130,7 +130,9 @@ export default function QuoteEdit() {
     orderType: "",
     reference: "",
     status: "draft",
+    purchaseOrder: "",
   });
+  const isLocked = !isNew && !!form.purchaseOrder;
   const [lines, setLines] = useState<Line[]>([blankLine()]);
 
   const [savedQuote, setSavedQuote] = useState<{ id: number; number: string; clientId: number | null } | null>(null);
@@ -392,6 +394,7 @@ export default function QuoteEdit() {
           orderType: q.orderType || "",
           reference: q.reference || "",
           status: q.status || "draft",
+          purchaseOrder: q.purchaseOrder || "",
         });
         setLines(
           (q.lines || []).map((l: any) => ({
@@ -699,19 +702,32 @@ export default function QuoteEdit() {
               Descargar PDF
             </Button>
           )}
-          {!isNew && (
+          {!isNew && !isLocked && (
             <Button variant="outline" onClick={convertToOrder}>
               <ShoppingCart className="w-4 h-4 mr-2" />
               Confirmar pedido
             </Button>
           )}
-          <Button onClick={save}>
-            <Save className="w-4 h-4 mr-2" />
-            Guardar
-          </Button>
+          {!isLocked && (
+            <Button onClick={save}>
+              <Save className="w-4 h-4 mr-2" />
+              Guardar
+            </Button>
+          )}
         </div>
       </div>
 
+      {isLocked && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <div>
+            <p className="font-medium text-sm">Cotización confirmada con OC — solo lectura</p>
+            <p className="text-xs opacity-80 mt-0.5">Esta cotización fue confirmada con la OC <strong>{form.purchaseOrder}</strong> y no puede modificarse.</p>
+          </div>
+        </div>
+      )}
+
+      <div className={isLocked ? "pointer-events-none opacity-70 select-none" : ""}>
       <Card className="mb-4">
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -1468,6 +1484,8 @@ export default function QuoteEdit() {
           <DocumentUploader entityType="quote" entityId={id} />
         </div>
       )}
+
+      </div>{/* end isLocked wrapper */}
 
       {/* ── Modal: Convertir a Pedido ── */}
       <Dialog open={showConvertModal} onOpenChange={setShowConvertModal}>

@@ -167,6 +167,10 @@ router.post("/quotes", async (req, res) => {
 router.patch("/quotes/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const [existing] = await db.select().from(quotesTable).where(eq(quotesTable.id, id));
+    if (existing?.purchaseOrder) {
+      return res.status(403).json({ error: "Esta cotización fue confirmada con una OC y no puede modificarse." });
+    }
     const { lines, ...rest } = req.body;
     const data: any = { ...rest };
     for (const k of ["date", "deliveryDate", "dueDate", "followupDate", "sentAt", "approvedAt"]) {
