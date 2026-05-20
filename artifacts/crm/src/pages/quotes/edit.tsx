@@ -1008,10 +1008,9 @@ export default function QuoteEdit() {
             <div>
               <Label>Estado de cotización</Label>
               <div className="mt-1.5">
-                {(() => {
-                  const qs = computeQuoteStatus(form.status, form.purchaseOrder, form.closeReason);
-                  return <Badge className={`text-sm px-3 py-1 ${qs.color}`}>{qs.label}</Badge>;
-                })()}
+                <Badge className={`text-sm px-3 py-1 ${computeQuoteStatus(form.status, form.purchaseOrder, form.closeReason).color}`}>
+                  {computeQuoteStatus(form.status, form.purchaseOrder, form.closeReason).label}
+                </Badge>
                 <p className="text-xs text-muted-foreground mt-1">Se actualiza automáticamente según el estado</p>
               </div>
             </div>
