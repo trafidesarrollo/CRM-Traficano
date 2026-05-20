@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, ArrowLeft, FileText, ShoppingCart, Contact2, Activity,
@@ -75,6 +75,8 @@ export default function ClientDetail() {
   const [reminderTask, setReminderTask] = useState<any>(null);
   const [reminderDismissed, setReminderDismissed] = useState(false);
   const [completingTask, setCompletingTask] = useState(false);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [completeNote, setCompleteNote] = useState("");
 
   useEffect(() => {
     if (!taskId) return;
@@ -84,7 +86,7 @@ export default function ClientDetail() {
       .catch(() => {});
   }, [taskId]);
 
-  const completeTask = async () => {
+  const completeTask = async (note: string) => {
     if (!reminderTask) return;
     setCompletingTask(true);
     try {
@@ -95,8 +97,26 @@ export default function ClientDetail() {
         body: JSON.stringify({ status: "completed" }),
       });
       if (r.ok) {
-        toast({ title: "Tarea completada" });
+        // Si hay una nota, la registramos como actividad en el cliente
+        if (note.trim() && id) {
+          await fetch(`${API}/api/activities`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              clientId: parseInt(id),
+              type: "note",
+              title: `Cierre de tarea: ${reminderTask.title}`,
+              description: note.trim(),
+            }),
+          }).catch(() => {});
+        }
+        toast({ title: "Tarea completada", description: note.trim() ? "Resultado registrado en actividades." : undefined });
         setReminderTask((t: any) => ({ ...t, status: "completed" }));
+        setCompleteModalOpen(false);
+        setCompleteNote("");
+      } else {
+        toast({ title: "Error al completar la tarea", variant: "destructive" });
       }
     } finally { setCompletingTask(false); }
   };
@@ -263,8 +283,8 @@ export default function ClientDetail() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {reminderTask.status !== "completed" && (
-                <Button size="sm" variant="outline" className="border-green-500/40 text-green-400 hover:bg-green-500/10" onClick={completeTask} disabled={completingTask}>
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />{completingTask ? "..." : "Completar"}
+                <Button size="sm" variant="outline" className="border-green-500/40 text-green-400 hover:bg-green-500/10" onClick={() => setCompleteModalOpen(true)} disabled={completingTask}>
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Completar
                 </Button>
               )}
               <button onClick={() => setReminderDismissed(true)} className="text-muted-foreground hover:text-foreground">
@@ -558,6 +578,54 @@ export default function ClientDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal: Completar tarea */}
+      <Dialog open={completeModalOpen} onOpenChange={(o) => { if (!completingTask) { setCompleteModalOpen(o); if (!o) setCompleteNote(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-400" />
+              Completar tarea
+            </DialogTitle>
+            {reminderTask && (
+              <DialogDescription className="text-sm text-muted-foreground pt-1">
+                <span className="font-medium text-foreground">{reminderTask.title}</span>
+                {reminderTask.dueDate && (
+                  <span className="ml-2 text-xs">· Vencía: {new Date(reminderTask.dueDate).toLocaleDateString("es-AR")}</span>
+                )}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <Label htmlFor="complete-note">¿Cómo resultó? <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            <Textarea
+              id="complete-note"
+              placeholder="Ej: Se habló con el cliente, está interesado. Quedamos en reunirnos la próxima semana…"
+              value={completeNote}
+              onChange={(e) => setCompleteNote(e.target.value)}
+              rows={4}
+              className="resize-none"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">Si escribís un resultado, se guardará automáticamente como actividad en este cliente.</p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => { setCompleteModalOpen(false); setCompleteNote(""); }} disabled={completingTask}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => completeTask(completeNote)}
+              disabled={completingTask}
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              {completingTask ? "Completando…" : "Completar tarea"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
