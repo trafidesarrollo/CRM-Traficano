@@ -303,15 +303,24 @@ router.post("/tasks/bulk", async (req, res) => {
 router.get("/tasks/stats/summary", async (req, res) => {
   try {
     const userId = (req as any).session?.userId;
+    const userRole = (req as any).session?.userRole;
+    const isManager = ["admin", "gerente", "gerente_comercial"].includes(userRole);
     const now = new Date();
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
 
+    // Managers see team-wide stats; vendedores see only their own
+    const userFilter = isManager ? undefined : eq(tasksTable.assignedTo, userId);
+
     const [pending, overdue, today, completed] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(tasksTable).where(and(eq(tasksTable.assignedTo, userId), eq(tasksTable.status, "pending"))),
-      db.select({ count: sql<number>`count(*)` }).from(tasksTable).where(and(eq(tasksTable.assignedTo, userId), lt(tasksTable.dueDate, now), sql`${tasksTable.status} != 'completed'`)),
-      db.select({ count: sql<number>`count(*)` }).from(tasksTable).where(and(eq(tasksTable.assignedTo, userId), gt(tasksTable.dueDate, todayStart), lt(tasksTable.dueDate, todayEnd))),
-      db.select({ count: sql<number>`count(*)` }).from(tasksTable).where(and(eq(tasksTable.assignedTo, userId), eq(tasksTable.status, "completed"))),
+      db.select({ count: sql<number>`count(*)` }).from(tasksTable)
+        .where(and(userFilter, eq(tasksTable.status, "pending")) as any),
+      db.select({ count: sql<number>`count(*)` }).from(tasksTable)
+        .where(and(userFilter, lt(tasksTable.dueDate, now), sql`${tasksTable.status} != 'completed'`) as any),
+      db.select({ count: sql<number>`count(*)` }).from(tasksTable)
+        .where(and(userFilter, gt(tasksTable.dueDate, todayStart), lt(tasksTable.dueDate, todayEnd)) as any),
+      db.select({ count: sql<number>`count(*)` }).from(tasksTable)
+        .where(and(userFilter, eq(tasksTable.status, "completed")) as any),
     ]);
 
     res.json({
@@ -319,6 +328,7 @@ router.get("/tasks/stats/summary", async (req, res) => {
       overdue: Number(overdue[0].count),
       today: Number(today[0].count),
       completed: Number(completed[0].count),
+      isTeamView: isManager,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

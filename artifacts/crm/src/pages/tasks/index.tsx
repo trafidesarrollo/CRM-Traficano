@@ -355,6 +355,11 @@ export default function Tasks() {
       </div>
 
       {/* Stats */}
+      {stats.isTeamView && (
+        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+          <User className="w-3 h-3" />Mostrando métricas de todo el equipo
+        </p>
+      )}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Pendientes</div><div className="text-3xl font-bold">{stats.pending || 0}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground flex items-center gap-1"><AlertCircle className="w-3 h-3 text-red-400" />Vencidas</div><div className="text-3xl font-bold text-red-400">{stats.overdue || 0}</div></CardContent></Card>
