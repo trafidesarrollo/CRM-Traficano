@@ -590,20 +590,29 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
           {isAdmin && users.length > 0 && (
             <div>
               <Label>Usuario a cargo</Label>
-              <Select
-                value={form.assignedUserId ? String(form.assignedUserId) : "none"}
-                onValueChange={v => setForm(p => ({ ...p, assignedUserId: v === "none" ? undefined : Number(v) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin asignar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
-                  {users.map((u: any) => (
-                    <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {showTaskForm && taskForm.assignedToUserId && taskForm.assignedToUserId !== "none" ? (
+                <div className="flex items-center gap-2 h-9 rounded-md border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
+                  <span className="flex-1">
+                    {users.find((u: any) => String(u.id) === taskForm.assignedToUserId)?.fullName || "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground/60">Asignado desde la tarea</span>
+                </div>
+              ) : (
+                <Select
+                  value={form.assignedUserId ? String(form.assignedUserId) : "none"}
+                  onValueChange={v => setForm(p => ({ ...p, assignedUserId: v === "none" ? undefined : Number(v) }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin asignar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {users.map((u: any) => (
+                      <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           )}
 
@@ -673,7 +682,14 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label className="text-xs">Asignar a</Label>
-                  <Select value={taskForm.assignedToUserId || "none"} onValueChange={v => setTaskForm(p => ({ ...p, assignedToUserId: v === "none" ? "" : v }))}>
+                  <Select
+                    value={taskForm.assignedToUserId || "none"}
+                    onValueChange={v => {
+                      const uid = v === "none" ? "" : v;
+                      setTaskForm(p => ({ ...p, assignedToUserId: uid }));
+                      setForm(p => ({ ...p, assignedUserId: uid ? Number(uid) : undefined }));
+                    }}
+                  >
                     <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sin asignar</SelectItem>
