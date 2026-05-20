@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { AppLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,6 +52,7 @@ const QUOTE_STATUS: Record<string, { label: string; color: string }> = {
 export default function Tasks() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const isVendedor = user?.role === "vendedor";
 
   const [items, setItems] = useState<any[]>([]);
@@ -281,8 +282,7 @@ export default function Tasks() {
   };
 
   const openQuoteDetail = (q: any) => {
-    setSelQuote(q); setQuoteDetailOpen(true);
-    setNewFollowupDate(q.followupDate ? format(parseISO(q.followupDate), "yyyy-MM-dd'T'HH:mm") : "");
+    navigate(`/quotes/${q.id}`);
   };
 
   const isOverdue = (t: any) => t.dueDate && t.status !== "completed" && isPast(parseISO(t.dueDate));
