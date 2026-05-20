@@ -158,11 +158,23 @@ router.patch("/clients/:id", async (req, res) => {
     if (!existing) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
 
     // Status logic for PATCH:
-    // - If "status" is explicitly sent in the body → honor it (never demote "final")
-    // - If "status" is NOT in the body → keep existing status as-is (no auto-compute)
+    // 1. Explicit "status" in body → honor it (never demote "final")
+    // 2. "consumptionScale" in body (no explicit status) → auto-compute upgrade/downgrade by scale
+    // 3. Neither → keep existing status unchanged
     let newStatus: string;
     if ("status" in body && body.status) {
       newStatus = existing.status === "final" ? "final" : body.status;
+    } else if ("consumptionScale" in body && existing.status !== "final") {
+      const scale = parseFloat(body.consumptionScale ?? "");
+      if (isNaN(scale) || body.consumptionScale === "" || body.consumptionScale == null) {
+        newStatus = existing.status;
+      } else if (scale === 0) {
+        // scale = 0 → inactive (but never downgrade from potential+ unless explicitly)
+        newStatus = existing.status === "potential" ? "potential" : "inactive";
+      } else {
+        // scale > 0 → at least potential
+        newStatus = existing.status === "prospect" || existing.status === "inactive" ? "potential" : existing.status;
+      }
     } else {
       newStatus = existing.status;
     }
