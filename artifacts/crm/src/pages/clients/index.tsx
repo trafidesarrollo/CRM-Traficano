@@ -586,33 +586,16 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             <Textarea value={form.notes} onChange={f("notes")} placeholder="Observaciones..." rows={2} />
           </div>
 
-          {/* ── Usuario a cargo ── */}
-          {isAdmin && users.length > 0 && (
+          {/* ── Usuario a cargo (solo lectura, se llena desde "Asignar a" en la tarea) ── */}
+          {isAdmin && (
             <div>
               <Label>Usuario a cargo</Label>
-              {showTaskForm && taskForm.assignedToUserId && taskForm.assignedToUserId !== "none" ? (
-                <div className="flex items-center gap-2 h-9 rounded-md border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
-                  <span className="flex-1">
-                    {users.find((u: any) => String(u.id) === taskForm.assignedToUserId)?.fullName || "—"}
-                  </span>
-                  <span className="text-xs text-muted-foreground/60">Asignado desde la tarea</span>
-                </div>
-              ) : (
-                <Select
-                  value={form.assignedUserId ? String(form.assignedUserId) : "none"}
-                  onValueChange={v => setForm(p => ({ ...p, assignedUserId: v === "none" ? undefined : Number(v) }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin asignar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin asignar</SelectItem>
-                    {users.map((u: any) => (
-                      <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <div className="flex items-center h-9 rounded-md border border-border/50 bg-muted/30 px-3 text-sm">
+                {form.assignedUserId
+                  ? <span className="text-foreground">{users.find((u: any) => u.id === form.assignedUserId)?.fullName || "—"}</span>
+                  : <span className="text-muted-foreground">Se asigna desde "Asignar a" en la tarea</span>
+                }
+              </div>
             </div>
           )}
 
