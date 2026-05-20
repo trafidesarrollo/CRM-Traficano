@@ -1,0 +1,137 @@
+# SISTEMA DE CARGA MASIVA DE PROSPECTOS/CLIENTES CON TAREAS CONDICIONALES
+# DOCUMENTO DE ESPECIFICACIÓN DE LÓGICA Y CÓDIGO (PARA REPLIT AI / PROMPT)
+
+===============================================================================
+1. OBJETIVO DEL SCRIPT
+===============================================================================
+Procesar un archivo CSV para la carga masiva de Nuevos Clientes (Prospectos). 
+El script debe:
+1. Determinar automáticamente el estado comercial del cliente según su escala de consumo.
+2. Crear de forma opcional y condicional una tarea asignada a un vendedor si los campos de la tarea vienen informados en la fila del CSV.
+
+===============================================================================
+2. REGLAS DE NEGOCIO (ESTADOS DE CLIENTE)
+===============================================================================
+Basado en el campo 'escala_consumo':
+- Si 'escala_consumo' está VACÍO (o no definido) -> Estado: "Prospecto"
+- Si 'escala_consumo' es IGUAL a 0 -> Estado: "Cliente Inactivo"
+- Si 'escala_consumo' es MAYOR a 0 -> Estado: "Cliente Potencial"
+
+===============================================================================
+3. ESTRUCTURA DEL CSV REQUERIDA (COLUMNAS)
+===============================================================================
+Las columnas que debe procesar el script son:
+empresa,cuit,industria,telefono,ciudad,emails,escala_consumo,notas,tarea_nombre,tarea_prioridad,tarea_fecha_limite,tarea_asignar_a
+
+Ejemplo de contenido del CSV:
+```csv
+empresa,cuit,industria,telefono,ciudad,emails,escala_consumo,notas,tarea_nombre,tarea_prioridad,tarea_fecha_limite,tarea_asignar_a
+"Maderera Alfa","30-12345678-9","Metalúrgica","+54 11 1234-5678","Buenos Aires","ventas@alfa.com",50000,"Interesado en catálogo","Llamar para seguimiento","Media","2026-05-25","Juan Pérez"
+"Talleres Beta","30-87654321-9","Automotriz","+54 11 9876-5432","Rosario","contacto@beta.com",0,"Sin presupuesto actual",,,
+"Distribuidora Gamma","30-11111111-9","Logística","+54 11 5555-5555","Córdoba","info@gamma.com",,"Falta contactar",,,
+```
+
+===============================================================================
+4. LÓGICA DE PROCESAMIENTO EN PYTHON (BACKEND MOCK)
+===============================================================================
+
+import csv
+import io
+
+# Simulación de Base de Datos
+CLIENTES_DB = []
+TAREAS_DB = []
+
+def procesar_csv_prospectos(csv_contenido):
+    lector = csv.DictReader(io.StringIO(csv_contenido.strip()))
+    
+    clientes_creados = 0
+    tareas_creadas = 0
+    
+    for fila in lector:
+        # 1. Extracción de datos del cliente
+        empresa = fila.get('empresa')
+        cuit = fila.get('cuit')
+        industria = fila.get('industria')
+        telefono = fila.get('telefono')
+        ciudad = fila.get('ciudad')
+        emails = fila.get('emails')
+        notas = fila.get('notas', '')
+        
+        # Validación de campos obligatorios básicos
+        if not empresa or not cuit:
+            continue
+            
+        # 2. Lógica Condicional del Estado del Cliente
+        consumo_str = fila.get('escala_consumo', '').strip()
+        
+        if consumo_str == '' or consumo_str is None:
+            estado = "Prospecto"
+            escala_consumo = None
+        else:
+            try:
+                escala_consumo = float(consumo_str)
+                if escala_consumo > 0:
+                    estado = "Cliente Potencial"
+                else:
+                    estado = "Cliente Inactivo"
+            except ValueError:
+                estado = "Prospecto"
+                escala_consumo = None
+
+        # Guardar Cliente en Base de Datos ficticia
+        cliente_id = len(CLIENTES_DB) + 1
+        nuevo_cliente = {
+            "id": cliente_id,
+            "empresa": empresa,
+            "cuit": cuit,
+            "industria": industria,
+            "telefono": telefono,
+            "ciudad": ciudad,
+            "emails": emails,
+            "escala_consumo": escala_consumo,
+            "estado": estado,
+            "observaciones": notas
+        }
+        CLIENTES_DB.append(nuevo_cliente)
+        clientes_creados += 1
+        
+        # 3. Lógica Condicional de Asignación de Tarea
+        tarea_nombre = fila.get('tarea_nombre', '').strip()
+        
+        # Si la columna tarea_nombre tiene contenido, se crea la tarea vinculada
+        if tarea_nombre:
+            nueva_tarea = {
+                "id": len(TAREAS_DB) + 1,
+                "cliente_id": cliente_id,
+                "cliente_empresa": empresa,
+                "nombre_tarea": tarea_nombre,
+                "prioridad": fila.get('tarea_prioridad', 'Media') or 'Media',
+                "fecha_limite": fila.get('tarea_fecha_limite', '') or 'Sin Fecha',
+                "asignado_a": fila.get('tarea_asignar_a', 'Sin Asignar') or 'Sin Asignar',
+                "estado": "Pendiente"
+            }
+            TAREAS_DB.append(nueva_tarea)
+            tareas_creadas += 1
+            
+    return {
+        "status": "success",
+        "clientes_procesados": clientes_creados,
+        "tareas_creadas": tareas_creadas
+    }
+
+===============================================================================
+5. INSTRUCCIONES PARA REPLIT AI (PROMPT PARA INTERFAZ DE USUARIO)
+===============================================================================
+"Actúa como un desarrollador Full Stack Senior. Utiliza la lógica analítica de 
+este archivo para implementar o extender una sección de Carga Masiva en la aplicación. 
+Requiero que generes un módulo (puede ser usando Flask, FastAPI o Node.js según 
+corresponda a mi proyecto) que permita:
+1. Renderizar una interfaz sencilla donde el usuario pueda arrastrar o seleccionar 
+   un archivo CSV.
+2. Al procesar el archivo, aplicar estrictamente las reglas de negocio sobre 
+   la 'escala_consumo' para setear el estado del cliente (Prospecto, Inactivo, Potencial).
+3. Evaluar si la fila contiene datos de tarea ('tarea_nombre'). Si los tiene, 
+   crear la tarea en la base de datos vinculada al ID del cliente recién creado.
+4. Al finalizar la carga, mostrar un mensaje de éxito indicando la cantidad exacta 
+   de clientes dados de alta y cuántas tareas fueron asignadas en el proceso.
