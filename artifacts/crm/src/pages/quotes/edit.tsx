@@ -141,6 +141,7 @@ export default function QuoteEdit() {
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [convertForm, setConvertForm] = useState({ purchaseOrder: "", ocFile: null as File | null });
   const [converting, setConverting] = useState(false);
+  const [usdRate, setUsdRate] = useState<{ sell: number | null; date: string | null; stale: boolean } | null>(null);
 
   const followupDateDefault = new Date(Date.now() + 3 * 86400000)
     .toISOString()
@@ -168,6 +169,13 @@ export default function QuoteEdit() {
         setCatalogResults([]);
       }
     }, 250);
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API}/api/exchange-rate`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setUsdRate(d))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -658,6 +666,14 @@ export default function QuoteEdit() {
               <FileText className="w-7 h-7 text-primary" />
               Cotización de venta / {isNew ? "Nuevo" : `#${id}`}
             </h1>
+            {usdRate?.sell && (
+              <div className={`inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${usdRate.stale ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-green-50 text-green-700 border-green-200"}`}>
+                <span className="font-semibold">USD BNA venta:</span>
+                <span>${usdRate.sell.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                {usdRate.date && <span className="opacity-60">· {usdRate.date}</span>}
+                {usdRate.stale && <span className="opacity-70">(desactualizado)</span>}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-2">

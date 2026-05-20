@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { db, settingsTable } from "@workspace/db";
+import { startExchangeRateScheduler } from "./lib/exchange-rate.js";
 
 async function loadSettingsFromDb() {
   try {
@@ -38,7 +39,7 @@ loadSettingsFromDb().then(() => {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
     }
-
     logger.info({ port }, "Server listening");
+    startExchangeRateScheduler();
   });
 });

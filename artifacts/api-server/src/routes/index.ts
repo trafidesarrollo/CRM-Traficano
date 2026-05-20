@@ -42,6 +42,7 @@ import searchRouter from "./search.js";
 import bulkRouter from "./bulk.js";
 import bulkActivitiesRouter from "./bulk-activities.js";
 import duplicatesRouter from "./duplicates.js";
+import exchangeRateRouter from "./exchange-rate.js";
 import productionRouter from "./production.js";
 import {
   requireAuth,
@@ -251,6 +252,7 @@ router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 
 router.use("/goals", goalsRouter);
 
+router.use(exchangeRateRouter);
 router.use("/settings", requireRole("admin", "gerente_comercial"), settingsRouter);
 
 router.use("/users", requireRole("admin", "gerente_comercial"), usersRouter);
