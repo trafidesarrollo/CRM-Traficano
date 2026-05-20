@@ -158,11 +158,15 @@ router.patch("/clients/:id", async (req, res) => {
     if (!existing) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
 
     // Status logic for PATCH:
-    // 1. Explicit "status" in body → honor it (never demote "final")
-    // 2. "consumptionScale" in body (no explicit status) → auto-compute upgrade/downgrade by scale
+    // 1. "status" in body AND different from existing → intentional override, honor it
+    // 2. "consumptionScale" in body → drive status by scale (even if status also sent but unchanged)
     // 3. Neither → keep existing status unchanged
+    // "final" is never auto-demoted in any case.
+    const statusIntentionallyChanged =
+      "status" in body && body.status && body.status !== existing.status;
+
     let newStatus: string;
-    if ("status" in body && body.status) {
+    if (statusIntentionallyChanged) {
       newStatus = existing.status === "final" ? "final" : body.status;
     } else if ("consumptionScale" in body && existing.status !== "final") {
       const scale = parseFloat(body.consumptionScale ?? "");
