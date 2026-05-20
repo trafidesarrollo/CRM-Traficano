@@ -138,16 +138,15 @@ export default function Tasks() {
   useEffect(() => { if (user !== undefined) loadFollowups(); }, [view, user, salespersonId]);
 
   useEffect(() => {
-    if (isVendedor) return;
-    fetch(`${API}/api/users`, { credentials: "include" })
+    fetch(`${API}/api/users/assignable`, { credentials: "include" })
       .then(r => r.json())
-      .then(d => setUsers(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []))
+      .then(d => setUsers(Array.isArray(d) ? d : []))
       .catch(() => {});
     fetch(`${API}/api/clients?limit=300`, { credentials: "include" })
       .then(r => r.json())
       .then(d => setClients(Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []))
       .catch(() => {});
-  }, [isVendedor]);
+  }, []);
 
   const create = async () => {
     const clientName = clients.find((c: any) => String(c.id) === String(form.clientId))?.companyName;
@@ -158,7 +157,7 @@ export default function Tasks() {
       ...form,
       title: autoTitle,
       type: "task",
-      assignedTo: isVendedor ? (user?.id || null) : (form.assignedTo ? parseInt(form.assignedTo) : null),
+      assignedTo: form.assignedTo ? parseInt(form.assignedTo) : (user?.id || null),
       clientId: form.clientId ? parseInt(form.clientId) : null,
       dueDate: form.dueDate || null,
     };
@@ -338,14 +337,16 @@ export default function Tasks() {
                   </Select>
                 </div>
                 <div><Label>Vencimiento</Label><Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
-                {!isVendedor && (
-                  <div><Label>Asignar a</Label>
-                    <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
-                      <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
-                      <SelectContent>{users.map((u: any) => <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                )}
+                <div><Label>Asignar a</Label>
+                  <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
+                    <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
+                    <SelectContent>
+                      {users.map((u: any) => (
+                        <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button className="w-full" onClick={create}>Crear tarea</Button>
               </div>
             </DialogContent>

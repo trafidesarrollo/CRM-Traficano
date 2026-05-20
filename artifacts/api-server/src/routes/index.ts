@@ -59,6 +59,17 @@ router.use(importErpRouter);
 router.use(requireAuth);
 router.use(exchangeRateRouter);
 
+// Lista simple de usuarios asignable — accesible a cualquier usuario autenticado
+router.get("/users/assignable", async (req, res) => {
+  const { db: database, usersTable } = await import("@workspace/db");
+  const { asc } = await import("drizzle-orm");
+  const users = await database
+    .select({ id: usersTable.id, fullName: usersTable.fullName, role: usersTable.role })
+    .from(usersTable)
+    .orderBy(asc(usersTable.fullName));
+  res.json(users);
+});
+
 router.get("/integrations/anura/webhooks", async (req, res) => {
   const { db: database, anuraWebhooksTable } = await import("@workspace/db");
   const { desc, sql } = await import("drizzle-orm");
