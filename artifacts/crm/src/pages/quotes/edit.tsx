@@ -1005,27 +1005,11 @@ export default function QuoteEdit() {
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {isPrivilegedUser
-                    ? salespeople.map((s: any) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.name}
-                        </SelectItem>
-                      ))
-                    : currentSalesperson
-                      ? (
-                          <SelectItem
-                            key={currentSalesperson.id}
-                            value={String(currentSalesperson.id)}
-                          >
-                            {currentSalesperson.name}
-                          </SelectItem>
-                        )
-                      : salespeople.map((s: any) => (
-                          <SelectItem key={s.id} value={String(s.id)}>
-                            {s.name}
-                          </SelectItem>
-                        ))
-                  }
+                  {salespeople.map((s: any) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
