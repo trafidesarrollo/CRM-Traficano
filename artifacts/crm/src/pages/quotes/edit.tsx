@@ -131,8 +131,12 @@ export default function QuoteEdit() {
     reference: "",
     status: "draft",
     purchaseOrder: "",
+    closeReason: "",
   });
-  const isLocked = !isNew && !!form.purchaseOrder;
+  const isLocked = !isNew && form.status === "approved";
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeJustification, setCloseJustification] = useState("");
+  const [closingQuote, setClosingQuote] = useState(false);
   const [lines, setLines] = useState<Line[]>([blankLine()]);
 
   const [savedQuote, setSavedQuote] = useState<{ id: number; number: string; clientId: number | null } | null>(null);
@@ -395,6 +399,7 @@ export default function QuoteEdit() {
           reference: q.reference || "",
           status: q.status || "draft",
           purchaseOrder: q.purchaseOrder || "",
+          closeReason: q.closeReason || "",
         });
         setLines(
           (q.lines || []).map((l: any) => ({
@@ -598,6 +603,34 @@ export default function QuoteEdit() {
     setShowConvertModal(true);
   };
 
+  const handleCloseQuote = async () => {
+    if (!closeJustification.trim()) {
+      toast({ title: "El justificativo es requerido", variant: "destructive" });
+      return;
+    }
+    setClosingQuote(true);
+    try {
+      const r = await fetch(`${API}/api/quotes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "approved", quoteStatus: "FINALIZADA", closeReason: closeJustification.trim() }),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e.error || "Error al cerrar");
+      }
+      const updated = await r.json();
+      setForm((prev: any) => ({ ...prev, status: updated.status, quoteStatus: updated.quoteStatus || "FINALIZADA", closeReason: updated.closeReason || closeJustification }));
+      setShowCloseModal(false);
+      toast({ title: "Cotización cerrada" });
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setClosingQuote(false);
+    }
+  };
+
   const doConvertToOrder = async () => {
     if (!convertForm.purchaseOrder.trim()) {
       toast({ title: "El número de OC es obligatorio", variant: "destructive" });
@@ -708,6 +741,12 @@ export default function QuoteEdit() {
               Confirmar pedido
             </Button>
           )}
+          {!isNew && !isLocked && (
+            <Button variant="outline" className="text-amber-400 border-amber-500/40 hover:bg-amber-500/10" onClick={() => { setCloseJustification(""); setShowCloseModal(true); }}>
+              <AlertCircle className="w-4 h-4 mr-2" />
+              Cerrar cotización
+            </Button>
+          )}
           {!isLocked && (
             <Button onClick={save}>
               <Save className="w-4 h-4 mr-2" />
@@ -721,8 +760,17 @@ export default function QuoteEdit() {
         <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <div>
-            <p className="font-medium text-sm">Cotización confirmada con OC — solo lectura</p>
-            <p className="text-xs opacity-80 mt-0.5">Esta cotización fue confirmada con la OC <strong>{form.purchaseOrder}</strong> y no puede modificarse.</p>
+            {form.purchaseOrder ? (
+              <>
+                <p className="font-medium text-sm">Cotización confirmada con OC — solo lectura</p>
+                <p className="text-xs opacity-80 mt-0.5">Confirmada con la OC <strong>{form.purchaseOrder}</strong>. No puede modificarse.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-medium text-sm">Cotización cerrada — solo lectura</p>
+                {form.closeReason && <p className="text-xs opacity-80 mt-0.5">Motivo: {form.closeReason}</p>}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -952,12 +1000,16 @@ export default function QuoteEdit() {
 
             <div>
               <Label>Estado de cotización *</Label>
-              <Input
-                value={form.quoteStatus}
-                onChange={(e) =>
-                  setForm({ ...form, quoteStatus: e.target.value })
-                }
-              />
+              <Select value={form.quoteStatus} onValueChange={(v) => setForm({ ...form, quoteStatus: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EN PROCESO">En proceso</SelectItem>
+                  <SelectItem value="ENVIADA">Enviada</SelectItem>
+                  <SelectItem value="EN NEGOCIACION">En negociación</SelectItem>
+                  <SelectItem value="FINALIZADA">Finalizada</SelectItem>
+                  <SelectItem value="PERDIDA">Perdida</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Estado *</Label>
@@ -1486,6 +1538,47 @@ export default function QuoteEdit() {
       )}
 
       </div>{/* end isLocked wrapper */}
+
+      {/* ── Modal: Cerrar Cotización ── */}
+      <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-400" />
+              Cerrar cotización
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción cierra la cotización sin OC. Ingresá el motivo del cierre.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="text-sm">Justificativo <span className="text-destructive">*</span></Label>
+              <Textarea
+                className="mt-1"
+                rows={4}
+                placeholder="Ej: El cliente desistió de la compra, presupuesto fuera de rango, perdida contra competencia..."
+                value={closeJustification}
+                onChange={(e) => setCloseJustification(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowCloseModal(false)} disabled={closingQuote}>
+                Cancelar
+              </Button>
+              <Button
+                className="bg-amber-600 hover:bg-amber-700"
+                onClick={handleCloseQuote}
+                disabled={closingQuote || !closeJustification.trim()}
+              >
+                <AlertCircle className="w-4 h-4 mr-1" />
+                {closingQuote ? "Cerrando..." : "Confirmar cierre"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Modal: Convertir a Pedido ── */}
       <Dialog open={showConvertModal} onOpenChange={setShowConvertModal}>

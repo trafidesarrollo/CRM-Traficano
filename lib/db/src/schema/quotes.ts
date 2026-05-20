@@ -33,6 +33,7 @@ export const quotesTable = pgTable("quotes", {
   internalNote: text("internal_note"),
   reference: text("reference"),
   purchaseOrder: text("purchase_order"),
+  closeReason: text("close_reason"),
   createSchedule: boolean("create_schedule").default(false),
   pdfUrl: text("pdf_url"),
   sentAt: timestamp("sent_at", { withTimezone: true }),

@@ -168,8 +168,8 @@ router.patch("/quotes/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [existing] = await db.select().from(quotesTable).where(eq(quotesTable.id, id));
-    if (existing?.purchaseOrder) {
-      return res.status(403).json({ error: "Esta cotización fue confirmada con una OC y no puede modificarse." });
+    if (existing?.status === "approved") {
+      return res.status(403).json({ error: "Esta cotización está cerrada y no puede modificarse." });
     }
     const { lines, ...rest } = req.body;
     const data: any = { ...rest };
@@ -242,7 +242,12 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
           deliveryTime: l.deliveryTime, clientCode: l.clientCode, notes: l.notes,
         })));
       }
-      await tx.update(quotesTable).set({ status: "approved", approvedAt: new Date() }).where(eq(quotesTable.id, id));
+      await tx.update(quotesTable).set({
+        status: "approved",
+        approvedAt: new Date(),
+        purchaseOrder: bodyPurchaseOrder || quote.purchaseOrder || null,
+        quoteStatus: "FINALIZADA",
+      }).where(eq(quotesTable.id, id));
 
       // Promote client to "final" upon first OC
       if (quote.clientId) {
