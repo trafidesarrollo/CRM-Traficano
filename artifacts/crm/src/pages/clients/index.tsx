@@ -747,7 +747,7 @@ export default function Clients() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <ImportClientsDialog onDone={refetch} />
-          {canBulkImport && <ProspectsImportDialog onDone={refetch} />}
+          <ProspectsImportDialog onDone={refetch} />
           <Button variant="outline" onClick={() => { setContactForm(BLANK_CONTACT); setContactClientSearch(""); setContactOpen(true); }}>
             <Contact2 className="w-4 h-4 mr-2" />Nuevo Contacto
           </Button>
