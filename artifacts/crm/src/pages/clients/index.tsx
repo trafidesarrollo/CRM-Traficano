@@ -98,10 +98,10 @@ function ImportClientsDialog({ onDone }: { onDone: () => void }) {
   return (
     <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset(); }}>
       <Button variant="outline" className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20" onClick={() => setOpen(true)}>
-        <FileUp className="w-4 h-4 mr-2" />Importar CSV
+        <FileUp className="w-4 h-4 mr-2" />Importar Nuevos Clientes
       </Button>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><FileUp className="w-5 h-5 text-cyan-400" />Importar Clientes desde CSV</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><FileUp className="w-5 h-5 text-cyan-400" />Importar Nuevos Clientes desde CSV</DialogTitle></DialogHeader>
         {!result ? (
           <div className="space-y-4 mt-2">
             <p className="text-sm text-muted-foreground">Columnas: <span className="font-mono text-xs">Número de cliente, Razón social, Número de documento, Telefono, Correo, Localidad, Rubro, Responsable 1</span></p>
