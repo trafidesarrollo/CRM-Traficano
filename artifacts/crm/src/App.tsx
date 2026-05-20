@@ -40,6 +40,7 @@ import EmailTemplates from "@/pages/email-templates/index";
 import Reports from "@/pages/reports/index";
 import Automation from "@/pages/automation/index";
 import CustomFields from "@/pages/custom-fields/index";
+import CargaMasiva from "@/pages/carga-masiva/index";
 import NotFound from "@/pages/not-found";
 import { CommandPalette } from "@/components/command-palette";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
@@ -51,7 +52,7 @@ import ProductionDashboard from "@/pages/production/dashboard";
 
 const queryClient = new QueryClient();
 
-const VENDEDOR_ALLOWED_PATHS = ["/dashboard", "/quotes", "/calendar", "/clients", "/products", "/tasks", "/contacts", "/orders"];
+const VENDEDOR_ALLOWED_PATHS = ["/dashboard", "/quotes", "/calendar", "/clients", "/products", "/tasks", "/contacts", "/orders", "/carga-masiva"];
 
 function ProtectedRoute({ component: Component }: { component: any }) {
   const { user, isLoading } = useAuth();
@@ -135,6 +136,7 @@ function Router() {
       <Route path="/reports" component={() => <ProtectedRoute component={Reports} />} />
       <Route path="/automation" component={() => <ProtectedRoute component={Automation} />} />
       <Route path="/custom-fields" component={() => <ProtectedRoute component={CustomFields} />} />
+      <Route path="/carga-masiva" component={() => <ProtectedRoute component={CargaMasiva} />} />
 
       <Route component={NotFound} />
     </Switch>

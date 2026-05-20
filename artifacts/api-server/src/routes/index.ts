@@ -40,6 +40,7 @@ import csvRouter from "./csv.js";
 import importErpRouter from "./import-erp.js";
 import searchRouter from "./search.js";
 import bulkRouter from "./bulk.js";
+import bulkActivitiesRouter from "./bulk-activities.js";
 import duplicatesRouter from "./duplicates.js";
 import productionRouter from "./production.js";
 import {
@@ -242,6 +243,7 @@ router.use(gcalRouter);
 router.use(requireMinRole("vendedor"), csvRouter);
 router.use(requireMinRole("vendedor"), searchRouter);
 router.use(requireMinRole("gerente"), bulkRouter);
+router.use(requireMinRole("vendedor"), bulkActivitiesRouter);
 router.use(requireMinRole("vendedor"), duplicatesRouter);
 router.use(requireMinRole("vendedor"), productionRouter);
 router.use("/extractions", extractionsRouter);

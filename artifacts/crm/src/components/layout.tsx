@@ -32,6 +32,7 @@ const navItems = [
   { href: "/quotes/pipeline",  label: "Pipeline Visual",       icon: Kanban,          module: "cotizaciones" },
   { href: "/orders",           label: "Pedidos",               icon: ShoppingCart,    module: "pedidos",           hiddenFromRoles: ["vendedor"] },
   { href: "/tasks",            label: "Tareas",                icon: ListTodo,        module: "tareas" },
+  { href: "/carga-masiva",     label: "Carga Masiva",          icon: FileUp,          module: "carga_masiva" },
   { href: "/calendar",         label: "Calendario",            icon: CalendarDays,    module: "calendario" },
   { href: "/calendar/sync",    label: "Sync Google Calendar",  icon: CalendarClock,   module: "calendario",        hiddenFromRoles: ["vendedor"] },
   { href: "/pipelines",        label: "Pipelines",             icon: GitBranch,       module: "pipelines",         roles: ["admin", "gerente", "gerente_comercial"] },
