@@ -57,7 +57,7 @@ router.use(authRouter);
 router.use(integrationsRouter);
 router.use(importErpRouter);
 router.use(requireAuth);
-
+router.use(exchangeRateRouter);
 
 router.get("/integrations/anura/webhooks", async (req, res) => {
   const { db: database, anuraWebhooksTable } = await import("@workspace/db");
@@ -252,7 +252,6 @@ router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 
 router.use("/goals", goalsRouter);
 
-router.use(exchangeRateRouter);
 router.use("/settings", requireRole("admin", "gerente_comercial"), settingsRouter);
 
 router.use("/users", requireRole("admin", "gerente_comercial"), usersRouter);
