@@ -76,7 +76,25 @@ export default function ClientDetail() {
   const [reminderDismissed, setReminderDismissed] = useState(false);
   const [completingTask, setCompletingTask] = useState(false);
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
-  const [completeNote, setCompleteNote] = useState("");
+  const defaultFollowup = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 3);
+    return {
+      title: data?.client?.company_name || data?.client?.companyName || "",
+      date: d.toISOString().slice(0, 10),
+      priority: "medium" as "low" | "medium" | "high",
+      status: "pending" as "pending" | "completed",
+      description: "",
+    };
+  };
+  const [followupForm, setFollowupForm] = useState(defaultFollowup());
+
+  useEffect(() => {
+    if (completeModalOpen) {
+      setFollowupForm(defaultFollowup());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completeModalOpen]);
 
   useEffect(() => {
     if (!taskId) return;
@@ -86,7 +104,7 @@ export default function ClientDetail() {
       .catch(() => {});
   }, [taskId]);
 
-  const completeTask = async (note: string) => {
+  const completeTask = async (createFollowup: boolean) => {
     if (!reminderTask) return;
     setCompletingTask(true);
     try {
@@ -97,24 +115,26 @@ export default function ClientDetail() {
         body: JSON.stringify({ status: "completed" }),
       });
       if (r.ok) {
-        // Si hay una nota, la registramos como actividad en el cliente
-        if (note.trim() && id) {
-          await fetch(`${API}/api/activities`, {
+        if (createFollowup && id) {
+          await fetch(`${API}/api/tasks`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
+              title: followupForm.title,
+              type: "followup",
+              priority: followupForm.priority,
+              status: followupForm.status,
+              description: followupForm.description || undefined,
+              dueDate: followupForm.date ? new Date(followupForm.date + "T12:00:00").toISOString() : undefined,
               clientId: parseInt(id),
-              type: "note",
-              title: `Cierre de tarea: ${reminderTask.title}`,
-              description: note.trim(),
             }),
           }).catch(() => {});
         }
-        toast({ title: "Tarea completada", description: note.trim() ? "Resultado registrado en actividades." : undefined });
+        toast({ title: "Tarea completada", description: createFollowup ? "Seguimiento agendado." : undefined });
         setReminderTask((t: any) => ({ ...t, status: "completed" }));
         setCompleteModalOpen(false);
-        setCompleteNote("");
+        setFollowupForm(defaultFollowup());
       } else {
         toast({ title: "Error al completar la tarea", variant: "destructive" });
       }
@@ -579,49 +599,110 @@ export default function ClientDetail() {
         </Tabs>
       </div>
 
-      {/* Modal: Completar tarea */}
-      <Dialog open={completeModalOpen} onOpenChange={(o) => { if (!completingTask) { setCompleteModalOpen(o); if (!o) setCompleteNote(""); } }}>
+      {/* Modal: Completar tarea → agendar seguimiento */}
+      <Dialog open={completeModalOpen} onOpenChange={(o) => { if (!completingTask) setCompleteModalOpen(o); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-green-400" />
-              Completar tarea
+              Agendar seguimiento
             </DialogTitle>
-            {reminderTask && (
-              <DialogDescription className="text-sm text-muted-foreground pt-1">
-                <span className="font-medium text-foreground">{reminderTask.title}</span>
-                {reminderTask.dueDate && (
-                  <span className="ml-2 text-xs">· Vencía: {new Date(reminderTask.dueDate).toLocaleDateString("es-AR")}</span>
-                )}
-              </DialogDescription>
-            )}
+            <DialogDescription>
+              Completá los datos del próximo seguimiento antes de cerrar la tarea.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            <Label htmlFor="complete-note">¿Cómo resultó? <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-            <Textarea
-              id="complete-note"
-              placeholder="Ej: Se habló con el cliente, está interesado. Quedamos en reunirnos la próxima semana…"
-              value={completeNote}
-              onChange={(e) => setCompleteNote(e.target.value)}
-              rows={4}
-              className="resize-none"
-              autoFocus
-            />
-            <p className="text-xs text-muted-foreground">Si escribís un resultado, se guardará automáticamente como actividad en este cliente.</p>
+          <div className="space-y-4 py-1">
+            {/* Título */}
+            <div className="space-y-1.5">
+              <Label htmlFor="fu-title">Título</Label>
+              <Input
+                id="fu-title"
+                value={followupForm.title}
+                onChange={(e) => setFollowupForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="Nombre del cliente"
+              />
+            </div>
+
+            {/* Tipo (fijo) */}
+            <div className="space-y-1.5">
+              <Label>Tipo</Label>
+              <div className="flex items-center h-9 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground">
+                Seguimiento
+              </div>
+            </div>
+
+            {/* Fecha */}
+            <div className="space-y-1.5">
+              <Label htmlFor="fu-date">Fecha de seguimiento</Label>
+              <Input
+                id="fu-date"
+                type="date"
+                value={followupForm.date}
+                onChange={(e) => setFollowupForm((f) => ({ ...f, date: e.target.value }))}
+              />
+            </div>
+
+            {/* Prioridad y Estado en fila */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Prioridad</Label>
+                <Select
+                  value={followupForm.priority}
+                  onValueChange={(v) => setFollowupForm((f) => ({ ...f, priority: v as any }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">ALTA</SelectItem>
+                    <SelectItem value="medium">Media</SelectItem>
+                    <SelectItem value="low">BAJA</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Estado</Label>
+                <Select
+                  value={followupForm.status}
+                  onValueChange={(v) => setFollowupForm((f) => ({ ...f, status: v as any }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Abierta</SelectItem>
+                    <SelectItem value="completed">Cerrada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Descripción */}
+            <div className="space-y-1.5">
+              <Label htmlFor="fu-desc">Descripción <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Textarea
+                id="fu-desc"
+                value={followupForm.description}
+                onChange={(e) => setFollowupForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="Ej: Confirmar disponibilidad para reunión…"
+                rows={3}
+                className="resize-none"
+              />
+            </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => { setCompleteModalOpen(false); setCompleteNote(""); }} disabled={completingTask}>
-              Cancelar
+          <DialogFooter className="gap-2 pt-1">
+            <Button variant="ghost" onClick={() => completeTask(false)} disabled={completingTask}>
+              Cerrar sin agendar
             </Button>
             <Button
               className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => completeTask(completeNote)}
-              disabled={completingTask}
+              onClick={() => completeTask(true)}
+              disabled={completingTask || !followupForm.title.trim() || !followupForm.date}
             >
               <CheckCircle2 className="w-4 h-4 mr-2" />
-              {completingTask ? "Completando…" : "Completar tarea"}
+              {completingTask ? "Guardando…" : "Completar y agendar"}
             </Button>
           </DialogFooter>
         </DialogContent>
