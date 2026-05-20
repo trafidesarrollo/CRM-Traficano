@@ -85,6 +85,7 @@ export default function ClientDetail() {
       priority: "medium" as "low" | "medium" | "high",
       status: "pending" as "pending" | "completed",
       description: "",
+      assignedToUserId: String((user as any)?.id || ""),
     };
   };
   const [followupForm, setFollowupForm] = useState(defaultFollowup());
@@ -128,6 +129,7 @@ export default function ClientDetail() {
               description: followupForm.description || undefined,
               dueDate: followupForm.date ? new Date(followupForm.date + "T12:00:00").toISOString() : undefined,
               clientId: parseInt(id),
+              assignedToUserId: followupForm.assignedToUserId ? parseInt(followupForm.assignedToUserId) : undefined,
             }),
           }).catch(() => {});
         }
@@ -143,6 +145,15 @@ export default function ClientDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
+
+  // ── Usuarios asignables ──
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  useEffect(() => {
+    fetch(`${API}/api/users/assignable`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(setAssignableUsers)
+      .catch(() => {});
+  }, []);
 
   // ── Filtro de actividades por vendedor ──
   const [activitySpFilter, setActivitySpFilter] = useState<number | "all">("all");
@@ -676,6 +687,25 @@ export default function ClientDetail() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Asignar a */}
+            <div className="space-y-1.5">
+              <Label>Asignar a</Label>
+              <Select
+                value={followupForm.assignedToUserId || "none"}
+                onValueChange={(v) => setFollowupForm((f) => ({ ...f, assignedToUserId: v === "none" ? "" : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin asignar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {assignableUsers.map((u: any) => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Descripción */}
