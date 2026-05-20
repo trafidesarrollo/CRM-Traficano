@@ -479,45 +479,11 @@ router.post("/csv/import/clients-bulk", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/csv/import/:entity", async (req: Request, res: Response) => {
-  const def = ENTITIES[req.params.entity];
-  if (!def) { res.status(404).json({ error: "Entidad no soportada" }); return; }
-  try {
-    const { csv, mode = "upsert" } = req.body || {};
-    if (typeof csv !== "string" || !csv.trim()) { res.status(400).json({ error: "csv requerido" }); return; }
-    const { headers, rows } = parseCsv(csv);
-    if (!headers.length) { res.status(400).json({ error: "CSV vacío" }); return; }
-    const allowed = new Set(def.fields);
-    const unknown = headers.filter(h => !allowed.has(h));
-    let inserted = 0, updated = 0, skipped = 0;
-    const errors: { line: number; error: string }[] = [];
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const data: any = {};
-      for (const h of headers) {
-        if (!allowed.has(h)) continue;
-        data[h] = coerceValue(def, h, row[h]);
-      }
-      const missing = (def.required || []).filter(r => data[r] === null || data[r] === undefined || data[r] === "");
-      if (missing.length) { errors.push({ line: i + 2, error: `Faltan campos: ${missing.join(", ")}` }); skipped++; continue; }
-      try {
-        if (data.id && mode === "upsert") {
-          const id = Number(data.id); delete data.id;
-          const upd = await db.update(def.table).set(data).where(sql`id = ${id}`).returning();
-          if (upd.length) updated++;
-          else { await db.insert(def.table).values({ ...data, id }); inserted++; }
-        } else {
-          delete data.id;
-          await db.insert(def.table).values(data);
-          inserted++;
-        }
-      } catch (e: any) { errors.push({ line: i + 2, error: e.message }); skipped++; }
-    }
-    res.json({ ok: true, total: rows.length, inserted, updated, skipped, unknownColumns: unknown, errors: errors.slice(0, 50) });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
-});
-
 // ─── Importador de Prospectos con Tareas Condicionales ────────────────────────
+// DEBE ir antes del wildcard /csv/import/:entity
+const PROSPECTS_HEADERS = "empresa,cuit,industria,telefono,ciudad,emails,escala_consumo,notas,tarea_nombre,tarea_prioridad,tarea_fecha_limite,tarea_asignar_a";
+const PROSPECTS_HEADER_SET = new Set(PROSPECTS_HEADERS.split(","));
+
 router.post("/csv/import/prospects", async (req: Request, res: Response) => {
   try {
     const { csv, separator } = req.body || {};
@@ -525,7 +491,14 @@ router.post("/csv/import/prospects", async (req: Request, res: Response) => {
       res.status(400).json({ error: "csv requerido" }); return;
     }
 
-    const { rows } = parseFlexibleCsv(csv, separator || ",");
+    // Auto-detectar si la primera fila es encabezado o datos
+    const sep = separator || ",";
+    const firstLine = csv.trim().split(/\r?\n/)[0] || "";
+    const firstLineCols = firstLine.split(sep).map((c: string) => c.trim().replace(/^"|"$/g, "").toLowerCase());
+    const hasHeader = firstLineCols.some((c: string) => PROSPECTS_HEADER_SET.has(c));
+    const csvToParse = hasHeader ? csv : PROSPECTS_HEADERS + "\n" + csv;
+
+    const { rows } = parseFlexibleCsv(csvToParse, sep);
     if (!rows.length) {
       res.status(400).json({ error: "CSV vacío o sin filas" }); return;
     }
@@ -602,7 +575,6 @@ router.post("/csv/import/prospects", async (req: Request, res: Response) => {
             if (matched) assignedUserId = matched.id;
           }
 
-          // Si se especificó nombre pero no matchea → ignorar tarea
           if (tareaAsignarA && !assignedUserId) {
             tasksSkipped++;
           } else {
@@ -634,6 +606,44 @@ router.post("/csv/import/prospects", async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+router.post("/csv/import/:entity", async (req: Request, res: Response) => {
+  const def = ENTITIES[req.params.entity];
+  if (!def) { res.status(404).json({ error: "Entidad no soportada" }); return; }
+  try {
+    const { csv, mode = "upsert" } = req.body || {};
+    if (typeof csv !== "string" || !csv.trim()) { res.status(400).json({ error: "csv requerido" }); return; }
+    const { headers, rows } = parseCsv(csv);
+    if (!headers.length) { res.status(400).json({ error: "CSV vacío" }); return; }
+    const allowed = new Set(def.fields);
+    const unknown = headers.filter(h => !allowed.has(h));
+    let inserted = 0, updated = 0, skipped = 0;
+    const errors: { line: number; error: string }[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const data: any = {};
+      for (const h of headers) {
+        if (!allowed.has(h)) continue;
+        data[h] = coerceValue(def, h, row[h]);
+      }
+      const missing = (def.required || []).filter(r => data[r] === null || data[r] === undefined || data[r] === "");
+      if (missing.length) { errors.push({ line: i + 2, error: `Faltan campos: ${missing.join(", ")}` }); skipped++; continue; }
+      try {
+        if (data.id && mode === "upsert") {
+          const id = Number(data.id); delete data.id;
+          const upd = await db.update(def.table).set(data).where(sql`id = ${id}`).returning();
+          if (upd.length) updated++;
+          else { await db.insert(def.table).values({ ...data, id }); inserted++; }
+        } else {
+          delete data.id;
+          await db.insert(def.table).values(data);
+          inserted++;
+        }
+      } catch (e: any) { errors.push({ line: i + 2, error: e.message }); skipped++; }
+    }
+    res.json({ ok: true, total: rows.length, inserted, updated, skipped, unknownColumns: unknown, errors: errors.slice(0, 50) });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 export default router;
