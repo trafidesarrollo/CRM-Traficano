@@ -16,6 +16,37 @@ function parseCSV(text: string, separator: string = ";"): Record<string, string>
   });
 }
 
+function urgenciaToPriority(urgencia: string | null): string {
+  const u = (urgencia || "").toLowerCase();
+  if (u === "alta" || u === "high" || u === "urgente") return "high";
+  if (u === "baja" || u === "low") return "low";
+  return "medium";
+}
+
+async function createFollowupTask(
+  clientId: number,
+  clientName: string,
+  titulo: string | null,
+  novedad: string,
+  fechaSeguimiento: string,
+  urgencia: string | null,
+  assignedTo: number
+) {
+  const due = new Date(fechaSeguimiento);
+  if (isNaN(due.getTime())) return null;
+  due.setHours(9, 0, 0, 0);
+  const [task] = await db.insert(tasksTable).values({
+    title: titulo ? `Seguimiento: ${titulo}` : `Seguimiento - ${clientName}`,
+    description: novedad,
+    clientId,
+    assignedTo,
+    status: "pending",
+    priority: urgenciaToPriority(urgencia) as any,
+    dueDate: due,
+  } as any).returning();
+  return task;
+}
+
 router.post("/bulk-activities/process", async (req, res) => {
   try {
     const { csv, separator = ";" } = req.body;
@@ -23,6 +54,8 @@ router.post("/bulk-activities/process", async (req, res) => {
       res.status(400).json({ error: "Se requiere el campo 'csv'" });
       return;
     }
+
+    const userId: number = (req as any).userId;
 
     const rows = parseCSV(csv, separator);
     if (rows.length === 0) {
@@ -79,11 +112,11 @@ router.post("/bulk-activities/process", async (req, res) => {
         clientId,
         clientName: clientMap.get(clientId),
         fecha: row.fecha || new Date().toISOString().slice(0, 10),
-        fechaSeguimiento: row.fecha_seguimiento || null,
-        urgencia: row.urgencia || null,
-        titulo: row.titulo || null,
+        fechaSeguimiento: row.fecha_seguimiento?.trim() || null,
+        urgencia: row.urgencia?.trim() || null,
+        titulo: row.titulo?.trim() || null,
         novedad: row.novedad,
-        accion: row.accion || null,
+        accion: row.accion?.trim() || null,
       };
 
       if (pending.length > 0) {
@@ -93,9 +126,11 @@ router.post("/bulk-activities/process", async (req, res) => {
       }
     }
 
-    const savedDirect: any[] = [];
+    let savedDirect = 0;
+    let createdTasks = 0;
+
     for (const row of directRows) {
-      const [act] = await db.insert(activitiesTable).values({
+      await db.insert(activitiesTable).values({
         type: "note",
         title: row.titulo || `Novedad - ${row.clientName}`,
         clientId: row.clientId,
@@ -103,11 +138,20 @@ router.post("/bulk-activities/process", async (req, res) => {
         outcome: row.accion || undefined,
         completedAt: row.fecha ? new Date(row.fecha) : new Date(),
       }).returning();
-      savedDirect.push(act);
+      savedDirect++;
+
+      if (row.fechaSeguimiento) {
+        const t = await createFollowupTask(
+          row.clientId, row.clientName, row.titulo,
+          row.novedad, row.fechaSeguimiento, row.urgencia, userId
+        );
+        if (t) createdTasks++;
+      }
     }
 
     res.json({
-      savedDirect: savedDirect.length,
+      savedDirect,
+      createdTasks,
       conflicts: conflictRows,
       errors,
     });
@@ -123,6 +167,8 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         clientId: number;
         clientName: string;
         fecha: string;
+        fechaSeguimiento?: string | null;
+        urgencia?: string | null;
         titulo?: string;
         novedad: string;
         accion?: string;
@@ -131,16 +177,21 @@ router.post("/bulk-activities/resolve", async (req, res) => {
       }>;
     };
 
+    const userId: number = (req as any).userId;
+
     if (!Array.isArray(rows) || rows.length === 0) {
       res.status(400).json({ error: "Se requiere un array 'rows'" });
       return;
     }
 
-    const saved: any[] = [];
+    let saved = 0;
+    let createdTasks = 0;
 
     for (const row of rows) {
       const shouldClose = row.accion_vendedor === "asociar_y_cerrar";
-      const taskInfo = shouldClose ? await db.select({ title: tasksTable.title }).from(tasksTable).where(eq(tasksTable.id, row.tareaId)).limit(1) : [];
+      const taskInfo = shouldClose
+        ? await db.select({ title: tasksTable.title }).from(tasksTable).where(eq(tasksTable.id, row.tareaId)).limit(1)
+        : [];
 
       const description = shouldClose && taskInfo[0]
         ? `[Tarea cerrada: ${taskInfo[0].title}] ${row.novedad}` + (row.accion ? `\nAcción: ${row.accion}` : "")
@@ -152,7 +203,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
           .where(eq(tasksTable.id, row.tareaId));
       }
 
-      const [act] = await db.insert(activitiesTable).values({
+      await db.insert(activitiesTable).values({
         type: "note",
         title: row.titulo || `Novedad - ${row.clientName}`,
         clientId: row.clientId,
@@ -160,11 +211,18 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         outcome: row.accion || undefined,
         completedAt: row.fecha ? new Date(row.fecha) : new Date(),
       }).returning();
+      saved++;
 
-      saved.push(act);
+      if (row.fechaSeguimiento) {
+        const t = await createFollowupTask(
+          row.clientId, row.clientName, row.titulo || null,
+          row.novedad, row.fechaSeguimiento, row.urgencia || null, userId
+        );
+        if (t) createdTasks++;
+      }
     }
 
-    res.json({ saved: saved.length });
+    res.json({ saved, createdTasks });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

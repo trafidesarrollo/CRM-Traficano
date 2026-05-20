@@ -35,10 +35,12 @@ export default function CargaMasivaPage() {
 
   const [step, setStep] = useState<"upload" | "conflicts" | "done">("upload");
   const [savedDirect, setSavedDirect] = useState(0);
+  const [createdTasksDirect, setCreatedTasksDirect] = useState(0);
   const [conflicts, setConflicts] = useState<ConflictRow[]>([]);
   const [errors, setErrors] = useState<{ line: number; error: string }[]>([]);
   const [resolutions, setResolutions] = useState<Record<number, { tareaId: number; accion: Resolution }>>({});
   const [savedResolved, setSavedResolved] = useState(0);
+  const [createdTasksResolved, setCreatedTasksResolved] = useState(0);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -64,6 +66,7 @@ export default function CargaMasivaPage() {
       if (!r.ok) throw new Error(data.error || "Error al procesar");
 
       setSavedDirect(data.savedDirect);
+      setCreatedTasksDirect(data.createdTasks || 0);
       setConflicts(data.conflicts || []);
       setErrors(data.errors || []);
 
@@ -96,6 +99,8 @@ export default function CargaMasivaPage() {
         clientId: c.clientId,
         clientName: c.clientName,
         fecha: c.fecha,
+        fechaSeguimiento: c.fechaSeguimiento,
+        urgencia: c.urgencia,
         titulo: c.titulo,
         novedad: c.novedad,
         accion: c.accion,
@@ -112,6 +117,7 @@ export default function CargaMasivaPage() {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Error al resolver");
       setSavedResolved(data.saved);
+      setCreatedTasksResolved(data.createdTasks || 0);
       setStep("done");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -124,10 +130,12 @@ export default function CargaMasivaPage() {
     setCsvText("");
     setStep("upload");
     setSavedDirect(0);
+    setCreatedTasksDirect(0);
     setConflicts([]);
     setErrors([]);
     setResolutions({});
     setSavedResolved(0);
+    setCreatedTasksResolved(0);
   }
 
   const allResolved = conflicts.length > 0 && conflicts.every((_, i) => resolutions[i]?.accion !== null);
@@ -334,24 +342,26 @@ export default function CargaMasivaPage() {
             </div>
             <h2 className="text-xl font-semibold">¡Carga completada!</h2>
 
-            <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto text-center">
+            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto text-center">
               <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-                <p className="text-2xl font-bold text-green-400">{savedDirect}</p>
-                <p className="text-xs text-muted-foreground mt-1">Sin conflicto</p>
+                <p className="text-2xl font-bold text-green-400">{savedDirect + savedResolved}</p>
+                <p className="text-xs text-muted-foreground mt-1">Novedades en bitácora</p>
               </div>
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
-                <p className="text-2xl font-bold text-blue-400">{savedResolved}</p>
-                <p className="text-xs text-muted-foreground mt-1">Con resolución</p>
-              </div>
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                <p className="text-2xl font-bold text-red-400">{errors.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">Errores</p>
+              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-3">
+                <p className="text-2xl font-bold text-cyan-400">{createdTasksDirect + createdTasksResolved}</p>
+                <p className="text-xs text-muted-foreground mt-1">Tareas de seguimiento</p>
               </div>
             </div>
 
+            {(createdTasksDirect + createdTasksResolved) > 0 && (
+              <p className="text-xs text-cyan-400/80 bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 max-w-xs mx-auto">
+                Las tareas quedaron asignadas a tu usuario con la fecha de seguimiento del CSV.
+              </p>
+            )}
+
             {errors.length > 0 && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-left space-y-1 max-w-sm mx-auto">
-                <p className="text-xs font-semibold text-red-400">Filas no procesadas:</p>
+                <p className="text-xs font-semibold text-red-400">Filas no procesadas ({errors.length}):</p>
                 {errors.map((e, i) => (
                   <p key={i} className="text-xs text-muted-foreground">Línea {e.line}: {e.error}</p>
                 ))}
