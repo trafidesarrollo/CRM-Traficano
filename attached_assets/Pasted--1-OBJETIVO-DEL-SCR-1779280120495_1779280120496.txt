@@ -1,0 +1,122 @@
+===============================================================================
+1. OBJETIVO DEL SCRIPT
+===============================================================================
+Procesar un archivo CSV de "Carga Masiva" de actividades diarias de vendedores. 
+Si el cliente del CSV TIENE tareas pendientes, el sistema detiene esa fila y 
+la envía a una lista de "Preguntas al Usuario" (Para decidir si cierra la tarea 
+o solo guarda en bitácora). Si el cliente NO tiene tareas pendientes, se guarda 
+directamente en la Bitácora.
+
+===============================================================================
+2. MODELOS DE DATOS DE EJEMPLO (ESTRUCTURA MOCK)
+===============================================================================
+
+# Tareas registradas en el sistema (Base de Datos)
+Utiliza la tabla de Tareas que se encuentra creada
+
+# Bitácora histórica del cliente (Donde va todo el historial)
+
+BITACORA_DB = []
+
+===============================================================================
+3. EJEMPLO DE ARCHIVO CSV DE ENTRADA
+===============================================================================
+nro_cliente, nombre_cliente, fecha, fecha_seguimiento, urgencia, titulo, novedad, accion
+El CSV 
+
+===============================================================================
+4. LÓGICA DE PROCESAMIENTO EN BACKEND (PYTHON)
+===============================================================================
+
+import csv
+import io
+
+def procesar_carga_masiva(csv_contenido):
+    filas_directas_a_bitacora = []
+    filas_con_conflicto = []
+    
+    # Simular lectura del CSV
+    lector = csv.DictReader(io.StringIO(csv_contenido.strip()))
+    
+    for fila in lector:
+        c_id = fila['cliente_id']
+        comentario = fila['comentario']
+        fecha = fila['fecha']
+        
+        # Buscar si el cliente tiene tareas PENDIENTES
+        tareas_pendientes = [t for t in TAREAS_DB if t['cliente_id'] == c_id and t['estado'] == 'Pendiente']
+        
+        if len(tareas_pendientes) > 0:
+            # Caso 1: Tiene tarea pendiente -> Se va a la lista de PREGUNTAR al vendedor
+            filas_con_conflicto.append({
+                "cliente_id": c_id,
+                "fecha": fecha,
+                "comentario": comentario,
+                "tarea_pendiente": tareas_pendientes[0] # Tomamos la primera pendiente
+            })
+        else:
+            # Caso 2: No tiene tareas pendientes -> Va directo a la Bitácora
+            BITACORA_DB.append({
+                "cliente_id": c_id,
+                "fecha": fecha,
+                "comentario": comentario,
+                "tarea_asociada_id": None
+            })
+            filas_directas_a_bitacora.append(fila)
+            
+    return {
+        "guardados_directos": filas_directas_a_bitacora,
+        "requiere_confirmacion": filas_con_conflicto
+    }
+
+===============================================================================
+5. LÓGICA DE RESOLUCIÓN DE PREGUNTAS (ACCIONES DEL VENDEDOR)
+===============================================================================
+
+def resolver_conflicto(fila_conflicto, accion_vendedor):
+    """
+    accion_vendedor puede ser: 
+    A) 'asociar_y_cerrar' -> Cierra la tarea pendiente y guarda en bitácora.
+    B) 'solo_bitacora'     -> Deja la tarea pendiente abierta y guarda en bitácora.
+    """
+    c_id = fila_conflicto['cliente_id']
+    comentario = fila_conflicto['comentario']
+    fecha = fila_conflicto['fecha']
+    tarea = fila_conflicto['tarea_pendiente']
+    
+    if accion_vendedor == 'asociar_y_cerrar':
+        # 1. Buscar la tarea en la base de datos y cambiar estado
+        for t in TAREAS_DB:
+            if t['id'] == tarea['id']:
+                t['estado'] = 'Completada'
+                
+        # 2. Guardar en bitácora aclarando qué tarea cerró
+        BITACORA_DB.append({
+            "cliente_id": c_id,
+            "fecha": fecha,
+            "comentario": f"[Tarea Cerrada: {tarea['descripcion']}] - {comentario}",
+            "tarea_asociada_id": tarea['id']
+        })
+        
+    elif accion_vendedor == 'solo_bitacora':
+        # Guardar en bitácora normal, la tarea sigue 'Pendiente'
+        BITACORA_DB.append({
+            "cliente_id": c_id,
+            "fecha": fecha,
+            "comentario": comentario,
+            "tarea_asociada_id": None
+        })
+
+===============================================================================
+6. INSTRUCCIONES PARA REPLIT AI (PROMPT DE EJECUCIÓN)
+===============================================================================
+"Actúa como un desarrollador Senior. Utiliza la lógica descripta en este archivo 
+para crear una pequeña aplicación web funcional (puede ser usando Flask o FastHTML 
+en Python). Requiero una interfaz HTML simple con:
+1. Un input para subir un archivo CSV.
+2. Al subirlo, debe procesar las filas. Las que no tienen conflicto se guardan.
+3. Si hay conflictos, debe mostrar una pantalla de conciliación con una tabla 
+   que enumere el cliente, lo cargado en el CSV, la tarea pendiente, y dos botones:
+   - [Asociar a Tarea y Cerrarla]
+   - [Solo guardar en Bitácora]
+4. Al hacer click en los botones, debe impactar el estado en las listas de datos."
