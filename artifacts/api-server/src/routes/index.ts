@@ -214,6 +214,7 @@ router.use(contactsRouter);
 router.use(salespeopleRouter);
 router.use(productsRouter);
 router.use(activitiesRouter);
+router.use(bulkActivitiesRouter);
 
 router.use(gmailRouter);
 router.use(conversationsRouter);
@@ -242,7 +243,6 @@ router.use(requireMinRole("vendedor"), reportsExportRouter);
 router.use(gcalRouter);
 router.use(requireMinRole("vendedor"), csvRouter);
 router.use(requireMinRole("vendedor"), searchRouter);
-router.use(bulkActivitiesRouter);
 router.use(requireMinRole("gerente"), bulkRouter);
 router.use(requireMinRole("vendedor"), duplicatesRouter);
 router.use(requireMinRole("vendedor"), productionRouter);
