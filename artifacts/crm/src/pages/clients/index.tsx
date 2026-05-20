@@ -583,6 +583,27 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             <Textarea value={form.notes} onChange={f("notes")} placeholder="Observaciones..." rows={2} />
           </div>
 
+          {/* ── Vendedor asignado ── */}
+          {isAdmin && salespeople.length > 0 && (
+            <div>
+              <Label>Vendedor asignado</Label>
+              <Select
+                value={form.assignedSalespersonId ? String(form.assignedSalespersonId) : "none"}
+                onValueChange={v => setForm(p => ({ ...p, assignedSalespersonId: v === "none" ? undefined : Number(v) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin asignar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {salespeople.map((s: any) => (
+                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* ── Comprador inline ── */}
           {!showBuyerForm ? (
             <button type="button" onClick={() => setShowBuyerForm(true)}
