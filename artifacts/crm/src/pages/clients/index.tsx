@@ -147,6 +147,178 @@ function ImportClientsDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
+// ─── Importador de Prospectos con Tareas Condicionales ───────────────────────
+const PROSPECTS_TEMPLATE = `empresa,cuit,industria,telefono,ciudad,emails,escala_consumo,notas,tarea_nombre,tarea_prioridad,tarea_fecha_limite,tarea_asignar_a
+"Maderera Alfa","30-12345678-9","Metalúrgica","+54 11 1234-5678","Buenos Aires","ventas@alfa.com",50000,"Interesado en catálogo","Llamar para seguimiento","Media","2026-06-10","Juan Pérez"
+"Talleres Beta","30-87654321-9","Automotriz","+54 11 9876-5432","Rosario","contacto@beta.com",0,"Sin presupuesto actual",,,
+"Distribuidora Gamma","30-11111111-9","Logística","+54 11 5555-5555","Córdoba","info@gamma.com",,"Falta contactar",,,
+`;
+
+function ProspectsImportDialog({ onDone }: { onDone: () => void }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const reset = () => { setCsvText(""); setResult(null); };
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return;
+    setCsvText(await file.text()); e.target.value = "";
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault(); setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.name.endsWith(".csv") || file.type === "text/csv")) {
+      file.text().then(setCsvText);
+    }
+  }
+
+  function downloadTemplate() {
+    const blob = new Blob([PROSPECTS_TEMPLATE], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = "plantilla-prospectos.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function doImport() {
+    if (!csvText.trim()) { toast({ title: "Cargá un CSV primero", variant: "destructive" }); return; }
+    setLoading(true); setResult(null);
+    try {
+      const r = await fetch(`${API}/api/csv/import/prospects`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ csv: csvText }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error de importación");
+      setResult(data);
+      toast({ title: "Importación finalizada", description: `${data.created} prospectos creados, ${data.tasksCreated} tareas asignadas` });
+      onDone();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset(); }}>
+      <Button variant="outline" className="border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20" onClick={() => setOpen(true)}>
+        <Upload className="w-4 h-4 mr-2" />Importar Prospectos
+      </Button>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="w-5 h-5 text-violet-400" />Carga Masiva de Prospectos
+          </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
+            Creá clientes y tareas en bulk desde un CSV. Columnas requeridas: <span className="font-mono">empresa, cuit</span>. El estado se asigna automáticamente según <span className="font-mono">escala_consumo</span>.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!result ? (
+          <div className="space-y-4 mt-1">
+            {/* Reglas de negocio */}
+            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 space-y-1 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Lógica de estados:</p>
+              <p><span className="text-blue-400 font-medium">escala_consumo vacía</span> → Prospecto</p>
+              <p><span className="text-zinc-400 font-medium">escala_consumo = 0</span> → Cliente Inactivo</p>
+              <p><span className="text-amber-400 font-medium">escala_consumo &gt; 0</span> → Cliente Potencial</p>
+              <p className="pt-1 border-t border-border/30"><span className="text-violet-400 font-medium">tarea_nombre</span> relleno + usuario exacto encontrado → tarea creada y asignada</p>
+            </div>
+
+            {/* Zona de drag & drop */}
+            <div
+              onDragOver={e => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+              className={`border-2 border-dashed rounded-lg px-4 py-5 text-center transition-colors cursor-pointer ${dragging ? "border-violet-500/60 bg-violet-500/10" : "border-border/50 hover:border-violet-500/40 hover:bg-violet-500/5"}`}
+            >
+              <label className="cursor-pointer flex flex-col items-center gap-2">
+                <Upload className="w-6 h-6 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {csvText ? "Archivo cargado — clic o arrastrá para reemplazar" : "Arrastrá un .csv o hacé clic para seleccionar"}
+                </span>
+                <input type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
+              </label>
+            </div>
+
+            <Textarea
+              value={csvText}
+              onChange={e => setCsvText(e.target.value)}
+              rows={4}
+              className="font-mono text-xs"
+              placeholder="O pegá el contenido del CSV directamente aquí..."
+            />
+
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" className="text-xs" onClick={downloadTemplate}>
+                <FileUp className="w-3.5 h-3.5 mr-1.5" />Descargar plantilla
+              </Button>
+              <div className="flex-1" />
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button
+                className="bg-violet-600 hover:bg-violet-500 text-white"
+                disabled={loading || !csvText.trim()}
+                onClick={doImport}
+              >
+                {loading ? "Procesando..." : "Importar"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 mt-1">
+            {/* Resultados */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-green-400">{result.created}</p>
+                <p className="text-xs text-muted-foreground mt-1">Prospectos creados</p>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-yellow-400">{result.skippedDuplicates}</p>
+                <p className="text-xs text-muted-foreground mt-1">Duplicados (CUIT)</p>
+              </div>
+              <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-violet-400">{result.tasksCreated}</p>
+                <p className="text-xs text-muted-foreground mt-1">Tareas asignadas</p>
+              </div>
+              <div className="bg-zinc-500/10 border border-zinc-500/20 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-zinc-400">{result.tasksSkipped}</p>
+                <p className="text-xs text-muted-foreground mt-1">Tareas sin usuario</p>
+              </div>
+            </div>
+
+            {result.duplicates?.length > 0 && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 max-h-28 overflow-y-auto space-y-1">
+                <p className="text-xs font-medium text-yellow-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" />CUITs duplicados omitidos</p>
+                {result.duplicates.map((d: string, i: number) => <p key={i} className="text-xs text-muted-foreground">{d}</p>)}
+              </div>
+            )}
+
+            {result.errors?.length > 0 && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 max-h-28 overflow-y-auto space-y-1">
+                <p className="text-xs font-medium text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{result.errors.length} error(es)</p>
+                {result.errors.map((e: any, i: number) => <p key={i} className="text-xs text-muted-foreground">L{e.line}: {e.error}</p>)}
+              </div>
+            )}
+
+            {result.errors?.length === 0 && result.skippedDuplicates === 0 && (
+              <div className="flex items-center gap-2 text-green-400 text-sm"><CheckCircle2 className="w-4 h-4" />Sin errores ni duplicados</div>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={reset}>Nueva importación</Button>
+              <Button className="flex-1" onClick={() => setOpen(false)}>Cerrar</Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Client form (create/edit) ────────────────────────────────────────────────
 const BLANK_FORM = {
   companyName: "", taxId: "", industry: "", phone: "", city: "",
@@ -521,6 +693,8 @@ export default function Clients() {
   const salespeople = (salespeopleRes as any) || [];
 
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canBulkImport = ["admin", "gerente", "gerente_comercial"].includes((user as any)?.role);
 
   const toggleStatus = (s: string) =>
     setStatusFilter(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -573,6 +747,7 @@ export default function Clients() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <ImportClientsDialog onDone={refetch} />
+          {canBulkImport && <ProspectsImportDialog onDone={refetch} />}
           <Button variant="outline" onClick={() => { setContactForm(BLANK_CONTACT); setContactClientSearch(""); setContactOpen(true); }}>
             <Contact2 className="w-4 h-4 mr-2" />Nuevo Contacto
           </Button>

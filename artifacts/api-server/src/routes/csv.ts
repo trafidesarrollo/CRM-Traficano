@@ -14,6 +14,7 @@ import {
   pipelineStagesTable,
   quotesTable,
   ordersTable,
+  usersTable,
 } from "@workspace/db";
 import { sql, eq } from "drizzle-orm";
 
@@ -514,6 +515,125 @@ router.post("/csv/import/:entity", async (req: Request, res: Response) => {
     }
     res.json({ ok: true, total: rows.length, inserted, updated, skipped, unknownColumns: unknown, errors: errors.slice(0, 50) });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Importador de Prospectos con Tareas Condicionales ────────────────────────
+router.post("/csv/import/prospects", async (req: Request, res: Response) => {
+  try {
+    const { csv, separator } = req.body || {};
+    if (typeof csv !== "string" || !csv.trim()) {
+      res.status(400).json({ error: "csv requerido" }); return;
+    }
+
+    const { rows } = parseFlexibleCsv(csv, separator || ",");
+    if (!rows.length) {
+      res.status(400).json({ error: "CSV vacío o sin filas" }); return;
+    }
+
+    const allUsers = await db.select({ id: usersTable.id, fullName: usersTable.fullName }).from(usersTable);
+
+    let created = 0, skippedDuplicates = 0, tasksCreated = 0, tasksSkipped = 0;
+    const errors: { line: number; error: string }[] = [];
+    const duplicates: string[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const lineNum = i + 2;
+      try {
+        const empresa = (row.empresa || "").trim();
+        const cuit    = (row.cuit    || "").trim();
+
+        if (!empresa || !cuit) {
+          errors.push({ line: lineNum, error: "Empresa y CUIT son obligatorios" });
+          continue;
+        }
+
+        // Duplicado por CUIT
+        const existing = await db.select({ id: clientsTable.id })
+          .from(clientsTable).where(eq(clientsTable.taxId, cuit)).limit(1);
+        if (existing[0]) {
+          skippedDuplicates++;
+          duplicates.push(`L${lineNum}: ${empresa} (${cuit})`);
+          continue;
+        }
+
+        // Estado según escala de consumo
+        const consumoStr = (row.escala_consumo || "").trim();
+        let status: "prospect" | "inactive" | "potential" = "prospect";
+        let consumptionScale: number | null = null;
+        if (consumoStr !== "") {
+          const n = parseFloat(consumoStr);
+          if (!isNaN(n)) {
+            consumptionScale = n;
+            status = n === 0 ? "inactive" : "potential";
+          }
+        }
+
+        // Emails (separados por coma o punto y coma)
+        const emailRaw = (row.emails || "").trim();
+        const clientEmails = emailRaw
+          ? emailRaw.split(/[;,]/).map((e: string) => e.trim()).filter((e: string) => e.includes("@"))
+          : [];
+
+        // Crear cliente
+        const [newClient] = await db.insert(clientsTable).values({
+          companyName: empresa,
+          taxId: cuit,
+          industry:   (row.industria || "").trim() || null,
+          phone:      (row.telefono  || "").trim() || null,
+          city:       (row.ciudad    || "").trim() || null,
+          clientEmails,
+          notes:      (row.notas     || "").trim() || null,
+          status,
+          consumptionScale,
+        } as any).returning();
+        created++;
+
+        // Tarea condicional
+        const tareaNombre = (row.tarea_nombre || "").trim();
+        if (tareaNombre && newClient?.id) {
+          const tareaAsignarA = (row.tarea_asignar_a || "").trim();
+          let assignedUserId: number | null = null;
+
+          if (tareaAsignarA) {
+            const matched = allUsers.find(u =>
+              u.fullName.trim().toLowerCase() === tareaAsignarA.toLowerCase()
+            );
+            if (matched) assignedUserId = matched.id;
+          }
+
+          // Si se especificó nombre pero no matchea → ignorar tarea
+          if (tareaAsignarA && !assignedUserId) {
+            tasksSkipped++;
+          } else {
+            const prioRaw = (row.tarea_prioridad || "").trim().toLowerCase();
+            const priority = prioRaw.includes("alta") || prioRaw.includes("urgente") ? "high"
+              : prioRaw.includes("baja") ? "low" : "medium";
+
+            const dueDateRaw = (row.tarea_fecha_limite || "").trim();
+            const dueDateObj = dueDateRaw ? new Date(dueDateRaw + "T12:00:00") : null;
+
+            await db.insert(tasksTable).values({
+              title:      tareaNombre,
+              type:       "followup",
+              status:     "pending",
+              priority,
+              clientId:   newClient.id,
+              assignedTo: assignedUserId || null,
+              dueDate:    dueDateObj && !isNaN(dueDateObj.getTime()) ? dueDateObj : null,
+            });
+            tasksCreated++;
+          }
+        }
+      } catch (e: any) {
+        errors.push({ line: lineNum, error: e.message });
+      }
+    }
+
+    res.json({ ok: true, total: rows.length, created, skippedDuplicates, duplicates, tasksCreated, tasksSkipped, errors: errors.slice(0, 100) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;
