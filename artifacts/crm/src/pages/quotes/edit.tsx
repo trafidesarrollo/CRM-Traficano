@@ -174,9 +174,17 @@ export default function QuoteEdit() {
   useEffect(() => {
     fetch(`${API}/api/exchange-rate`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => setUsdRate(d))
+      .then((d) => {
+        setUsdRate(d);
+        if (isNew && d?.sell) {
+          setForm((prev: any) => ({
+            ...prev,
+            exchangeRate: String(d.sell),
+          }));
+        }
+      })
       .catch(() => {});
-  }, []);
+  }, [isNew]);
 
   useEffect(() => {
     const safe = (p: Promise<any>, fallback: any = []) =>
