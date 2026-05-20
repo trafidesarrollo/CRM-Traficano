@@ -786,7 +786,7 @@ export default function QuoteEdit() {
                 <SelectContent>
                   {contacts.map((c: any) => (
                     <SelectItem key={c.id} value={String(c.id)}>
-                      {c.fullName || c.name}
+                      {c.fullName || c.name}{c.position ? ` (${c.position})` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
