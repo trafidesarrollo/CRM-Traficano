@@ -157,15 +157,14 @@ router.patch("/clients/:id", async (req, res) => {
     const [existing] = await db.select().from(clientsTable).where(eq(clientsTable.id, id)).limit(1);
     if (!existing) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
 
-    const merged = { ...existing, ...body };
-
-    // Only auto-compute status if caller didn't explicitly pass one
+    // Status logic for PATCH:
+    // - If "status" is explicitly sent in the body → honor it (never demote "final")
+    // - If "status" is NOT in the body → keep existing status as-is (no auto-compute)
     let newStatus: string;
-    if (body.status && body.status !== existing.status) {
-      // Explicit override (admin)
-      newStatus = body.status;
+    if ("status" in body && body.status) {
+      newStatus = existing.status === "final" ? "final" : body.status;
     } else {
-      newStatus = computeStatus(merged, existing.status);
+      newStatus = existing.status;
     }
 
     const [updated] = await db.update(clientsTable)
