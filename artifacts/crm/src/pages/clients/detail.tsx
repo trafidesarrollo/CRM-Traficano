@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, ArrowLeft, FileText, ShoppingCart, Contact2, Activity,
   Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X,
-  CheckCircle2, Circle, Clock, ListTodo
+  CheckCircle2, Circle, Clock, ListTodo, UserSquare
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -104,6 +104,10 @@ export default function ClientDetail() {
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
+  // ── Filtro de actividades por vendedor ──
+  const [activitySpFilter, setActivitySpFilter] = useState<number | "all">("all");
+  const [salespeople, setSalespeople] = useState<any[]>([]);
+
   const BLANK_CONTACT = { firstName: "", lastName: "", position: "", email: "", phone: "", isPrimary: false };
   const [contactOpen, setContactOpen] = useState(false);
   const [contactForm, setContactForm] = useState(BLANK_CONTACT);
@@ -125,6 +129,13 @@ export default function ClientDetail() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    fetch(`${API}/api/salespeople`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setSalespeople(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
 
   const openEdit = () => {
     const c = data.client;
@@ -199,6 +210,21 @@ export default function ClientDetail() {
     ...activities.map((a: any) => ({ ...a, _kind: "activity" as const, _date: a.createdAt })),
     ...tasks.map((t: any) => ({ ...t, _kind: "task" as const, _date: t.created_at || t.createdAt })),
   ].sort((a, b) => new Date(b._date || 0).getTime() - new Date(a._date || 0).getTime());
+
+  // Vendedores que tienen actividades en este cliente
+  const spIdsWithActivity = [...new Set(
+    activities.map((a: any) => a.salesperson_id ?? a.salespersonId).filter(Boolean)
+  )];
+  const spWithActivity = salespeople.filter((s: any) => spIdsWithActivity.includes(s.id));
+
+  const filteredTimeline = activitySpFilter === "all"
+    ? mergedTimeline
+    : mergedTimeline.filter((item: any) => {
+        if (item._kind === "activity") {
+          return (item.salesperson_id ?? item.salespersonId) === activitySpFilter;
+        }
+        return true; // tasks always shown
+      });
   const cs = CLIENT_STATUS[client.status] || { label: client.status, color: "bg-gray-500/20 text-gray-300" };
 
   return (
@@ -434,9 +460,37 @@ export default function ClientDetail() {
           </TabsContent>
 
           <TabsContent value="activities" className="mt-4">
+            {/* ── Filtro por vendedor ── */}
+            {spWithActivity.length > 1 && (
+              <div className="flex items-center gap-2 flex-wrap mb-4 p-3 bg-card/60 border border-border/40 rounded-xl">
+                <UserSquare className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground font-medium">Filtrar por vendedor:</span>
+                <button
+                  onClick={() => setActivitySpFilter("all")}
+                  className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${activitySpFilter === "all" ? "bg-primary/20 border-primary/50 text-primary" : "border-border/40 text-muted-foreground hover:border-border/70"}`}
+                >
+                  Todos ({activities.length})
+                </button>
+                {spWithActivity.map((sp: any) => {
+                  const count = activities.filter((a: any) => (a.salesperson_id ?? a.salespersonId) === sp.id).length;
+                  const active = activitySpFilter === sp.id;
+                  return (
+                    <button
+                      key={sp.id}
+                      onClick={() => setActivitySpFilter(sp.id)}
+                      className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${active ? "bg-primary/20 border-primary/50 text-primary" : "border-border/40 text-muted-foreground hover:border-border/70"}`}
+                    >
+                      {sp.name} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="space-y-2">
-              {mergedTimeline.map((item: any) => {
+              {filteredTimeline.map((item: any) => {
                 if (item._kind === "activity") {
+                  const spName = salespeople.find((s: any) => s.id === (item.salesperson_id ?? item.salespersonId))?.name;
                   return (
                     <Card key={`act-${item.id}`}>
                       <CardContent className="p-3 flex items-start gap-3">
@@ -450,6 +504,11 @@ export default function ClientDetail() {
                           </div>
                           {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
                           {item.outcome && <p className="text-xs text-primary/80 mt-1">Resultado: {item.outcome}</p>}
+                          {spName && (
+                            <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
+                              <UserSquare className="h-3 w-3" />{spName}
+                            </p>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -488,8 +547,12 @@ export default function ClientDetail() {
                   </Card>
                 );
               })}
-              {mergedTimeline.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">Sin actividades ni tareas registradas</div>
+              {filteredTimeline.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  {activitySpFilter !== "all"
+                    ? "Este vendedor no tiene actividades registradas con este cliente."
+                    : "Sin actividades ni tareas registradas"}
+                </div>
               )}
             </div>
           </TabsContent>
