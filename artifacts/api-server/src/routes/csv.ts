@@ -172,15 +172,43 @@ function coerceValue(def: EntityDef, key: string, raw: string): any {
   return raw;
 }
 
+function stripQuotes(v: string): string {
+  const t = v.trim();
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    return t.slice(1, -1).trim();
+  }
+  return t;
+}
+
+function splitCsvLine(line: string, sep: string): string[] {
+  const result: string[] = [];
+  let cur = "";
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQuote = !inQuote; }
+    } else if (ch === sep && !inQuote) {
+      result.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function parseFlexibleCsv(text: string, forcedSeparator?: string): { headers: string[]; rows: Record<string, string>[] } {
   const separator = forcedSeparator || (text.includes(";") && !text.includes(",") ? ";" : ",");
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
   if (!lines.length) return { headers: [], rows: [] };
-  const headers = lines[0].split(separator).map(h => h.trim());
+  const headers = splitCsvLine(lines[0], separator).map(h => stripQuotes(h));
   const rows = lines.slice(1).map(line => {
-    const values = line.split(separator);
+    const values = splitCsvLine(line, separator);
     const row: Record<string, string> = {};
-    headers.forEach((h, i) => { row[h] = (values[i] ?? "").trim(); });
+    headers.forEach((h, i) => { row[h] = stripQuotes(values[i] ?? ""); });
     return row;
   });
   return { headers, rows };

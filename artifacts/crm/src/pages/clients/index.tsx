@@ -418,8 +418,10 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         assignedSalespersonId: form.assignedSalespersonId || undefined,
       };
       if (form.consumptionScale.trim() !== "") payload.consumptionScale = form.consumptionScale.trim();
-      // Admin explicit status override
-      if (isAdmin && editClient?.status === "final") payload.status = "final";
+      // Preserve existing status on edit; only override if explicitly "final"
+      if (editClient) {
+        payload.status = editClient.status || "prospect";
+      }
 
       let savedId: number;
       if (editClient) {
