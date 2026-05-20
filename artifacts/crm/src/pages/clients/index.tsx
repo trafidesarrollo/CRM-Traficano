@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useGetClients, useGetSalespeople } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
+import { ProspectsNearPotential } from "@/components/prospects-near-potential";
 import { AppLayout } from "@/components/layout";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -600,6 +601,9 @@ export default function Clients() {
           )}
         </div>
       </div>
+
+      {/* ── Prospectos a un paso de ser Potenciales ── */}
+      <ProspectsNearPotential maxItems={6} />
 
       {/* ── Tabla ── */}
       <div className="bg-card rounded-2xl border border-border/50 overflow-hidden shadow-lg">
