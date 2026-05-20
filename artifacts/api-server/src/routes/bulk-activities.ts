@@ -131,8 +131,9 @@ router.post("/bulk-activities/process", async (req, res) => {
       const rowData = {
         clientId,
         clientName: clientMap.get(clientId),
-        fecha: row.fecha || new Date().toISOString().slice(0, 10),
-        fechaSeguimiento: row.fecha_seguimiento?.trim() || null,
+        fecha: row.fecha?.trim() || new Date().toISOString().slice(0, 10),
+        // fecha_seguimiento takes priority; fallback to fecha itself
+        fechaSeguimiento: row.fecha_seguimiento?.trim() || row.fecha?.trim() || null,
         urgencia: row.urgencia?.trim() || null,
         titulo: row.titulo?.trim() || null,
         novedad: row.novedad,
