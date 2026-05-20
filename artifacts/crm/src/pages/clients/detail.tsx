@@ -129,7 +129,7 @@ export default function ClientDetail() {
               description: followupForm.description || undefined,
               dueDate: followupForm.date ? new Date(followupForm.date + "T12:00:00").toISOString() : undefined,
               clientId: parseInt(id),
-              assignedToUserId: followupForm.assignedToUserId ? parseInt(followupForm.assignedToUserId) : undefined,
+              assignedTo: followupForm.assignedToUserId ? parseInt(followupForm.assignedToUserId) : undefined,
             }),
           }).catch(() => {});
         }
