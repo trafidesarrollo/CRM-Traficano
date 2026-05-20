@@ -32,6 +32,10 @@ function isReadyForPotential(form: any): boolean {
   return REQUIRED_FOR_POTENTIAL.every(f => form[f]?.trim()) && (form.clientEmails?.length > 0);
 }
 
+function isReadyForScale(form: any): boolean {
+  return !!(form.companyName?.trim() && form.taxId?.trim() && form.city?.trim());
+}
+
 // ─── Email manager ────────────────────────────────────────────────────────────
 function EmailManager({ emails, onChange }: { emails: string[]; onChange: (emails: string[]) => void }) {
   const [input, setInput] = useState("");
@@ -323,7 +327,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
           {statusBadge(previewStatus)}
           {!editClient && (
             <span className="text-xs text-muted-foreground">
-              {ready ? "— campos completos" : "— completá todos los campos para pasar a Potencial"}
+              {ready ? "— campos completos" : isReadyForScale(form) ? "— agregá industria, teléfono y email para pasar a Potencial" : "— completá Nombre, CUIT y Ciudad para cargar escala"}
             </span>
           )}
         </div>
@@ -361,8 +365,8 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
 
           <EmailManager emails={form.clientEmails} onChange={emails => setForm(p => ({ ...p, clientEmails: emails }))} />
 
-          {/* ── Escala de consumo (solo visible si ready for potential) ── */}
-          {(ready || (editClient && ["potential", "inactive", "final"].includes(editClient.status))) && (
+          {/* ── Escala de consumo (visible con Nombre + CUIT + Ciudad) ── */}
+          {(isReadyForScale(form) || (editClient && ["potential", "inactive", "final"].includes(editClient.status))) && (
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
               <Label className="flex items-center gap-1.5 text-amber-400">
                 <DollarSign className="w-4 h-4" />Escala de Consumo (USD/año proyectado)
