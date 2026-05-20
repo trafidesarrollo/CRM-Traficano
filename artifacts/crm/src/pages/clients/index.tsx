@@ -324,6 +324,7 @@ const BLANK_FORM = {
   companyName: "", taxId: "", industry: "", phone: "", city: "",
   clientEmails: [] as string[], notes: "", consumptionScale: "",
   assignedSalespersonId: undefined as number | undefined,
+  assignedUserId: undefined as number | undefined,
 };
 
 type ClientForm = typeof BLANK_FORM;
@@ -379,6 +380,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
           notes: editClient.notes || "",
           consumptionScale: editClient.consumptionScale != null ? String(editClient.consumptionScale) : "",
           assignedSalespersonId: editClient.assignedSalespersonId || undefined,
+          assignedUserId: editClient.assignedUserId || undefined,
         });
       } else {
         setForm({ ...BLANK_FORM });
@@ -416,6 +418,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         clientEmails: form.clientEmails,
         notes: form.notes.trim() || undefined,
         assignedSalespersonId: form.assignedSalespersonId || undefined,
+        assignedUserId: form.assignedUserId || undefined,
       };
       if (form.consumptionScale.trim() !== "") payload.consumptionScale = form.consumptionScale.trim();
       // Preserve existing status on edit; only override if explicitly "final"
@@ -583,21 +586,21 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             <Textarea value={form.notes} onChange={f("notes")} placeholder="Observaciones..." rows={2} />
           </div>
 
-          {/* ── Vendedor asignado ── */}
-          {isAdmin && salespeople.length > 0 && (
+          {/* ── Usuario a cargo ── */}
+          {isAdmin && users.length > 0 && (
             <div>
-              <Label>Vendedor asignado</Label>
+              <Label>Usuario a cargo</Label>
               <Select
-                value={form.assignedSalespersonId ? String(form.assignedSalespersonId) : "none"}
-                onValueChange={v => setForm(p => ({ ...p, assignedSalespersonId: v === "none" ? undefined : Number(v) }))}
+                value={form.assignedUserId ? String(form.assignedUserId) : "none"}
+                onValueChange={v => setForm(p => ({ ...p, assignedUserId: v === "none" ? undefined : Number(v) }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sin asignar" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin asignar</SelectItem>
-                  {salespeople.map((s: any) => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                  {users.map((u: any) => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
