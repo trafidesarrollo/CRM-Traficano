@@ -243,7 +243,7 @@ router.use(gcalRouter);
 router.use(requireMinRole("vendedor"), csvRouter);
 router.use(requireMinRole("vendedor"), searchRouter);
 router.use(requireMinRole("gerente"), bulkRouter);
-router.use(requireMinRole("vendedor"), bulkActivitiesRouter);
+router.use(bulkActivitiesRouter);
 router.use(requireMinRole("vendedor"), duplicatesRouter);
 router.use(requireMinRole("vendedor"), productionRouter);
 router.use("/extractions", extractionsRouter);
