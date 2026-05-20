@@ -173,6 +173,13 @@ router.patch("/quotes/:id", async (req, res) => {
     }
     const { lines, ...rest } = req.body;
     const data: any = { ...rest };
+    // Auto-derive quoteStatus from status
+    if (data.status === "draft") data.quoteStatus = "EN PROCESO";
+    else if (data.status === "sent") data.quoteStatus = "ENVIADA";
+    else if (data.status === "approved" && !data.closeReason) data.quoteStatus = "FINALIZADA";
+    else if (data.status === "approved" && data.closeReason) data.quoteStatus = "PERDIDA";
+    // Remove manual override of quoteStatus if it came from body
+    else delete data.quoteStatus;
     for (const k of ["date", "deliveryDate", "dueDate", "followupDate", "sentAt", "approvedAt"]) {
       data[k] = parseDateField(data[k]);
     }

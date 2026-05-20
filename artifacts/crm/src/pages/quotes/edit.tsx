@@ -95,6 +95,14 @@ export default function QuoteEdit() {
   const [creatingContact, setCreatingContact] = useState(false);
   const [salespeople, setSalespeople] = useState<any[]>([]);
   const isPrivilegedUser = user?.role === "admin" || user?.role === "gerente_comercial";
+
+  const computeQuoteStatus = (status: string, purchaseOrder: string, closeReason: string) => {
+    if (status === "approved" && purchaseOrder) return { label: "Finalizada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
+    if (status === "approved" && closeReason) return { label: "Perdida", color: "bg-red-500/20 text-red-300 border-red-500/30" };
+    if (status === "approved") return { label: "Finalizada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
+    if (status === "sent") return { label: "Enviada", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" };
+    return { label: "En proceso", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" };
+  };
   const currentSalesperson =
     salespeople.find(
       (s: any) => user?.id && Number(s.userId) === Number(user.id),
@@ -468,7 +476,6 @@ export default function QuoteEdit() {
       ["saleConditionId", "Condición de venta"],
       ["date", "Fecha"],
       ["exchangeRate", "Tasa de cambio"],
-      ["quoteStatus", "Estado de cotización"],
       ["status", "Estado"],
       ["priority", "Prioridad"],
       ["quoteType", "Tipo de cotización"],
@@ -614,7 +621,7 @@ export default function QuoteEdit() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ status: "approved", quoteStatus: "FINALIZADA", closeReason: closeJustification.trim() }),
+        body: JSON.stringify({ status: "approved", closeReason: closeJustification.trim() }),
       });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
@@ -999,17 +1006,14 @@ export default function QuoteEdit() {
             </div>
 
             <div>
-              <Label>Estado de cotización *</Label>
-              <Select value={form.quoteStatus} onValueChange={(v) => setForm({ ...form, quoteStatus: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EN PROCESO">En proceso</SelectItem>
-                  <SelectItem value="ENVIADA">Enviada</SelectItem>
-                  <SelectItem value="EN NEGOCIACION">En negociación</SelectItem>
-                  <SelectItem value="FINALIZADA">Finalizada</SelectItem>
-                  <SelectItem value="PERDIDA">Perdida</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Estado de cotización</Label>
+              <div className="mt-1.5">
+                {(() => {
+                  const qs = computeQuoteStatus(form.status, form.purchaseOrder, form.closeReason);
+                  return <Badge className={`text-sm px-3 py-1 ${qs.color}`}>{qs.label}</Badge>;
+                })()}
+                <p className="text-xs text-muted-foreground mt-1">Se actualiza automáticamente según el estado</p>
+              </div>
             </div>
             <div>
               <Label>Estado *</Label>
