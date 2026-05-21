@@ -571,15 +571,17 @@ export default function Tasks() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
-        {[["all", "Todas"], ["today", "Hoy"], ["overdue", "Vencidas"]].map(([v, l]) => (
-          <Button key={v} size="sm" variant={view === v ? "default" : "outline"} onClick={() => setView(v)}>{l}</Button>
-        ))}
-      </div>
+      {/* Filters — solo para vendedor */}
+      {!isAdmin && (
+        <div className="flex gap-2 mb-4">
+          {[["all", "Todas"], ["today", "Hoy"], ["overdue", "Vencidas"]].map(([v, l]) => (
+            <Button key={v} size="sm" variant={view === v ? "default" : "outline"} onClick={() => setView(v)}>{l}</Button>
+          ))}
+        </div>
+      )}
 
-      {/* ── Task list ── */}
-      <div className="space-y-2 mb-8">
+      {/* ── Task list — solo para vendedor ── */}
+      {!isAdmin && (<div className="space-y-2 mb-8">
         {items.map(t => (
           <Card key={t.id} className={`transition-all cursor-pointer hover:bg-white/5 ${isOverdue(t) ? "border-red-500/40" : ""} ${(t.deferCount ?? 0) > 0 ? "border-orange-500/20" : ""} ${t.status === "completed" ? "opacity-60" : ""}`} onClick={() => openDetail(t)}>
             <CardContent className="p-4 flex items-center gap-3">
@@ -614,7 +616,7 @@ export default function Tasks() {
             <p className="text-muted-foreground text-sm">{isVendedor ? "No tenés tareas asignadas por el momento." : "Sin tareas para mostrar."}</p>
           </CardContent></Card>
         )}
-      </div>
+      </div>)}
 
       {/* ── Quote followups section ── */}
       <div className="mb-2">
