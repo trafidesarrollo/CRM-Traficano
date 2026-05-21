@@ -537,13 +537,6 @@ export default function Tasks() {
                           <span className="text-sm font-medium truncate">{t.title}</span>
                           {t.assigneeName && <span className="text-xs text-muted-foreground shrink-0">· {t.assigneeName}</span>}
                           {t.clientName && <span className="text-xs text-muted-foreground shrink-0">· {t.clientName}</span>}
-                          {t.quoteId && (
-                            <Link href={`/quotes/${t.quoteId}`}
-                              className="text-xs text-primary/80 hover:text-primary flex items-center gap-0.5 shrink-0"
-                              onClick={e => e.stopPropagation()}>
-                              <FileText className="w-3 h-3" />{t.quoteNumber || `#${t.quoteId}`}
-                            </Link>
-                          )}
                         </div>
                         {t.dueDate && (
                           <p className={`text-xs mt-0.5 ${t.dueDate && isPast(parseISO(t.dueDate)) && t.status !== "completed" ? "text-red-400" : "text-muted-foreground"}`}>
@@ -578,17 +571,15 @@ export default function Tasks() {
         </div>
       )}
 
-      {/* Filters — solo para vendedor */}
-      {!isAdmin && (
-        <div className="flex gap-2 mb-4">
-          {[["all", "Todas"], ["today", "Hoy"], ["overdue", "Vencidas"]].map(([v, l]) => (
-            <Button key={v} size="sm" variant={view === v ? "default" : "outline"} onClick={() => setView(v)}>{l}</Button>
-          ))}
-        </div>
-      )}
+      {/* Filters */}
+      <div className="flex gap-2 mb-4">
+        {[["all", "Todas"], ["today", "Hoy"], ["overdue", "Vencidas"]].map(([v, l]) => (
+          <Button key={v} size="sm" variant={view === v ? "default" : "outline"} onClick={() => setView(v)}>{l}</Button>
+        ))}
+      </div>
 
-      {/* ── Task list — solo para vendedor ── */}
-      {!isAdmin && (<div className="space-y-2 mb-8">
+      {/* ── Task list ── */}
+      <div className="space-y-2 mb-8">
         {items.map(t => (
           <Card key={t.id} className={`transition-all cursor-pointer hover:bg-white/5 ${isOverdue(t) ? "border-red-500/40" : ""} ${(t.deferCount ?? 0) > 0 ? "border-orange-500/20" : ""} ${t.status === "completed" ? "opacity-60" : ""}`} onClick={() => openDetail(t)}>
             <CardContent className="p-4 flex items-center gap-3">
@@ -605,13 +596,6 @@ export default function Tasks() {
                   {t.clientName && <span className="text-xs text-muted-foreground">· {t.clientName}</span>}
                   {!isVendedor && t.assigneeName && <span className="text-xs text-muted-foreground">· {t.assigneeName}</span>}
                   {(t.deferCount ?? 0) > 0 && <span className="text-xs text-orange-400 flex items-center gap-0.5"><RefreshCw className="w-3 h-3" />Diferida {t.deferCount}x</span>}
-                  {t.quoteId && (
-                    <Link href={`/quotes/${t.quoteId}`}
-                      className="text-xs text-primary/80 hover:text-primary flex items-center gap-0.5 shrink-0"
-                      onClick={e => e.stopPropagation()}>
-                      <FileText className="w-3 h-3" />{t.quoteNumber || `#${t.quoteId}`}
-                    </Link>
-                  )}
                 </div>
                 {t.description && <p className="text-xs text-muted-foreground mt-1 truncate max-w-xl">{t.description}</p>}
                 {t.dueDate && (
@@ -630,7 +614,7 @@ export default function Tasks() {
             <p className="text-muted-foreground text-sm">{isVendedor ? "No tenés tareas asignadas por el momento." : "Sin tareas para mostrar."}</p>
           </CardContent></Card>
         )}
-      </div>)}
+      </div>
 
       {/* ── Quote followups section ── */}
       <div className="mb-2">
@@ -738,17 +722,6 @@ export default function Tasks() {
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Building2 className="w-4 h-4 shrink-0" />
                       <span>Cliente: <strong className="text-foreground">{selected.clientName}</strong></span>
-                    </div>
-                  )}
-                  {selected.quoteId && (
-                    <div className="flex items-center gap-2 text-primary/80">
-                      <FileText className="w-4 h-4 shrink-0" />
-                      <span>Cotización vinculada:&nbsp;</span>
-                      <Link href={`/quotes/${selected.quoteId}`} onClick={() => setDetailOpen(false)}
-                        className="font-semibold text-primary hover:underline flex items-center gap-1">
-                        {selected.quoteNumber || `#${selected.quoteId}`}
-                        <ExternalLink className="w-3 h-3" />
-                      </Link>
                     </div>
                   )}
                   {selected.completedAt && (

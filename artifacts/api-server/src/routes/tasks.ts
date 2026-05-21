@@ -8,13 +8,11 @@ router.get("/tasks", async (req, res) => {
   try {
     const status = req.query.status as string | undefined;
     const assignedTo = req.query.assignedTo ? parseInt(req.query.assignedTo as string) : undefined;
-    const quoteId = req.query.quoteId ? parseInt(req.query.quoteId as string) : undefined;
     const view = req.query.view as string | undefined;
 
     const conds: any[] = [];
     if (status) conds.push(eq(tasksTable.status, status as any));
     if (assignedTo) conds.push(eq(tasksTable.assignedTo, assignedTo));
-    if (quoteId) conds.push(eq(tasksTable.quoteId, quoteId));
     if (view === "today") {
       const start = new Date(); start.setHours(0,0,0,0);
       const end = new Date(); end.setHours(23,59,59,999);
@@ -37,16 +35,14 @@ router.get("/tasks", async (req, res) => {
       t: tasksTable,
       assigneeName: usersTable.fullName,
       clientName: clientsTable.companyName,
-      quoteNumber: quotesTable.number,
     }).from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
       .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
-      .leftJoin(quotesTable, eq(tasksTable.quoteId, quotesTable.id))
       .where(where as any)
       .orderBy(sql`case when ${tasksTable.status}='completed' then 1 else 0 end, ${tasksTable.dueDate} asc nulls last`)
       .limit(500);
 
-    res.json(data.map(r => ({ ...r.t, assigneeName: r.assigneeName, clientName: r.clientName, quoteNumber: r.quoteNumber })));
+    res.json(data.map(r => ({ ...r.t, assigneeName: r.assigneeName, clientName: r.clientName })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -60,15 +56,13 @@ router.get("/tasks/:id", async (req, res) => {
         t: tasksTable,
         assigneeName: sql<string>`coalesce(${usersTable.fullName}, '')`,
         clientName: sql<string>`coalesce(${clientsTable.companyName}, '')`,
-        quoteNumber: quotesTable.number,
       })
       .from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
       .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
-      .leftJoin(quotesTable, eq(tasksTable.quoteId, quotesTable.id))
       .where(eq(tasksTable.id, id));
     if (!row) { res.status(404).json({ error: "Tarea no encontrada" }); return; }
-    res.json({ ...row.t, assigneeName: row.assigneeName, clientName: row.clientName, quoteNumber: row.quoteNumber });
+    res.json({ ...row.t, assigneeName: row.assigneeName, clientName: row.clientName });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

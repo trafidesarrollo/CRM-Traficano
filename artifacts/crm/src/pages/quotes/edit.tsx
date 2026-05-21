@@ -31,11 +31,6 @@ import {
   ShoppingCart,
   CalendarDays,
   AlertCircle,
-  CheckCircle2,
-  Circle,
-  ListTodo,
-  ChevronRight,
-  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -162,19 +157,6 @@ export default function QuoteEdit() {
   const [convertForm, setConvertForm] = useState({ purchaseOrder: "", ocFile: null as File | null });
   const [converting, setConverting] = useState(false);
   const [usdRate, setUsdRate] = useState<{ sell: number | null; date: string | null; stale: boolean } | null>(null);
-
-  // Tasks linked to this quote
-  const [quoteTasks, setQuoteTasks] = useState<any[]>([]);
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [addTaskForm, setAddTaskForm] = useState({ title: "", type: "followup", priority: "medium", dueDate: "", parentId: "" });
-  const [savingTask, setSavingTask] = useState(false);
-
-  const loadQuoteTasks = async (qId: number) => {
-    try {
-      const r = await fetch(`${API}/api/tasks?quoteId=${qId}`, { credentials: "include" });
-      if (r.ok) setQuoteTasks(await r.json());
-    } catch {}
-  };
 
   const followupDateDefault = new Date(Date.now() + 3 * 86400000)
     .toISOString()
@@ -400,10 +382,6 @@ export default function QuoteEdit() {
   };
 
   useEffect(() => {
-    if (!isNew && id) loadQuoteTasks(id);
-  }, [id, isNew]);
-
-  useEffect(() => {
     if (isNew || !id) return;
     fetch(`${API}/api/quotes/${id}`, { credentials: "include" })
       .then((r) => r.json())
@@ -626,52 +604,6 @@ export default function QuoteEdit() {
   const skipFollowup = () => {
     setShowFollowup(false);
     if (savedQuote) setLocation(`/quotes/${savedQuote.id}`);
-  };
-
-  const saveQuoteTask = async () => {
-    if (!addTaskForm.title.trim()) {
-      toast({ title: "El título es requerido", variant: "destructive" });
-      return;
-    }
-    setSavingTask(true);
-    try {
-      const body: any = {
-        title: addTaskForm.title.trim(),
-        type: addTaskForm.type,
-        priority: addTaskForm.priority,
-        status: "pending",
-        quoteId: id,
-        clientId: form.clientId ? parseInt(form.clientId) : null,
-      };
-      if (addTaskForm.dueDate) body.dueDate = new Date(addTaskForm.dueDate + "T09:00:00").toISOString();
-      if (addTaskForm.parentId) body.parentId = parseInt(addTaskForm.parentId);
-      const r = await fetch(`${API}/api/tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error("Error al guardar");
-      setAddTaskForm({ title: "", type: "followup", priority: "medium", dueDate: "", parentId: "" });
-      setShowAddTask(false);
-      if (id) loadQuoteTasks(id);
-      toast({ title: "Tarea agregada" });
-    } catch (e: any) {
-      toast({ title: e.message, variant: "destructive" });
-    } finally {
-      setSavingTask(false);
-    }
-  };
-
-  const toggleQuoteTask = async (taskId: number, current: string) => {
-    const next = current === "completed" ? "pending" : "completed";
-    await fetch(`${API}/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ status: next, completedAt: next === "completed" ? new Date().toISOString() : null }),
-    });
-    if (id) loadQuoteTasks(id);
   };
 
   const convertToOrder = () => {
@@ -1606,151 +1538,6 @@ export default function QuoteEdit() {
       {!isNew && id && (
         <div className="mt-4">
           <DocumentUploader entityType="quote" entityId={id} />
-        </div>
-      )}
-
-      {/* ── Tareas vinculadas a esta cotización ── */}
-      {!isNew && id && (
-        <div className="mt-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <ListTodo className="w-4 h-4 text-primary" />
-                  <span className="font-semibold text-sm">Tareas vinculadas</span>
-                  {quoteTasks.length > 0 && (
-                    <Badge variant="outline" className="text-xs">{quoteTasks.length}</Badge>
-                  )}
-                </div>
-                {!isLocked && (
-                  <Button size="sm" variant="outline" onClick={() => setShowAddTask(!showAddTask)}>
-                    {showAddTask ? <X className="w-3.5 h-3.5 mr-1" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
-                    {showAddTask ? "Cancelar" : "Agregar tarea"}
-                  </Button>
-                )}
-              </div>
-
-              {/* Mini form para agregar tarea */}
-              {showAddTask && (
-                <div className="mb-4 p-3 rounded-lg bg-white/5 border border-border/50 space-y-3">
-                  <div>
-                    <Label className="text-xs mb-1 block">Título <span className="text-destructive">*</span></Label>
-                    <Input
-                      className="h-8 text-sm"
-                      placeholder="Ej: Llamar al cliente para confirmar precio"
-                      value={addTaskForm.title}
-                      onChange={e => setAddTaskForm(p => ({ ...p, title: e.target.value }))}
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <Label className="text-xs mb-1 block">Tipo</Label>
-                      <Select value={addTaskForm.type} onValueChange={v => setAddTaskForm(p => ({ ...p, type: v }))}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="followup">Seguimiento</SelectItem>
-                          <SelectItem value="call">Llamada</SelectItem>
-                          <SelectItem value="meeting">Reunión</SelectItem>
-                          <SelectItem value="email">Email</SelectItem>
-                          <SelectItem value="task">Tarea</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs mb-1 block">Prioridad</Label>
-                      <Select value={addTaskForm.priority} onValueChange={v => setAddTaskForm(p => ({ ...p, priority: v }))}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Baja</SelectItem>
-                          <SelectItem value="medium">Media</SelectItem>
-                          <SelectItem value="high">Alta</SelectItem>
-                          <SelectItem value="urgent">Urgente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs mb-1 block">Vencimiento</Label>
-                      <Input type="date" className="h-8 text-xs" value={addTaskForm.dueDate} onChange={e => setAddTaskForm(p => ({ ...p, dueDate: e.target.value }))} />
-                    </div>
-                  </div>
-                  {/* Selector de tarea padre (subtarea) */}
-                  {quoteTasks.filter(t => !t.parentId).length > 0 && (
-                    <div>
-                      <Label className="text-xs mb-1 block">Subtarea de (opcional)</Label>
-                      <Select value={addTaskForm.parentId} onValueChange={v => setAddTaskForm(p => ({ ...p, parentId: v }))}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sin padre (tarea raíz)" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Sin padre (tarea raíz)</SelectItem>
-                          {quoteTasks.filter(t => !t.parentId).map(t => (
-                            <SelectItem key={t.id} value={String(t.id)}>{t.title}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="flex justify-end">
-                    <Button size="sm" onClick={saveQuoteTask} disabled={savingTask}>
-                      <Plus className="w-3.5 h-3.5 mr-1" />
-                      {savingTask ? "Guardando..." : "Guardar tarea"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Lista de tareas */}
-              {quoteTasks.length === 0 && !showAddTask && (
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  No hay tareas vinculadas. Se crea automáticamente al guardar la cotización.
-                </p>
-              )}
-
-              {/* Tareas raíz (sin padre) */}
-              <div className="space-y-1.5">
-                {quoteTasks.filter(t => !t.parentId).map(parent => (
-                  <div key={parent.id}>
-                    {/* Tarea padre */}
-                    <div className={`flex items-center gap-2 p-2.5 rounded-lg hover:bg-white/5 group ${parent.status === "completed" ? "opacity-60" : ""}`}>
-                      <button onClick={() => toggleQuoteTask(parent.id, parent.status)} className="shrink-0">
-                        {parent.status === "completed"
-                          ? <CheckCircle2 className="w-4 h-4 text-green-400" />
-                          : <Circle className="w-4 h-4 text-muted-foreground hover:text-primary" />}
-                      </button>
-                      <span className={`flex-1 text-sm ${parent.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
-                        {parent.title}
-                      </span>
-                      {parent.dueDate && (
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {new Date(parent.dueDate).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
-                        </span>
-                      )}
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {parent.type === "followup" ? "Seguimiento" : parent.type === "call" ? "Llamada" : parent.type === "meeting" ? "Reunión" : parent.type === "email" ? "Email" : "Tarea"}
-                      </Badge>
-                    </div>
-                    {/* Subtareas (hijos) */}
-                    {quoteTasks.filter(t => t.parentId === parent.id).map(child => (
-                      <div key={child.id} className={`flex items-center gap-2 p-2 pl-8 rounded-lg hover:bg-white/5 ${child.status === "completed" ? "opacity-60" : ""}`}>
-                        <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
-                        <button onClick={() => toggleQuoteTask(child.id, child.status)} className="shrink-0">
-                          {child.status === "completed"
-                            ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-                            : <Circle className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />}
-                        </button>
-                        <span className={`flex-1 text-xs ${child.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
-                          {child.title}
-                        </span>
-                        {child.dueDate && (
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {new Date(child.dueDate).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 
