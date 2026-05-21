@@ -97,6 +97,10 @@ export default defineConfig({
     hmr: {
       clientPort: 443,
     },
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Pragma": "no-cache",
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],
