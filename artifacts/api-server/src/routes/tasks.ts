@@ -309,19 +309,88 @@ router.get("/tasks/stats/summary", async (req, res) => {
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
 
-    // Managers see team-wide stats; vendedores see only their own
-    const userFilter = isManager ? undefined : eq(tasksTable.assignedTo, userId);
+    // Support optional assignedTo filter (array of user ids for admin panel)
+    const assignedToParam = req.query.assignedTo as string | undefined;
+    const assignedToIds = assignedToParam
+      ? assignedToParam.split(",").map(Number).filter(n => !isNaN(n))
+      : [];
+
+    // Date range filters
+    const fromParam = req.query.from as string | undefined;
+    const toParam = req.query.to as string | undefined;
+    const fromDate = fromParam ? new Date(fromParam) : null;
+    const toDate = toParam ? new Date(toParam) : null;
+
+    // Build base filter
+    let userFilter: any = isManager ? undefined : eq(tasksTable.assignedTo, userId);
+    if (isManager && assignedToIds.length > 0) {
+      userFilter = inArray(tasksTable.assignedTo, assignedToIds);
+    }
+
+    const dateRangeConds: any[] = [];
+    if (fromDate) dateRangeConds.push(gte(tasksTable.dueDate, fromDate));
+    if (toDate) dateRangeConds.push(lte(tasksTable.dueDate, toDate));
+
+    const base = (extra: any) => {
+      const conds = [userFilter, ...dateRangeConds, extra].filter(Boolean);
+      return conds.length ? and(...conds) : undefined;
+    };
 
     const [pending, overdue, today, completed] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(tasksTable)
-        .where(and(userFilter, eq(tasksTable.status, "pending")) as any),
+        .where(base(eq(tasksTable.status, "pending")) as any),
       db.select({ count: sql<number>`count(*)` }).from(tasksTable)
-        .where(and(userFilter, lt(tasksTable.dueDate, now), sql`${tasksTable.status} != 'completed'`) as any),
+        .where(base(and(lt(tasksTable.dueDate, now), sql`${tasksTable.status} != 'completed'`)) as any),
       db.select({ count: sql<number>`count(*)` }).from(tasksTable)
-        .where(and(userFilter, gt(tasksTable.dueDate, todayStart), lt(tasksTable.dueDate, todayEnd)) as any),
+        .where(base(and(gte(tasksTable.dueDate, todayStart), lte(tasksTable.dueDate, todayEnd))) as any),
       db.select({ count: sql<number>`count(*)` }).from(tasksTable)
-        .where(and(userFilter, eq(tasksTable.status, "completed")) as any),
+        .where(base(eq(tasksTable.status, "completed")) as any),
     ]);
+
+    // Per-vendor breakdown (only for managers)
+    let byVendor: any[] = [];
+    if (isManager) {
+      const vendorConds = [
+        ...(assignedToIds.length > 0 ? [inArray(tasksTable.assignedTo, assignedToIds)] : []),
+        ...dateRangeConds,
+      ].filter(Boolean);
+      const vendorWhere = vendorConds.length ? and(...vendorConds) : undefined;
+
+      const rows = await db.select({
+        userId: tasksTable.assignedTo,
+        userName: usersTable.fullName,
+        status: tasksTable.status,
+        count: sql<number>`count(*)`,
+      }).from(tasksTable)
+        .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
+        .where(vendorWhere as any)
+        .groupBy(tasksTable.assignedTo, usersTable.fullName, tasksTable.status);
+
+      const map = new Map<number, any>();
+      for (const r of rows) {
+        if (!r.userId) continue;
+        if (!map.has(r.userId)) map.set(r.userId, { userId: r.userId, name: r.userName || `User ${r.userId}`, pending: 0, overdue: 0, completed: 0 });
+        const entry = map.get(r.userId)!;
+        if (r.status === "pending" || r.status === "in_progress") entry.pending += Number(r.count);
+        if (r.status === "completed") entry.completed += Number(r.count);
+      }
+      // overdue per vendor
+      const overdueRows = await db.select({
+        userId: tasksTable.assignedTo,
+        count: sql<number>`count(*)`,
+      }).from(tasksTable)
+        .where(and(
+          vendorWhere as any,
+          lt(tasksTable.dueDate, now),
+          sql`${tasksTable.status} != 'completed'`
+        ) as any)
+        .groupBy(tasksTable.assignedTo);
+      for (const r of overdueRows) {
+        if (!r.userId) continue;
+        if (map.has(r.userId)) map.get(r.userId)!.overdue = Number(r.count);
+      }
+      byVendor = Array.from(map.values());
+    }
 
     res.json({
       pending: Number(pending[0].count),
@@ -329,6 +398,7 @@ router.get("/tasks/stats/summary", async (req, res) => {
       today: Number(today[0].count),
       completed: Number(completed[0].count),
       isTeamView: isManager,
+      byVendor,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
