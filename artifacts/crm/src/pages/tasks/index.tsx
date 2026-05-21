@@ -12,14 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import {
   Plus, Trash2, Clock, AlertCircle, Calendar, ListTodo, RefreshCw,
   CheckCircle2, Circle, CalendarClock, User, Building2,
-  ChevronRight, Bell, X, FileText, DollarSign, ExternalLink,
-  BarChart3, Filter, Users
+  ChevronRight, Bell, X, FileText, DollarSign, ExternalLink
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { format, parseISO, isPast, startOfDay, endOfDay, startOfWeek, endOfWeek } from "date-fns";
+import { format, parseISO, isPast, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -56,22 +54,11 @@ export default function Tasks() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const isVendedor = user?.role === "vendedor";
-  const isAdmin = user?.role === "admin" || user?.role === "gerente" || user?.role === "gerente_comercial";
 
   const [items, setItems] = useState<any[]>([]);
   const [followups, setFollowups] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [view, setView] = useState<string>("all");
-
-  // Admin panel state
-  const [adminDateMode, setAdminDateMode] = useState<"today" | "week" | "range">("today");
-  const [adminFrom, setAdminFrom] = useState("");
-  const [adminTo, setAdminTo] = useState("");
-  const [adminVendors, setAdminVendors] = useState<number[]>([]);
-  const [adminStats, setAdminStats] = useState<any>({});
-  const [adminDetailType, setAdminDetailType] = useState<string | null>(null);
-  const [adminDetailItems, setAdminDetailItems] = useState<any[]>([]);
-  const [adminDetailLoading, setAdminDetailLoading] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -112,41 +99,6 @@ export default function Tasks() {
       .catch(() => {});
   }, [isVendedor, user?.id]);
 
-  const getAdminDateRange = (mode: "today" | "week" | "range", from: string, to: string) => {
-    const now = new Date();
-    if (mode === "today") return { from: startOfDay(now).toISOString(), to: endOfDay(now).toISOString() };
-    if (mode === "week") return { from: startOfWeek(now, { locale: es }).toISOString(), to: endOfWeek(now, { locale: es }).toISOString() };
-    return { from: from ? new Date(from).toISOString() : "", to: to ? new Date(to + "T23:59:59").toISOString() : "" };
-  };
-
-  const loadAdminStats = async (mode = adminDateMode, from = adminFrom, to = adminTo, vendors = adminVendors) => {
-    if (!isAdmin) return;
-    const range = getAdminDateRange(mode, from, to);
-    const params = new URLSearchParams();
-    if (range.from) params.set("from", range.from);
-    if (range.to) params.set("to", range.to);
-    if (vendors.length > 0) params.set("assignedTo", vendors.join(","));
-    const r = await fetch(`${API}/api/tasks/stats/summary?${params}`, { credentials: "include" });
-    if (r.ok) setAdminStats(await r.json());
-  };
-
-  const loadAdminDetail = async (type: string) => {
-    setAdminDetailLoading(true);
-    setAdminDetailType(type);
-    setAdminDetailItems([]);
-    const range = getAdminDateRange(adminDateMode, adminFrom, adminTo);
-    const params = new URLSearchParams();
-    if (adminVendors.length > 0) params.set("assignedTo", adminVendors.join(","));
-    if (type === "today") { params.set("view", "today"); }
-    else if (type === "overdue") { params.set("view", "overdue"); }
-    else if (type === "pending") { params.set("status", "pending"); if (range.from) params.set("from", range.from); if (range.to) params.set("to", range.to); }
-    else if (type === "completed") { params.set("status", "completed"); if (range.from) params.set("from", range.from); if (range.to) params.set("to", range.to); }
-    try {
-      const r = await fetch(`${API}/api/tasks?${params}`, { credentials: "include" });
-      if (r.ok) setAdminDetailItems(await r.json());
-    } finally { setAdminDetailLoading(false); }
-  };
-
   const load = async () => {
     try {
       const params = new URLSearchParams();
@@ -185,7 +137,6 @@ export default function Tasks() {
 
   useEffect(() => { if (user !== undefined) load(); }, [view, user]);
   useEffect(() => { if (user !== undefined) loadFollowups(); }, [view, user, salespersonId]);
-  useEffect(() => { if (isAdmin && user !== undefined) loadAdminStats(); }, [user, isAdmin]);
 
   useEffect(() => {
     fetch(`${API}/api/users/assignable`, { credentials: "include" })
@@ -403,173 +354,18 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* ── ADMIN PANEL ── */}
-      {isAdmin && (
-        <div className="mb-8 space-y-4">
-          {/* Filters bar */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-wrap items-end gap-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Filter className="w-3 h-3" />Período</Label>
-                  <div className="flex gap-1">
-                    {([["today", "Hoy"], ["week", "Semana"], ["range", "Rango"]] as const).map(([m, l]) => (
-                      <Button key={m} size="sm" variant={adminDateMode === m ? "default" : "outline"}
-                        onClick={() => { setAdminDateMode(m); loadAdminStats(m, adminFrom, adminTo, adminVendors); }}>
-                        {l}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                {adminDateMode === "range" && (
-                  <>
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">Desde</Label>
-                      <Input type="date" className="h-8 text-sm w-36" value={adminFrom} onChange={e => setAdminFrom(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">Hasta</Label>
-                      <Input type="date" className="h-8 text-sm w-36" value={adminTo} onChange={e => setAdminTo(e.target.value)} />
-                    </div>
-                  </>
-                )}
-                <div className="min-w-[180px]">
-                  <Label className="text-xs text-muted-foreground mb-1 block flex items-center gap-1"><Users className="w-3 h-3" />Vendedor(es)</Label>
-                  <div className="flex flex-wrap gap-1 p-1.5 border rounded-md bg-background min-h-[32px]">
-                    {users.length === 0 && <span className="text-xs text-muted-foreground px-1">Cargando...</span>}
-                    {users.map((u: any) => {
-                      const active = adminVendors.includes(u.id);
-                      return (
-                        <button key={u.id}
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}
-                          onClick={() => {
-                            const next = active ? adminVendors.filter(id => id !== u.id) : [...adminVendors, u.id];
-                            setAdminVendors(next);
-                            loadAdminStats(adminDateMode, adminFrom, adminTo, next);
-                          }}>
-                          {u.fullName?.split(" ")[0] || u.fullName}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => loadAdminStats()}>
-                  <RefreshCw className="w-3.5 h-3.5 mr-1" />Actualizar
-                </Button>
-                {adminDateMode === "range" && (adminFrom || adminTo) && (
-                  <Button size="sm" variant="ghost" onClick={() => loadAdminStats(adminDateMode, adminFrom, adminTo, adminVendors)}>
-                    Aplicar rango
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { key: "pending", label: "Pendientes", value: adminStats.pending ?? 0, color: "text-yellow-300", icon: <Circle className="w-5 h-5 text-yellow-400" />, border: "border-yellow-500/20" },
-              { key: "overdue", label: "Vencidas", value: adminStats.overdue ?? 0, color: "text-red-400", icon: <AlertCircle className="w-5 h-5 text-red-400" />, border: "border-red-500/30" },
-              { key: "today", label: "Para hoy", value: adminStats.today ?? 0, color: "text-blue-400", icon: <Calendar className="w-5 h-5 text-blue-400" />, border: "border-blue-500/20" },
-              { key: "completed", label: "Completadas", value: adminStats.completed ?? 0, color: "text-green-400", icon: <CheckCircle2 className="w-5 h-5 text-green-400" />, border: "border-green-500/20" },
-            ].map(card => (
-              <Card key={card.key}
-                className={`cursor-pointer transition-all hover:bg-white/5 border ${card.border} ${adminDetailType === card.key ? "ring-1 ring-primary/50" : ""}`}
-                onClick={() => { if (adminDetailType === card.key) { setAdminDetailType(null); setAdminDetailItems([]); } else { loadAdminDetail(card.key); } }}>
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">{card.label}</span>
-                    {card.icon}
-                  </div>
-                  <div className={`text-4xl font-bold ${card.color}`}>{card.value}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Click para ver detalle</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Bar chart per vendor */}
-          {(adminStats.byVendor || []).length > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <BarChart3 className="w-4 h-4 text-primary" />
-                  <span className="font-semibold text-sm">Tareas por vendedor</span>
-                </div>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={adminStats.byVendor} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
-                    <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="pending" name="Pendientes" fill="#eab308" radius={[3,3,0,0]} />
-                    <Bar dataKey="overdue" name="Vencidas" fill="#ef4444" radius={[3,3,0,0]} />
-                    <Bar dataKey="completed" name="Completadas" fill="#22c55e" radius={[3,3,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Detail panel */}
-          {adminDetailType && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-semibold text-sm capitalize">
-                    Detalle — {adminDetailType === "pending" ? "Pendientes" : adminDetailType === "overdue" ? "Vencidas" : adminDetailType === "today" ? "Para hoy" : "Completadas"}
-                  </span>
-                  <Button size="sm" variant="ghost" onClick={() => { setAdminDetailType(null); setAdminDetailItems([]); }}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-                {adminDetailLoading && <p className="text-sm text-muted-foreground py-4 text-center">Cargando...</p>}
-                {!adminDetailLoading && adminDetailItems.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No hay tareas en esta categoría.</p>
-                )}
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {adminDetailItems.map((t: any) => (
-                    <div key={t.id} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/8 cursor-pointer" onClick={() => openDetail(t)}>
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${t.status === "completed" ? "bg-green-400" : t.dueDate && isPast(parseISO(t.dueDate)) ? "bg-red-400" : "bg-yellow-400"}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium truncate">{t.title}</span>
-                          {t.assigneeName && <span className="text-xs text-muted-foreground shrink-0">· {t.assigneeName}</span>}
-                          {t.clientName && <span className="text-xs text-muted-foreground shrink-0">· {t.clientName}</span>}
-                        </div>
-                        {t.dueDate && (
-                          <p className={`text-xs mt-0.5 ${t.dueDate && isPast(parseISO(t.dueDate)) && t.status !== "completed" ? "text-red-400" : "text-muted-foreground"}`}>
-                            {format(parseISO(t.dueDate), "EEE d MMM, HH:mm", { locale: es })}
-                          </p>
-                        )}
-                      </div>
-                      <Badge className={`text-xs shrink-0 ${PRIORITY_COLORS[t.priority]}`}>{PRIORITY_LABELS[t.priority]}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="h-px bg-border/40 my-2" />
-        </div>
-      )}
-
-      {/* Stats (vendedor view) */}
-      {!isAdmin && stats.isTeamView && (
+      {/* Stats */}
+      {stats.isTeamView && (
         <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
           <User className="w-3 h-3" />Mostrando métricas de todo el equipo
         </p>
       )}
-      {!isAdmin && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Pendientes</div><div className="text-3xl font-bold">{stats.pending || 0}</div></CardContent></Card>
-          <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground flex items-center gap-1"><AlertCircle className="w-3 h-3 text-red-400" />Vencidas</div><div className="text-3xl font-bold text-red-400">{stats.overdue || 0}</div></CardContent></Card>
-          <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3 text-blue-400" />Hoy</div><div className="text-3xl font-bold text-blue-400">{stats.today || 0}</div></CardContent></Card>
-          <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Completadas</div><div className="text-3xl font-bold text-green-400">{stats.completed || 0}</div></CardContent></Card>
-        </div>
-      )}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Pendientes</div><div className="text-3xl font-bold">{stats.pending || 0}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground flex items-center gap-1"><AlertCircle className="w-3 h-3 text-red-400" />Vencidas</div><div className="text-3xl font-bold text-red-400">{stats.overdue || 0}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3 text-blue-400" />Hoy</div><div className="text-3xl font-bold text-blue-400">{stats.today || 0}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Completadas</div><div className="text-3xl font-bold text-green-400">{stats.completed || 0}</div></CardContent></Card>
+      </div>
 
       {/* Filters */}
       <div className="flex gap-2 mb-4">
