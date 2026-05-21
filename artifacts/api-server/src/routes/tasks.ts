@@ -8,11 +8,13 @@ router.get("/tasks", async (req, res) => {
   try {
     const status = req.query.status as string | undefined;
     const assignedTo = req.query.assignedTo ? parseInt(req.query.assignedTo as string) : undefined;
+    const quoteId = req.query.quoteId ? parseInt(req.query.quoteId as string) : undefined;
     const view = req.query.view as string | undefined;
 
     const conds: any[] = [];
     if (status) conds.push(eq(tasksTable.status, status as any));
     if (assignedTo) conds.push(eq(tasksTable.assignedTo, assignedTo));
+    if (quoteId) conds.push(eq(tasksTable.quoteId, quoteId));
     if (view === "today") {
       const start = new Date(); start.setHours(0,0,0,0);
       const end = new Date(); end.setHours(23,59,59,999);

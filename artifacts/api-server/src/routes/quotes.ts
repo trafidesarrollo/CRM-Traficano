@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, quotesTable, quoteLinesTable, ordersTable, orderLinesTable, clientsTable, salespeopleTable } from "@workspace/db";
+import { db, quotesTable, quoteLinesTable, ordersTable, orderLinesTable, clientsTable, salespeopleTable, tasksTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -158,6 +158,25 @@ router.post("/quotes", async (req, res) => {
     }
 
     const [final] = await db.select().from(quotesTable).where(eq(quotesTable.id, quote.id));
+
+    // Auto-create a parent tracking task linked to this quote
+    try {
+      const [sp] = final.salespersonId
+        ? await db.select().from(salespeopleTable).where(eq(salespeopleTable.id, final.salespersonId))
+        : [null];
+      await db.insert(tasksTable).values({
+        title: `Seguimiento: ${final.number}`,
+        type: "followup",
+        priority: "medium",
+        status: "pending",
+        quoteId: final.id,
+        clientId: final.clientId || undefined,
+        assignedTo: sp?.userId || userId || undefined,
+        createdBy: userId,
+        dueDate: final.dueDate || undefined,
+      });
+    } catch {}
+
     res.status(201).json(final);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -186,6 +205,12 @@ router.patch("/quotes/:id", async (req, res) => {
     if (data.date === null) delete data.date;
     if (Object.keys(data).length) {
       await db.update(quotesTable).set(data).where(eq(quotesTable.id, id));
+    }
+    // Auto-close all linked tasks when quote is approved
+    if (data.status === "approved") {
+      await db.update(tasksTable)
+        .set({ status: "completed", completedAt: new Date() })
+        .where(and(eq(tasksTable.quoteId, id), sql`${tasksTable.status} != 'completed'`));
     }
     if (Array.isArray(lines)) {
       await db.delete(quoteLinesTable).where(eq(quoteLinesTable.quoteId, id));
@@ -255,6 +280,11 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
         purchaseOrder: bodyPurchaseOrder || quote.purchaseOrder || null,
         quoteStatus: "FINALIZADA",
       }).where(eq(quotesTable.id, id));
+
+      // Auto-close all linked tasks when quote converts to order
+      await tx.update(tasksTable)
+        .set({ status: "completed", completedAt: new Date() })
+        .where(and(eq(tasksTable.quoteId, id), sql`${tasksTable.status} != 'completed'`));
 
       // Promote client to "final" upon first OC
       if (quote.clientId) {

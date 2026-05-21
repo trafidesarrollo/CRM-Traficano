@@ -16,6 +16,7 @@ export const tasksTable = pgTable("tasks", {
   opportunityId: integer("opportunity_id"),
   quoteId: integer("quote_id"),
   orderId: integer("order_id"),
+  parentId: integer("parent_id"),
   dueDate: timestamp("due_date", { withTimezone: true }),
   reminderAt: timestamp("reminder_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
