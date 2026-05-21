@@ -18,3 +18,27 @@ id = "VeeGqpEhXX26iB4yLw-RU"
 uri = "file://crm-traficano.tar.gz"
 type = "unspecified"
 title = "Código fuente — CRM Traficaño"
+
+[[outputs]]
+id = "QUxsoxalcqLVx4YxUjfiC"
+uri = "file://ejemplos-csv/1_prospectos_clientes.csv"
+type = "table"
+title = "Prospectos / Clientes"
+
+[[outputs]]
+id = "Q3PNXvAFGOi_qMPkEOuSA"
+uri = "file://ejemplos-csv/2_bitacora_carga_masiva.csv"
+type = "table"
+title = "Bitácora — Carga Masiva"
+
+[[outputs]]
+id = "iOYDE8L7U1G5TSmfyqVN3"
+uri = "file://ejemplos-csv/3_contactos.csv"
+type = "table"
+title = "Contactos"
+
+[[outputs]]
+id = "a1M2sW7GNiFB1JtFL7KB6"
+uri = "file://ejemplos-csv/4_productos.csv"
+type = "table"
+title = "Productos"

@@ -1,0 +1,6 @@
+nro_cliente;fecha;titulo;novedad;accion;urgencia;fecha_seguimiento
+1;20/05/2026;Llamada de seguimiento;Se contactó al cliente para consultar avance de proyecto. Confirmó que están evaluando presupuesto interno. Se mostraron interesados en los perfiles IPE 200.;Enviar catálogo actualizado y lista de precios vigente;media;27/05/2026
+2;19/05/2026;Visita comercial;Reunión en planta con Jefe de Compras, Ing. Ramírez. Recorrida por instalaciones. Necesitan 500 unidades de bridas DN150 para Agosto.;Preparar cotización formal antes del viernes;alta;23/05/2026
+3;20/05/2026;Consulta técnica por email;El cliente envió especificaciones técnicas para tuberías de alta presión. Material: ASTM A106 Gr.B, Schedule 80, diámetros 2" a 6".;Derivar a ingeniería para análisis. Responder en 48hs;alta;22/05/2026
+1;15/05/2026;Envío de muestra;Se despacharon 10 unidades de muestra de tubo redondo 2" según lo acordado. Número de guía: 12345-MER;Confirmar recepción y solicitar feedback;baja;28/05/2026
+2;20/05/2026;Negociación de precio;Cliente solicita descuento del 8% sobre lista. Actualmente trabajamos con 5% para volumen. Hay margen de negociación.;Consultar con gerencia comercial el descuento máximo autorizable;alta;21/05/2026

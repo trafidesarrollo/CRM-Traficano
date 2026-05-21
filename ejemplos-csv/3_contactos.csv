@@ -1,0 +1,7 @@
+clientId;firstName;lastName;email;phone;position;isPrimary;notes
+1;Carlos;Fernández;cfernandez@acerosdelnorte.com.ar;011-4523-1122;Gerente de Compras;true;Decisor principal. Prefiere contacto por email
+1;Laura;Gómez;lgomez@acerosdelnorte.com.ar;011-4523-1133;Jefa de Logística;false;Coordinación de entregas y recepciones
+2;Marcelo;Ramírez;mramirez@tubosynet.com;0351-4789-0011;Ingeniero de Planta;true;Referente técnico. Conoce bien los productos
+3;Susana;Villalba;svilalba@inpat.com.ar;0297-4456-7890;Directora Administrativa;true;Firma contratos. Muy puntual en pagos
+4;Roberto;Sánchez;rsanchez@metalmec.com.ar;011-4788-3344;Jefe de Compras;true;Reunión solicitada para la semana próxima
+5;Diego;Morales;dmorales@grupoenr.com;0261-4567-8901;Gerente de Proyectos;true;Maneja todos los proyectos de infraestructura
