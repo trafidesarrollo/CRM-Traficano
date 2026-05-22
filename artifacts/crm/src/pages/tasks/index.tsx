@@ -521,7 +521,7 @@ export default function Tasks() {
           <div className="h-px flex-1 bg-border/50" />
         </div>
 
-        {view === "all" && (
+        {quickFilter === "all" && (
           <p className="text-xs text-muted-foreground text-center mb-3">
             Próximos 30 días
           </p>
