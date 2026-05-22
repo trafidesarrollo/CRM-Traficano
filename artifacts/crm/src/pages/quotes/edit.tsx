@@ -38,6 +38,11 @@ import {
   User,
   UserCheck,
   Activity,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Package,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +53,7 @@ const API = import.meta.env.VITE_API_URL || "";
 interface Line {
   id?: number;
   productType?: string;
-  catalogType?: string; // "productos" | "medidas" | "accesorios" | "" (libre)
+  catalogType?: string; // "medidas" | "accesorios" | "" (libre)
   productId?: number | null;
   productName?: string;
   productCode?: string;
@@ -268,37 +273,67 @@ export default function QuoteEdit() {
   const followupDateDefault = new Date(Date.now() + 3 * 86400000)
     .toISOString()
     .slice(0, 10);
-  const [openProductIdx, setOpenProductIdx] = useState<number | null>(null);
-  const [catalogResults, setCatalogResults] = useState<any[]>([]);
-  const catalogSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── Catalog modal state ──────────────────────────────────────────────────
+  const [catalogModal, setCatalogModal] = useState<{
+    open: boolean;
+    type: "medidas" | "accesorios";
+    lineIdx: number;
+  } | null>(null);
+  const [catalogModalSearch, setCatalogModalSearch] = useState("");
+  const [catalogModalResults, setCatalogModalResults] = useState<any[]>([]);
+  const [catalogModalTotal, setCatalogModalTotal] = useState(0);
+  const [catalogModalPage, setCatalogModalPage] = useState(1);
+  const [catalogModalLoading, setCatalogModalLoading] = useState(false);
+  const catalogModalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const CATALOG_PAGE_SIZE = 50;
 
-  const searchCatalog = useCallback((catalogType: string, query: string) => {
-    if (!catalogType) {
-      setCatalogResults([]);
-      return;
-    }
-    if (catalogSearchTimer.current) clearTimeout(catalogSearchTimer.current);
-    catalogSearchTimer.current = setTimeout(async () => {
+  const fetchCatalogModal = useCallback(
+    async (type: string, query: string, page: number) => {
+      setCatalogModalLoading(true);
       try {
-        let url: string;
-        if (catalogType === "productos") {
-          url = query.trim()
-            ? `${API}/api/products?search=${encodeURIComponent(query)}`
-            : `${API}/api/products`;
-        } else {
-          const endpoint = catalogType === "medidas" ? "medidas" : "accesorios";
-          url = query.trim()
-            ? `${API}/api/products/${endpoint}?search=${encodeURIComponent(query)}`
-            : `${API}/api/products/${endpoint}`;
-        }
+        const url = `${API}/api/products/catalog?type=${type}&search=${encodeURIComponent(query.trim())}&page=${page}&limit=${CATALOG_PAGE_SIZE}`;
         const r = await fetch(url, { credentials: "include" });
         const data = await r.json();
-        setCatalogResults(Array.isArray(data) ? data : data.data || []);
+        setCatalogModalResults(data.data || []);
+        setCatalogModalTotal(data.total || 0);
       } catch {
-        setCatalogResults([]);
+        setCatalogModalResults([]);
+        setCatalogModalTotal(0);
+      } finally {
+        setCatalogModalLoading(false);
       }
-    }, 250);
-  }, []);
+    },
+    [],
+  );
+
+  const openCatalogModal = (type: "medidas" | "accesorios", lineIdx: number) => {
+    setCatalogModal({ open: true, type, lineIdx });
+    setCatalogModalSearch("");
+    setCatalogModalPage(1);
+    setCatalogModalResults([]);
+    setCatalogModalTotal(0);
+    fetchCatalogModal(type, "", 1);
+  };
+
+  const closeCatalogModal = () => {
+    setCatalogModal(null);
+    setCatalogModalSearch("");
+    setCatalogModalResults([]);
+  };
+
+  const selectCatalogItem = (p: any) => {
+    if (!catalogModal) return;
+    const price = p.sale_price ?? p.price ?? null;
+    updateLine(catalogModal.lineIdx, {
+      catalogType: catalogModal.type,
+      productId: p.id,
+      productName: p.name,
+      productCode: p.code || "",
+      unit: p.unit || "UN",
+      unitPrice: price != null ? String(price) : "0",
+    });
+    closeCatalogModal();
+  };
 
   useEffect(() => {
     fetch(`${API}/api/exchange-rate`, { credentials: "include" })
@@ -1448,143 +1483,48 @@ export default function QuoteEdit() {
                       </Select>
                     </td>
                     <td className="p-2">
-                      <div className="relative min-w-[260px]">
-                        {/* Catalog type toggle */}
-                        <div className="flex gap-1 mb-1 flex-wrap">
-                          {(["productos", "medidas", "accesorios"] as const).map((ct) => (
-                            <button
-                              key={ct}
-                              type="button"
-                              onClick={() => {
-                                const next = l.catalogType === ct ? "" : ct;
-                                updateLine(i, {
-                                  catalogType: next,
-                                  productId: null,
-                                  productName: "",
-                                });
-                                setCatalogResults([]);
-                                if (next) searchCatalog(next, "");
-                              }}
-                              className={`px-2 py-0.5 text-[10px] rounded border font-medium transition-colors ${
-                                l.catalogType === ct
-                                  ? ct === "productos"
-                                    ? "bg-emerald-600/30 border-emerald-500/60 text-emerald-300"
-                                    : ct === "medidas"
-                                    ? "bg-blue-600/30 border-blue-500/60 text-blue-300"
-                                    : "bg-amber-600/30 border-amber-500/60 text-amber-300"
-                                  : "border-border/40 text-muted-foreground hover:border-border"
-                              }`}
-                            >
-                              {ct === "productos" ? "Productos" : ct === "medidas" ? "Medidas" : "Accesorios"}
-                            </button>
-                          ))}
+                      <div className="min-w-[260px] space-y-1">
+                        {/* Catalog modal buttons */}
+                        <div className="flex gap-1 items-center">
+                          <button
+                            type="button"
+                            onClick={() => openCatalogModal("medidas", i)}
+                            className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border font-medium transition-colors border-blue-500/50 text-blue-300 hover:bg-blue-600/20"
+                          >
+                            <Package className="w-2.5 h-2.5" />
+                            Medidas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openCatalogModal("accesorios", i)}
+                            className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border font-medium transition-colors border-amber-500/50 text-amber-300 hover:bg-amber-600/20"
+                          >
+                            <Package className="w-2.5 h-2.5" />
+                            Accesorios
+                          </button>
+                          {l.catalogType && (
+                            <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium ${
+                              l.catalogType === "medidas"
+                                ? "bg-blue-600/20 text-blue-300"
+                                : "bg-amber-600/20 text-amber-300"
+                            }`}>
+                              {l.catalogType === "medidas" ? "Medida" : "Accesorio"}
+                            </span>
+                          )}
                         </div>
+                        {/* Free-text name input */}
                         <Input
                           className="h-8 text-xs"
-                          placeholder={
-                            l.catalogType === "productos"
-                              ? "Buscar en Productos..."
-                              : l.catalogType === "medidas"
-                              ? "Buscar en Medidas..."
-                              : l.catalogType === "accesorios"
-                              ? "Buscar en Accesorios..."
-                              : "Escribir nombre libre..."
-                          }
+                          placeholder="Descripción del producto..."
                           value={l.productName || ""}
-                          onChange={(e) => {
+                          onChange={(e) =>
                             updateLine(i, {
                               productName: e.target.value,
                               productId: null,
-                            });
-                            setOpenProductIdx(i);
-                            if (l.catalogType) {
-                              searchCatalog(l.catalogType, e.target.value);
-                            }
-                          }}
-                          onFocus={() => {
-                            setOpenProductIdx(i);
-                            if (l.catalogType)
-                              searchCatalog(l.catalogType, l.productName || "");
-                          }}
-                          onBlur={() =>
-                            setTimeout(() => setOpenProductIdx(null), 200)
+                              catalogType: "",
+                            })
                           }
                         />
-                        {openProductIdx === i && (
-                          <div className="absolute z-[100] top-full left-0 w-96 bg-card border border-border rounded-lg shadow-xl max-h-72 overflow-y-auto mt-1">
-                            {l.catalogType ? (
-                              // Catalog mode: productos / medidas / accesorios
-                              catalogResults.length > 0 ? (
-                                catalogResults.map((p: any) => {
-                                  const price = p.price ?? p.sale_price ?? p.salePrice ?? null;
-                                  return (
-                                    <button
-                                      key={p.id}
-                                      type="button"
-                                      className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 border-b border-border/30 last:border-0"
-                                      onMouseDown={() => {
-                                        updateLine(i, {
-                                          productId: p.id,
-                                          productName: p.name,
-                                          productCode: p.code || "",
-                                          unit: p.unit || "UN",
-                                          unitPrice: String(price ?? 0),
-                                        });
-                                        setOpenProductIdx(null);
-                                      }}
-                                    >
-                                      <div className="font-medium truncate">{p.name}</div>
-                                      <div className="text-muted-foreground flex gap-2 flex-wrap mt-0.5">
-                                        {p.code && <span className="font-mono">{p.code}</span>}
-                                        {l.catalogType === "productos" && p.unit && (
-                                          <span>· {p.unit}</span>
-                                        )}
-                                        {l.catalogType === "productos" && price != null && (
-                                          <span className="text-emerald-400 font-medium">
-                                            {p.currency || "ARS"} {Number(price).toLocaleString("es-AR")}
-                                          </span>
-                                        )}
-                                        {l.catalogType === "medidas" && p.outer_diameter && (
-                                          <span>Ø{p.outer_diameter}mm</span>
-                                        )}
-                                        {l.catalogType === "medidas" && p.standard && (
-                                          <span className="truncate">{p.standard}</span>
-                                        )}
-                                        {l.catalogType === "accesorios" && p.accessory_type && (
-                                          <span>{p.accessory_type}</span>
-                                        )}
-                                        {l.catalogType === "accesorios" && p.standard && (
-                                          <span className="truncate">{p.standard}</span>
-                                        )}
-                                        {(l.catalogType === "medidas" || l.catalogType === "accesorios") && price != null && price > 0 && (
-                                          <span className="text-emerald-400 font-medium">
-                                            {Number(price).toLocaleString("es-AR")}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </button>
-                                  );
-                                })
-                              ) : (
-                                <div className="px-3 py-2 text-xs text-muted-foreground">
-                                  {l.productName
-                                    ? "Sin resultados para esa búsqueda."
-                                    : `Escribí para buscar en ${
-                                        l.catalogType === "productos" ? "Productos"
-                                        : l.catalogType === "medidas" ? "Medidas"
-                                        : "Accesorios"
-                                      }...`}
-                                </div>
-                              )
-                            ) : (
-                              // Free mode: type manually, no catalog
-                              <div className="px-3 py-3 text-xs text-muted-foreground space-y-1">
-                                <p className="font-medium text-foreground">Modo libre</p>
-                                <p>Elegí un catálogo arriba para buscar productos, o escribí el nombre directamente.</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </td>
                     <td className="p-2">
@@ -2003,6 +1943,173 @@ export default function QuoteEdit() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Búsqueda de Catálogo (Medidas / Accesorios) ── */}
+      <Dialog open={!!catalogModal?.open} onOpenChange={(o) => { if (!o) closeCatalogModal(); }}>
+        <DialogContent className="max-w-4xl w-full p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b border-border/50">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              {catalogModal?.type === "medidas" ? (
+                <span className="inline-flex items-center gap-1.5 text-blue-300">
+                  <Package className="w-4 h-4" />
+                  Catálogo de Medidas
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-amber-300">
+                  <Package className="w-4 h-4" />
+                  Catálogo de Accesorios
+                </span>
+              )}
+              <span className="text-muted-foreground font-normal text-sm ml-1">
+                — {catalogModalTotal.toLocaleString("es-AR")} registros
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Search bar */}
+          <div className="px-6 py-3 border-b border-border/30 bg-muted/20">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                autoFocus
+                className="pl-9 h-9"
+                placeholder="Buscar por código o nombre..."
+                value={catalogModalSearch}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCatalogModalSearch(val);
+                  setCatalogModalPage(1);
+                  if (catalogModalTimer.current) clearTimeout(catalogModalTimer.current);
+                  catalogModalTimer.current = setTimeout(() => {
+                    if (catalogModal) fetchCatalogModal(catalogModal.type, val, 1);
+                  }, 300);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Results table */}
+          <div className="overflow-auto" style={{ maxHeight: "420px" }}>
+            {catalogModalLoading ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                Cargando...
+              </div>
+            ) : catalogModalResults.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <Package className="w-8 h-8 mb-2 opacity-30" />
+                <p className="text-sm">Sin resultados{catalogModalSearch ? ` para "${catalogModalSearch}"` : ""}</p>
+              </div>
+            ) : (
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-card border-b border-border/50 z-10">
+                  <tr className="text-left text-[11px] text-muted-foreground uppercase">
+                    <th className="px-4 py-2 w-28">Código</th>
+                    <th className="px-4 py-2">Nombre</th>
+                    {catalogModal?.type === "medidas" && (
+                      <>
+                        <th className="px-4 py-2 w-20">Ø ext.</th>
+                        <th className="px-4 py-2 w-20">Esp.</th>
+                        <th className="px-4 py-2 w-28">Norma</th>
+                      </>
+                    )}
+                    {catalogModal?.type === "accesorios" && (
+                      <>
+                        <th className="px-4 py-2 w-32">Tipo</th>
+                        <th className="px-4 py-2 w-28">Norma</th>
+                      </>
+                    )}
+                    <th className="px-4 py-2 w-28 text-right">Precio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {catalogModalResults.map((p: any, idx: number) => {
+                    const price = p.sale_price ?? p.price ?? null;
+                    return (
+                      <tr
+                        key={`${p.source}-${p.id}-${idx}`}
+                        onClick={() => selectCatalogItem(p)}
+                        className="border-b border-border/20 hover:bg-white/5 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-2 font-mono text-muted-foreground">{p.code || "—"}</td>
+                        <td className="px-4 py-2 font-medium max-w-xs">
+                          <span className="line-clamp-2">{p.name}</span>
+                        </td>
+                        {catalogModal?.type === "medidas" && (
+                          <>
+                            <td className="px-4 py-2 text-muted-foreground">
+                              {p.outer_diameter ? `${p.outer_diameter}mm` : "—"}
+                            </td>
+                            <td className="px-4 py-2 text-muted-foreground">
+                              {p.nominal_thickness ? `${p.nominal_thickness}mm` : "—"}
+                            </td>
+                            <td className="px-4 py-2 text-muted-foreground truncate max-w-[112px]">
+                              {p.standard || "—"}
+                            </td>
+                          </>
+                        )}
+                        {catalogModal?.type === "accesorios" && (
+                          <>
+                            <td className="px-4 py-2 text-muted-foreground">{p.sub_type || "—"}</td>
+                            <td className="px-4 py-2 text-muted-foreground truncate max-w-[112px]">{p.standard || "—"}</td>
+                          </>
+                        )}
+                        <td className="px-4 py-2 text-right">
+                          {price != null && Number(price) > 0 ? (
+                            <span className="text-emerald-400 font-medium">
+                              {Number(price).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {catalogModalTotal > CATALOG_PAGE_SIZE && (
+            <div className="flex items-center justify-between px-6 py-3 border-t border-border/30 bg-muted/10 text-xs text-muted-foreground">
+              <span>
+                Página {catalogModalPage} de {Math.ceil(catalogModalTotal / CATALOG_PAGE_SIZE)}
+                {" · "}{catalogModalTotal.toLocaleString("es-AR")} registros
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2"
+                  disabled={catalogModalPage <= 1 || catalogModalLoading}
+                  onClick={() => {
+                    const p = catalogModalPage - 1;
+                    setCatalogModalPage(p);
+                    if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, p);
+                  }}
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2"
+                  disabled={catalogModalPage >= Math.ceil(catalogModalTotal / CATALOG_PAGE_SIZE) || catalogModalLoading}
+                  onClick={() => {
+                    const p = catalogModalPage + 1;
+                    setCatalogModalPage(p);
+                    if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, p);
+                  }}
+                >
+                  <ChevronRight className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
