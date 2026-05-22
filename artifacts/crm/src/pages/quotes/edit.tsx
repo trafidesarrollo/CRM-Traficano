@@ -89,13 +89,17 @@ const blankLine = (): Line => ({
 
 export default function QuoteEdit() {
   const [, params] = useRoute("/quotes/:id");
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
   const userRef = useRef<any>(undefined);
   useEffect(() => { userRef.current = user; });
   const isNew = !params || params.id === "new";
   const id = isNew ? null : parseInt(params!.id);
+
+  const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const urlOpportunityId = urlParams.get("opportunityId");
+  const urlClientId = urlParams.get("clientId");
 
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearch, setClientSearch] = useState("");
@@ -568,6 +572,17 @@ export default function QuoteEdit() {
       setForm((prev: any) => ({ ...prev, salespersonId: String(currentSalesperson.id) }));
     }
   }, [isNew, currentSalesperson?.id]);
+
+  // Pre-fill from URL params when creating from an opportunity
+  useEffect(() => {
+    if (!isNew) return;
+    const updates: any = {};
+    if (urlOpportunityId) updates.opportunityId = urlOpportunityId;
+    if (urlClientId) updates.clientId = urlClientId;
+    if (Object.keys(updates).length > 0) {
+      setForm((prev: any) => ({ ...prev, ...updates }));
+    }
+  }, [isNew]);
 
   useEffect(() => {
     if (isNew || !id) return;

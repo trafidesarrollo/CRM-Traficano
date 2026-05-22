@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, opportunitiesTable, salespeopleTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { db, opportunitiesTable, salespeopleTable, quotesTable, clientsTable } from "@workspace/db";
+import { eq, and, sql, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -47,6 +47,25 @@ router.post("/opportunities", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al crear oportunidad" });
+  }
+});
+
+router.get("/opportunities/:id/quotes", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = await db.select({
+      q: quotesTable,
+      clientName: clientsTable.companyName,
+      salespersonName: salespeopleTable.name,
+    }).from(quotesTable)
+      .leftJoin(clientsTable, eq(quotesTable.clientId, clientsTable.id))
+      .leftJoin(salespeopleTable, eq(quotesTable.salespersonId, salespeopleTable.id))
+      .where(eq(quotesTable.opportunityId, id))
+      .orderBy(desc(quotesTable.date));
+    res.json(data.map(r => ({ ...r.q, clientName: r.clientName, salespersonName: r.salespersonName })));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al obtener cotizaciones de la oportunidad" });
   }
 });
 

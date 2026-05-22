@@ -63,10 +63,12 @@ router.get("/quotes", async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const status = req.query.status as string | undefined;
     const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
+    const opportunityId = req.query.opportunityId ? parseInt(req.query.opportunityId as string) : undefined;
 
     const conds: any[] = [];
     if (status) conds.push(eq(quotesTable.status, status as any));
     if (clientId) conds.push(eq(quotesTable.clientId, clientId));
+    if (opportunityId) conds.push(eq(quotesTable.opportunityId, opportunityId));
 
     const where = conds.length ? and(...conds) : undefined;
 
