@@ -18,6 +18,12 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   expired:  { label: "Vencida",   color: "bg-orange-500/20 text-orange-300" },
 };
 
+const getQuoteStatusBadge = (q: any): { label: string; color: string } => {
+  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada", color: "bg-green-500/20 text-green-300" };
+  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",    color: "bg-red-500/20 text-red-300" };
+  return STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
+};
+
 export default function DashboardVendedor() {
   const { user } = useAuth();
   const [quotes, setQuotes] = useState<any[]>([]);
@@ -152,7 +158,7 @@ export default function DashboardVendedor() {
                     </thead>
                     <tbody>
                       {recent.map(q => {
-                        const s = STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
+                        const s = getQuoteStatusBadge(q);
                         return (
                           <tr key={q.id} className="border-b border-border/30 hover:bg-white/5">
                             <td className="px-4 py-3">

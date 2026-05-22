@@ -29,6 +29,12 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   expired:  { label: "Vencida",   color: "bg-orange-500/20 text-orange-300" },
 };
 
+const getQuoteStatusBadge = (q: any): { label: string; color: string } => {
+  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada", color: "bg-green-500/20 text-green-300" };
+  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",    color: "bg-red-500/20 text-red-300" };
+  return STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
+};
+
 const CLIENT_STATUS: Record<string, { label: string; color: string }> = {
   prospect:  { label: "Prospecto",         color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
   potential: { label: "Cliente Potencial", color: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
@@ -412,7 +418,7 @@ export default function ClientDetail() {
                   </thead>
                   <tbody>
                     {quotes.map((q: any) => {
-                      const s = STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
+                      const s = getQuoteStatusBadge(q);
                       return (
                         <tr key={q.id} className="border-b border-border/30 hover:bg-white/5">
                           <td className="p-3 font-mono">{q.number || `#${q.id}`}</td>

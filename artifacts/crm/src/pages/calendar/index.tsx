@@ -53,6 +53,12 @@ const QUOTE_STATUS: Record<string, { label: string; color: string }> = {
   expired:  { label: "Vencida",   color: "bg-orange-500/20 text-orange-300 border-orange-500/30" },
 };
 
+const getQuoteStatusBadge = (q: any): { label: string; color: string } => {
+  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
+  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",    color: "bg-red-500/20 text-red-300 border-red-500/30" };
+  return QUOTE_STATUS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300 border-gray-500/30" };
+};
+
 function startOfWeekMonday(d: Date) {
   const x = new Date(d);
   const day = x.getDay() === 0 ? 6 : x.getDay() - 1;
@@ -335,7 +341,7 @@ export default function CalendarPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-sm font-medium">{q.number || `Cot. #${q.id}`}</span>
-                            <Badge className={`text-xs ${QUOTE_STATUS[q.status]?.color || ""}`}>{QUOTE_STATUS[q.status]?.label || q.status}</Badge>
+                            <Badge className={`text-xs ${getQuoteStatusBadge(q).color}`}>{getQuoteStatusBadge(q).label}</Badge>
                           </div>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             {q.clientName && <span className="text-xs text-muted-foreground flex items-center gap-0.5"><Building2 className="w-3 h-3" />{q.clientName}</span>}
@@ -439,7 +445,7 @@ export default function CalendarPage() {
                   <div>
                     <DialogTitle className="text-left">{selQuote.number || `Cotización #${selQuote.id}`}</DialogTitle>
                     <div className="flex gap-1.5 mt-1">
-                      <Badge className={`text-xs ${QUOTE_STATUS[selQuote.status]?.color || ""}`}>{QUOTE_STATUS[selQuote.status]?.label || selQuote.status}</Badge>
+                      <Badge className={`text-xs ${getQuoteStatusBadge(selQuote).color}`}>{getQuoteStatusBadge(selQuote).label}</Badge>
                     </div>
                   </div>
                 </div>

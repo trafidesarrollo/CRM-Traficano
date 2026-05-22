@@ -19,6 +19,17 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: "Rechazada", partial: "Parcial", expired: "Vencida",
 };
 
+const getQuoteStatusBadge = (q: any): { label: string; color: string } => {
+  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada", color: "bg-green-500/20 text-green-300" };
+  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",    color: "bg-red-500/20 text-red-300" };
+  const colors: Record<string, string> = {
+    approved: "bg-green-500/20 text-green-300",
+    sent:     "bg-blue-500/20 text-blue-300",
+    rejected: "bg-red-500/20 text-red-300",
+  };
+  return { label: STATUS_LABELS[q.status] || q.status, color: colors[q.status] || "bg-gray-500/20 text-gray-300" };
+};
+
 export default function Reports() {
   const [days, setDays] = useState("30");
   const [summary, setSummary] = useState<any>({ quotes: {}, orders: {}, opportunities: {} });
@@ -242,13 +253,8 @@ export default function Reports() {
                               <span className="truncate max-w-[140px]">{q.clientName || "—"}</span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <Badge className={
-                                q.status === "approved" ? "bg-green-500/20 text-green-300" :
-                                q.status === "sent" ? "bg-blue-500/20 text-blue-300" :
-                                q.status === "rejected" ? "bg-red-500/20 text-red-300" :
-                                "bg-gray-500/20 text-gray-300"
-                              } style={{ fontSize: "10px" }}>
-                                {STATUS_LABELS[q.status] || q.status}
+                              <Badge className={getQuoteStatusBadge(q).color} style={{ fontSize: "10px" }}>
+                                {getQuoteStatusBadge(q).label}
                               </Badge>
                             </div>
                           </div>

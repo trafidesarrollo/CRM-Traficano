@@ -21,6 +21,12 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   expired: { label: "Vencida", color: "bg-orange-500/20 text-orange-300" },
 };
 
+const getQuoteStatusBadge = (q: any): { label: string; color: string } => {
+  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada", color: "bg-green-500/20 text-green-300" };
+  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",    color: "bg-red-500/20 text-red-300" };
+  return STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
+};
+
 const PRIORITY_COLORS: Record<string, string> = {
   ALTA: "bg-red-500/20 text-red-300",
   MEDIA: "bg-yellow-500/20 text-yellow-300",
@@ -109,7 +115,7 @@ export default function Quotes() {
             </thead>
             <tbody>
               {filtered.map(q => {
-                const s = STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
+                const s = getQuoteStatusBadge(q);
                 return (
                   <tr key={q.id} className="border-b border-border/30 hover:bg-white/5 cursor-pointer" onClick={() => navigate(`/quotes/${q.id}`)}>
                     <td className="p-3 font-mono">{q.number || `#${q.id}`}</td>

@@ -144,7 +144,8 @@ export default function QuoteEdit() {
   });
   const isLocked = !isNew && form.status === "approved";
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const [closeJustification, setCloseJustification] = useState("");
+  const [closeLostReason, setCloseLostReason] = useState("");
+  const [closeLostDetail, setCloseLostDetail] = useState("");
   const [closingQuote, setClosingQuote] = useState(false);
   const [lines, setLines] = useState<Line[]>([blankLine()]);
 
@@ -613,26 +614,31 @@ export default function QuoteEdit() {
   };
 
   const handleCloseQuote = async () => {
-    if (!closeJustification.trim()) {
-      toast({ title: "El justificativo es requerido", variant: "destructive" });
+    if (!closeLostReason) {
+      toast({ title: "Seleccioná el motivo de pérdida", variant: "destructive" });
       return;
     }
+    const closeReason = closeLostDetail.trim()
+      ? `${closeLostReason}: ${closeLostDetail.trim()}`
+      : closeLostReason;
     setClosingQuote(true);
     try {
       const r = await fetch(`${API}/api/quotes/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ status: "approved", closeReason: closeJustification.trim() }),
+        body: JSON.stringify({ status: "approved", closeReason }),
       });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
         throw new Error(e.error || "Error al cerrar");
       }
       const updated = await r.json();
-      setForm((prev: any) => ({ ...prev, status: updated.status, quoteStatus: updated.quoteStatus || "FINALIZADA", closeReason: updated.closeReason || closeJustification }));
+      setForm((prev: any) => ({ ...prev, status: updated.status, quoteStatus: updated.quoteStatus || "PERDIDA", closeReason: updated.closeReason || closeReason }));
       setShowCloseModal(false);
-      toast({ title: "Cotización cerrada" });
+      setCloseLostReason("");
+      setCloseLostDetail("");
+      toast({ title: "Cotización marcada como perdida" });
     } catch (e: any) {
       toast({ title: e.message, variant: "destructive" });
     } finally {
@@ -1544,28 +1550,44 @@ export default function QuoteEdit() {
 
       </div>{/* end isLocked wrapper */}
 
-      {/* ── Modal: Cerrar Cotización ── */}
-      <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
+      {/* ── Modal: Cerrar Cotización (Perdida) ── */}
+      <Dialog open={showCloseModal} onOpenChange={(open) => { setShowCloseModal(open); if (!open) { setCloseLostReason(""); setCloseLostDetail(""); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-400" />
-              Cerrar cotización
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              Marcar cotización como perdida
             </DialogTitle>
             <DialogDescription>
-              Esta acción cierra la cotización sin OC. Ingresá el motivo del cierre.
+              Esta acción cierra la cotización sin OC. Seleccioná el motivo principal.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <Label className="text-sm">Justificativo <span className="text-destructive">*</span></Label>
+              <Label className="text-sm">Motivo de pérdida <span className="text-destructive">*</span></Label>
+              <Select value={closeLostReason} onValueChange={setCloseLostReason}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Seleccioná el motivo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PRECIO">PRECIO — competidor más barato</SelectItem>
+                  <SelectItem value="FLETE">FLETE — costo de envío fuera de rango</SelectItem>
+                  <SelectItem value="PLAZO DE ENTREGA">PLAZO DE ENTREGA — el cliente necesitaba antes</SelectItem>
+                  <SelectItem value="CONDICIÓN DE PAGO">CONDICIÓN DE PAGO — no se adaptó al crédito</SelectItem>
+                  <SelectItem value="COMPETENCIA">COMPETENCIA — fue con otro proveedor</SelectItem>
+                  <SelectItem value="ESPECIFICACIÓN TÉCNICA">ESPECIFICACIÓN TÉCNICA — el producto no cumplía requisitos</SelectItem>
+                  <SelectItem value="CLIENTE DESISTIÓ">CLIENTE DESISTIÓ — proyecto cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm">Descripción adicional <span className="text-muted-foreground">(opcional)</span></Label>
               <Textarea
                 className="mt-1"
-                rows={4}
-                placeholder="Ej: El cliente desistió de la compra, presupuesto fuera de rango, perdida contra competencia..."
-                value={closeJustification}
-                onChange={(e) => setCloseJustification(e.target.value)}
-                autoFocus
+                rows={3}
+                placeholder="Detalle adicional o contexto del cierre..."
+                value={closeLostDetail}
+                onChange={(e) => setCloseLostDetail(e.target.value)}
               />
             </div>
             <div className="flex gap-2 justify-end">
@@ -1573,12 +1595,12 @@ export default function QuoteEdit() {
                 Cancelar
               </Button>
               <Button
-                className="bg-amber-600 hover:bg-amber-700"
+                className="bg-red-600 hover:bg-red-700"
                 onClick={handleCloseQuote}
-                disabled={closingQuote || !closeJustification.trim()}
+                disabled={closingQuote || !closeLostReason}
               >
                 <AlertCircle className="w-4 h-4 mr-1" />
-                {closingQuote ? "Cerrando..." : "Confirmar cierre"}
+                {closingQuote ? "Cerrando..." : "Confirmar pérdida"}
               </Button>
             </div>
           </div>
