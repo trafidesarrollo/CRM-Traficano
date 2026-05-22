@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGetClients, useGetSalespeople } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { ProspectsNearPotential } from "@/components/prospects-near-potential";
@@ -14,12 +14,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2, ListTodo } from "lucide-react";
+import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2, ListTodo, Columns3 } from "lucide-react";
 import { DuplicateWarning } from "@/components/duplicate-warning";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-// ─── Status config ──────────────────────────────────────────────────────────
+// ─── Column config ───────────────────────────────────────────────────────────
+const TOGGLEABLE_COLUMNS = [
+  { key: "emails",      label: "Emails",      default: true  },
+  { key: "phone",       label: "Teléfono",    default: false },
+  { key: "cuit",        label: "CUIT",        default: false },
+  { key: "industry",    label: "Industria",   default: true  },
+  { key: "city",        label: "Ciudad",      default: true  },
+  { key: "country",     label: "País",        default: false },
+  { key: "scale",       label: "Escala USD",  default: true  },
+  { key: "salesperson", label: "Vendedor",    default: false },
+  { key: "status",      label: "Estado",      default: true  },
+] as const;
+type ColKey = (typeof TOGGLEABLE_COLUMNS)[number]["key"];
+const LS_KEY = "crm:clients:columns";
+function loadCols(): Set<ColKey> {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return new Set(JSON.parse(raw) as ColKey[]);
+  } catch {}
+  return new Set(TOGGLEABLE_COLUMNS.filter(c => c.default).map(c => c.key));
+}
+
+// ─── Status config ───────────────────────────────────────────────────────────
 const CLIENT_STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
   prospect:  { label: "Prospecto",         badge: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
   potential: { label: "Cliente Potencial", badge: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
@@ -713,6 +735,30 @@ export default function Clients() {
   const [open, setOpen] = useState(false);
   const [editClient, setEditClient] = useState<any>(null);
 
+  // ── Column visibility ──
+  const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(loadCols);
+  const [colPickerOpen, setColPickerOpen] = useState(false);
+  const colPickerRef = useRef<HTMLDivElement>(null);
+  const col = (key: ColKey) => visibleCols.has(key);
+  const toggleCol = (key: ColKey) => {
+    setVisibleCols(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      localStorage.setItem(LS_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  };
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (colPickerRef.current && !colPickerRef.current.contains(e.target as Node)) {
+        setColPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+  const totalCols = 2 + visibleCols.size + 1; // Nro + Empresa + visible + actions
+
   const statusQuery = statusFilter.length ? statusFilter.join(",") : undefined;
   const { data: response, isLoading, refetch } = useGetClients({ search: search || undefined, status: statusQuery } as any);
   const { data: salespeopleRes } = useGetSalespeople();
@@ -805,6 +851,28 @@ export default function Clients() {
             </button>
           )}
         </div>
+
+        {/* ── Column picker ── */}
+        <div className="relative ml-auto" ref={colPickerRef}>
+          <Button variant="outline" size="sm" onClick={() => setColPickerOpen(p => !p)} className="gap-1.5">
+            <Columns3 className="w-3.5 h-3.5" />
+            Columnas
+            {visibleCols.size > 0 && (
+              <span className="ml-0.5 text-xs text-muted-foreground">({visibleCols.size})</span>
+            )}
+          </Button>
+          {colPickerOpen && (
+            <div className="absolute right-0 top-full mt-2 z-30 w-48 rounded-xl border border-border/60 bg-card shadow-xl p-2 space-y-0.5">
+              <p className="text-xs text-muted-foreground font-medium px-2 py-1">Mostrar columnas</p>
+              {TOGGLEABLE_COLUMNS.map(c => (
+                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer">
+                  <Checkbox checked={col(c.key)} onCheckedChange={() => toggleCol(c.key)} />
+                  <span className="text-sm">{c.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Prospectos a un paso de ser Potenciales ── */}
@@ -817,20 +885,24 @@ export default function Clients() {
             <TableRow>
               <TableHead className="w-24">Nro.</TableHead>
               <TableHead>Empresa</TableHead>
-              <TableHead>Emails</TableHead>
-              <TableHead>Industria</TableHead>
-              <TableHead>Ciudad</TableHead>
-              <TableHead>Escala USD</TableHead>
-              <TableHead>Estado</TableHead>
+              {col("emails")      && <TableHead>Emails</TableHead>}
+              {col("phone")       && <TableHead>Teléfono</TableHead>}
+              {col("cuit")        && <TableHead>CUIT</TableHead>}
+              {col("industry")    && <TableHead>Industria</TableHead>}
+              {col("city")        && <TableHead>Ciudad</TableHead>}
+              {col("country")     && <TableHead>País</TableHead>}
+              {col("scale")       && <TableHead>Escala USD</TableHead>}
+              {col("salesperson") && <TableHead>Vendedor</TableHead>}
+              {col("status")      && <TableHead>Estado</TableHead>}
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={totalCols} className="text-center py-8">Cargando...</TableCell></TableRow>
             ) : !response?.data?.length ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={totalCols} className="text-center py-12 text-muted-foreground">
                   <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p>No hay clientes{statusFilter.length ? " con ese filtro" : " todavía"}.</p>
                 </TableCell>
@@ -838,28 +910,51 @@ export default function Clients() {
             ) : response.data.map((client: any) => {
               const emails: string[] = Array.isArray(client.clientEmails) ? client.clientEmails : [];
               const cfg = CLIENT_STATUS_CONFIG[client.status] || CLIENT_STATUS_CONFIG.prospect;
+              const sp = salespeople.find((s: any) => s.id === client.assignedSalespersonId);
               return (
                 <TableRow key={client.id} className="border-border/50 hover:bg-white/5 cursor-pointer" onClick={() => setLocation(`/clients/${client.id}`)}>
                   <TableCell><span className="font-mono text-sm font-semibold text-primary/80">{client.externalId || client.id}</span></TableCell>
                   <TableCell>
                     <p className="font-medium">{client.companyName}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{client.taxId || ""}</p>
+                    {!col("cuit") && <p className="text-xs text-muted-foreground font-mono">{client.taxId || ""}</p>}
                   </TableCell>
-                  <TableCell>
-                    {emails.length > 0 ? (
-                      <div className="flex flex-col gap-0.5">{emails.slice(0, 2).map((em, i) => <span key={i} className="text-xs font-mono text-blue-400">{em}</span>)}</div>
-                    ) : <span className="text-xs text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{client.industry || "—"}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{client.city || "—"}</TableCell>
-                  <TableCell className="text-sm font-mono">
-                    {client.consumptionScale != null ? (
-                      <span className="text-amber-400">u$s {Number(client.consumptionScale).toLocaleString("es-AR")}</span>
-                    ) : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cfg.badge}>{cfg.label}</Badge>
-                  </TableCell>
+                  {col("emails") && (
+                    <TableCell>
+                      {emails.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">{emails.slice(0, 2).map((em, i) => <span key={i} className="text-xs font-mono text-blue-400">{em}</span>)}</div>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </TableCell>
+                  )}
+                  {col("phone") && (
+                    <TableCell className="text-sm text-muted-foreground">{client.phone || "—"}</TableCell>
+                  )}
+                  {col("cuit") && (
+                    <TableCell className="text-sm font-mono text-muted-foreground">{client.taxId || "—"}</TableCell>
+                  )}
+                  {col("industry") && (
+                    <TableCell className="text-muted-foreground text-sm">{client.industry || "—"}</TableCell>
+                  )}
+                  {col("city") && (
+                    <TableCell className="text-muted-foreground text-sm">{client.city || "—"}</TableCell>
+                  )}
+                  {col("country") && (
+                    <TableCell className="text-muted-foreground text-sm">{client.country || "—"}</TableCell>
+                  )}
+                  {col("scale") && (
+                    <TableCell className="text-sm font-mono">
+                      {client.consumptionScale != null ? (
+                        <span className="text-amber-400">u$s {Number(client.consumptionScale).toLocaleString("es-AR")}</span>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  )}
+                  {col("salesperson") && (
+                    <TableCell className="text-sm text-muted-foreground">{sp?.name || "—"}</TableCell>
+                  )}
+                  {col("status") && (
+                    <TableCell>
+                      <Badge variant="outline" className={cfg.badge}>{cfg.label}</Badge>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => openEdit(e, client)}>
                       <Pencil className="w-3.5 h-3.5" />
