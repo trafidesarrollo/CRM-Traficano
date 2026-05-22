@@ -175,6 +175,15 @@ router.post("/quotes", async (req, res) => {
     const { lines, ...rest } = req.body;
     const userId = (req as any).session?.userId;
     const data: any = { ...rest, createdBy: userId };
+
+    // Block quote creation for prospect clients
+    if (data.clientId) {
+      const [client] = await db.select({ status: clientsTable.status }).from(clientsTable).where(eq(clientsTable.id, data.clientId));
+      if (client?.status === "prospect") {
+        return res.status(400).json({ error: "CLIENTE PROSPECTO. ACTUALIZÁ LOS DATOS." });
+      }
+    }
+
     data.date = parseDateField(data.date) ?? new Date();
     data.deliveryDate = parseDateField(data.deliveryDate);
     data.dueDate = parseDateField(data.dueDate);

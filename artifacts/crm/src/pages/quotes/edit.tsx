@@ -589,6 +589,17 @@ export default function QuoteEdit() {
   };
 
   const save = async () => {
+    // Block prospect clients
+    const selectedClient = clients.find((c: any) => String(c.id) === String(form.clientId));
+    if (selectedClient?.status === "prospect") {
+      toast({
+        title: "Cliente prospecto — no se puede cotizar",
+        description: "Actualizá el estado del cliente a Potencial o Final antes de continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const required = [
       ["clientId", "Cliente"],
       ["cuit", "CUIT"],
@@ -944,8 +955,11 @@ export default function QuoteEdit() {
                           setClientSearchResults([]);
                         }}
                       >
-                        <div className="font-medium">
-                          {c.companyName || c.title}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{c.companyName || c.title}</span>
+                          {c.status === "prospect" && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 shrink-0">Prospecto</span>
+                          )}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {c.taxId || "Sin CUIT"}
@@ -955,6 +969,22 @@ export default function QuoteEdit() {
                   </div>
                 )}
               </div>
+              {/* Prospect warning banner */}
+              {(() => {
+                const sel = clients.find((c: any) => String(c.id) === String(form.clientId));
+                if (!sel || sel.status !== "prospect") return null;
+                return (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg border border-orange-500/40 bg-orange-500/10 px-3 py-2.5">
+                    <AlertCircle className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-orange-400">Cliente prospecto — no se puede cotizar</p>
+                      <p className="text-xs text-orange-300/80 mt-0.5">
+                        Actualizá el estado del cliente a <strong>Potencial</strong> o <strong>Final</strong> antes de crear una cotización.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <div>
               <Label>CUIT *</Label>
