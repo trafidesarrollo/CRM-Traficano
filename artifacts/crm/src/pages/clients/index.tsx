@@ -49,10 +49,10 @@ const CLIENT_STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
   final:     { label: "Cliente Final",     badge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
 };
 
-const REQUIRED_FOR_POTENTIAL = ["companyName", "taxId", "industry", "phone", "city"] as const;
+const REQUIRED_FOR_POTENTIAL = ["companyName", "taxId", "industry", "city"] as const;
 
 function isReadyForPotential(form: any): boolean {
-  return REQUIRED_FOR_POTENTIAL.every(f => form[f]?.trim()) && (form.clientEmails?.length > 0);
+  return REQUIRED_FOR_POTENTIAL.every(f => form[f]?.trim());
 }
 
 function isReadyForScale(form: any): boolean {
@@ -344,8 +344,8 @@ function ProspectsImportDialog({ onDone }: { onDone: () => void }) {
 
 // ─── Client form (create/edit) ────────────────────────────────────────────────
 const BLANK_FORM = {
-  companyName: "", taxId: "", industry: "", phone: "", city: "",
-  clientEmails: [] as string[], notes: "", consumptionScale: "",
+  companyName: "", taxId: "", industry: "", city: "",
+  notes: "", consumptionScale: "",
   assignedSalespersonId: undefined as number | undefined,
   assignedUserId: undefined as number | undefined,
 };
@@ -397,9 +397,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
           companyName: editClient.companyName || "",
           taxId: editClient.taxId || "",
           industry: editClient.industry || "",
-          phone: editClient.phone || "",
           city: editClient.city || "",
-          clientEmails: Array.isArray(editClient.clientEmails) ? editClient.clientEmails : [],
           notes: editClient.notes || "",
           consumptionScale: editClient.consumptionScale != null ? String(editClient.consumptionScale) : "",
           assignedSalespersonId: editClient.assignedSalespersonId || undefined,
@@ -437,9 +435,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         companyName: form.companyName.trim(),
         taxId: form.taxId.trim() || undefined,
         industry: form.industry.trim() || undefined,
-        phone: form.phone.trim() || undefined,
         city: form.city.trim() || undefined,
-        clientEmails: form.clientEmails,
         notes: form.notes.trim() || undefined,
         assignedSalespersonId: form.assignedSalespersonId || undefined,
         assignedUserId: form.assignedUserId || undefined,
@@ -535,7 +531,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
           {statusBadge(previewStatus)}
           {!editClient && (
             <span className="text-xs text-muted-foreground">
-              {ready ? "— campos completos" : isReadyForScale(form) ? "— agregá industria, teléfono y email para pasar a Potencial" : "— completá Nombre, CUIT y Ciudad para cargar escala"}
+              {ready ? "— campos completos" : isReadyForScale(form) ? "— agregá industria para pasar a Potencial" : "— completá Nombre, CUIT y Ciudad para cargar escala"}
             </span>
           )}
         </div>
@@ -560,18 +556,10 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
 
           <DuplicateWarning entity="clients" params={{ taxId: form.taxId, companyName: form.companyName }} />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Teléfono <span className="text-destructive">*</span></Label>
-              <Input value={form.phone} onChange={f("phone")} placeholder="+54 11 1234-5678" />
-            </div>
-            <div>
-              <Label>Ciudad <span className="text-destructive">*</span></Label>
-              <Input value={form.city} onChange={f("city")} placeholder="Buenos Aires" />
-            </div>
+          <div>
+            <Label>Ciudad <span className="text-destructive">*</span></Label>
+            <Input value={form.city} onChange={f("city")} placeholder="Buenos Aires" />
           </div>
-
-          <EmailManager emails={form.clientEmails} onChange={emails => setForm(p => ({ ...p, clientEmails: emails }))} />
 
           {/* ── Escala de consumo (visible con Nombre + CUIT + Ciudad) ── */}
           {(isReadyForScale(form) || (editClient && ["potential", "inactive", "final"].includes(editClient.status))) && (
