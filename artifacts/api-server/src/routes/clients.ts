@@ -130,7 +130,7 @@ router.get("/clients/:id/overview", async (req, res) => {
     const ordersData = orders.rows as any[];
     const totalQuoted = quotesData.reduce((s: number, q: any) => s + Number(q.net_amount || q.total || 0), 0);
     const totalOrdered = ordersData.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
-    const approvedQuotes = quotesData.filter((q: any) => q.status === "approved" || q.quote_status === "FINALIZADA");
+    const approvedQuotes = quotesData.filter((q: any) => q.quote_status === "FINALIZADA");
     const wonQuotes = approvedQuotes.length;
     const totalApproved = approvedQuotes.reduce((s: number, q: any) => s + Number(q.net_amount || q.total || 0), 0);
     const conversionRate = quotesData.length ? (wonQuotes / quotesData.length) * 100 : 0;

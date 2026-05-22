@@ -280,10 +280,8 @@ export default function ClientDetail() {
   const filteredTimeline = activitySpFilter === "all"
     ? mergedTimeline
     : mergedTimeline.filter((item: any) => {
-        if (item._kind === "activity") {
-          return (item.salesperson_id ?? item.salespersonId) === activitySpFilter;
-        }
-        return true; // tasks always shown
+        if (item._kind === "task") return false; // tasks have no salesperson — hide when filtering
+        return (item.salesperson_id ?? item.salespersonId) === activitySpFilter;
       });
   const cs = CLIENT_STATUS[client.status] || { label: client.status, color: "bg-gray-500/20 text-gray-300" };
 
@@ -423,21 +421,19 @@ export default function ClientDetail() {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Consumo anual proyectado</span>
                 </div>
-                <div className="flex items-end justify-between gap-4 mb-3 flex-wrap">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Se propuso</p>
-                    <p className="text-2xl font-bold font-mono text-amber-400">
-                      {proposed > 0 ? `u$s ${fmt(proposed)}` : <span className="text-muted-foreground text-base font-normal">Sin definir</span>}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground mb-0.5">
-                      Facturado · {stats.wonQuotes} {stats.wonQuotes === 1 ? "cotización cerrada" : "cotizaciones cerradas"}
-                    </p>
-                    <p className={`text-2xl font-bold font-mono ${over ? "text-emerald-400" : invoiced > 0 ? "text-green-400" : "text-muted-foreground"}`}>
-                      {invoiced > 0 ? `u$s ${fmt(invoiced)}` : "—"}
-                    </p>
-                  </div>
+                <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+                  <span className={`text-3xl font-bold font-mono ${over ? "text-emerald-400" : invoiced > 0 ? "text-green-400" : "text-muted-foreground"}`}>
+                    {invoiced > 0 ? `u$s ${fmt(invoiced)}` : "u$s 0"}
+                  </span>
+                  {proposed > 0 && (
+                    <>
+                      <span className="text-muted-foreground text-lg">/</span>
+                      <span className="text-xl font-mono text-amber-400">u$s {fmt(proposed)}</span>
+                    </>
+                  )}
+                  <span className="text-xs text-muted-foreground ml-1">
+                    · {stats.wonQuotes} {stats.wonQuotes === 1 ? "cotización cerrada" : "cotizaciones cerradas"}
+                  </span>
                 </div>
                 {proposed > 0 && (
                   <>

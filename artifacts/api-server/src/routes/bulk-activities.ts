@@ -193,7 +193,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         titulo?: string;
         novedad: string;
         accion?: string;
-        tareaId: number;
+        tareasACerrar: number[];
         accion_vendedor: "asociar_y_cerrar" | "solo_bitacora";
       }>;
     };
@@ -209,29 +209,44 @@ router.post("/bulk-activities/resolve", async (req, res) => {
     let createdTasks = 0;
 
     for (const row of rows) {
-      const shouldClose = row.accion_vendedor === "asociar_y_cerrar";
-      const taskInfo = shouldClose
-        ? await db.select({ title: tasksTable.title }).from(tasksTable).where(eq(tasksTable.id, row.tareaId)).limit(1)
-        : [];
+      const shouldClose = row.accion_vendedor === "asociar_y_cerrar" && row.tareasACerrar.length > 0;
 
-      const description = shouldClose && taskInfo[0]
-        ? `[Tarea cerrada: ${taskInfo[0].title}] ${row.novedad}` + (row.accion ? `\nAcción: ${row.accion}` : "")
-        : row.novedad + (row.accion ? `\nAcción: ${row.accion}` : "");
-
+      // Close all selected tasks
       if (shouldClose) {
-        await db.update(tasksTable)
-          .set({ status: "completed", completedAt: new Date() })
-          .where(eq(tasksTable.id, row.tareaId));
-      }
+        const taskTitles: string[] = [];
+        for (const tareaId of row.tareasACerrar) {
+          const [t] = await db.select({ title: tasksTable.title })
+            .from(tasksTable).where(eq(tasksTable.id, tareaId)).limit(1);
+          if (t) taskTitles.push(t.title);
+          await db.update(tasksTable)
+            .set({ status: "completed", completedAt: new Date() })
+            .where(eq(tasksTable.id, tareaId));
+        }
+        const closedLabel = taskTitles.length === 1
+          ? `[Tarea cerrada: ${taskTitles[0]}] `
+          : `[${taskTitles.length} tareas cerradas: ${taskTitles.join(", ")}] `;
+        const description = closedLabel + row.novedad + (row.accion ? `\nAcción: ${row.accion}` : "");
 
-      await db.insert(activitiesTable).values({
-        type: "note",
-        title: row.titulo || `Novedad - ${row.clientName}`,
-        clientId: row.clientId,
-        description,
-        outcome: row.accion || undefined,
-        completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
-      }).returning();
+        // ONE activity note per conflict row (no duplicates)
+        await db.insert(activitiesTable).values({
+          type: "note",
+          title: row.titulo || `Novedad - ${row.clientName}`,
+          clientId: row.clientId,
+          description,
+          outcome: row.accion || undefined,
+          completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
+        }).returning();
+      } else {
+        const description = row.novedad + (row.accion ? `\nAcción: ${row.accion}` : "");
+        await db.insert(activitiesTable).values({
+          type: "note",
+          title: row.titulo || `Novedad - ${row.clientName}`,
+          clientId: row.clientId,
+          description,
+          outcome: row.accion || undefined,
+          completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
+        }).returning();
+      }
       saved++;
 
       if (row.fechaSeguimiento) {

@@ -124,12 +124,11 @@ export default function CargaMasivaPage() {
     }
     setResolving(true);
     try {
-      // Expand: one row per task-to-close, or one row with solo_bitacora
-      const rows = conflicts.flatMap((c, i) => {
+      // One row per conflict, with all task IDs to close in an array
+      const rows = conflicts.map((c, i) => {
         const res = resolutions[i];
         if (res.accion === "asociar_y_cerrar" && res.tareasACerrar.length > 0) {
-          // One entry per selected task
-          return res.tareasACerrar.map(tareaId => ({
+          return {
             clientId: c.clientId,
             clientName: c.clientName,
             fecha: c.fecha,
@@ -138,11 +137,11 @@ export default function CargaMasivaPage() {
             titulo: c.titulo,
             novedad: c.novedad,
             accion: c.accion,
-            tareaId,
+            tareasACerrar: res.tareasACerrar,
             accion_vendedor: "asociar_y_cerrar" as const,
-          }));
+          };
         }
-        return [{
+        return {
           clientId: c.clientId,
           clientName: c.clientName,
           fecha: c.fecha,
@@ -151,9 +150,9 @@ export default function CargaMasivaPage() {
           titulo: c.titulo,
           novedad: c.novedad,
           accion: c.accion,
-          tareaId: c.tareasPendientes[0]?.id ?? 0,
+          tareasACerrar: [] as number[],
           accion_vendedor: "solo_bitacora" as const,
-        }];
+        };
       });
 
       const r = await fetch(`${API}/api/bulk-activities/resolve`, {
