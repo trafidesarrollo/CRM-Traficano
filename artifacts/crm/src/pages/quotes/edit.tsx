@@ -35,6 +35,8 @@ import {
   Clock,
   ListTodo,
   User,
+  UserCheck,
+  Activity,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -487,6 +489,13 @@ export default function QuoteEdit() {
 
   useEffect(() => { if (!isNew && id) loadLinkedTasks(); }, [id, isNew]);
 
+  // Auto-assign salesperson when creating new quote (vendor pre-fills themselves)
+  useEffect(() => {
+    if (isNew && currentSalesperson && !form.salespersonId) {
+      setForm((prev: any) => ({ ...prev, salespersonId: String(currentSalesperson.id) }));
+    }
+  }, [isNew, currentSalesperson?.id]);
+
   useEffect(() => {
     if (isNew || !id) return;
     fetch(`${API}/api/quotes/${id}`, { credentials: "include" })
@@ -642,14 +651,21 @@ export default function QuoteEdit() {
     });
     if (r.ok) {
       const data = await r.json();
-      toast({ title: "Cotización guardada" });
       if (isNew) {
-        setSavedQuote({
-          id: data.id,
-          number: data.number || `#${data.id}`,
-          clientId: data.clientId,
-        });
-        setShowFollowup(true);
+        setSavedQuote({ id: data.id, number: data.number || `#${data.id}`, clientId: data.clientId });
+        if (data.taskCreated) {
+          const spName = salespeople.find((s: any) => String(s.id) === form.salespersonId)?.name;
+          toast({
+            title: "Cotización creada",
+            description: `Tarea de seguimiento asignada a ${spName || "el vendedor responsable"}`,
+          });
+          setLocation(`/quotes/${data.id}`);
+        } else {
+          toast({ title: "Cotización guardada" });
+          setShowFollowup(true);
+        }
+      } else {
+        toast({ title: "Cotización guardada" });
       }
     } else {
       let errMsg = "Error al guardar";
@@ -1180,13 +1196,26 @@ export default function QuoteEdit() {
             </div>
 
             <div>
-              <Label>Vendedor *</Label>
+              <Label className="flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-muted-foreground" />
+                Creado por
+              </Label>
+              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-border/50 bg-muted/30 text-sm text-muted-foreground">
+                <span className="truncate">{user?.username || "—"}</span>
+                <Badge variant="outline" className="text-xs ml-auto shrink-0">Tú</Badge>
+              </div>
+            </div>
+            <div>
+              <Label className="flex items-center gap-1.5">
+                <UserCheck className="w-3.5 h-3.5 text-primary" />
+                Responsable de seguimiento *
+              </Label>
               <Select
                 value={form.salespersonId}
                 onValueChange={(v) => setForm({ ...form, salespersonId: v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar..." />
+                  <SelectValue placeholder="Seleccionar vendedor..." />
                 </SelectTrigger>
                 <SelectContent>
                   {salespeople.map((s: any) => (
@@ -1196,6 +1225,7 @@ export default function QuoteEdit() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">Se le asignará una tarea de seguimiento automáticamente</p>
             </div>
             <div>
               <Label>Tipo de orden</Label>

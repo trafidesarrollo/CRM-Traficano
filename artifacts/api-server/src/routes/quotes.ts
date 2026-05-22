@@ -192,7 +192,19 @@ router.post("/quotes", async (req, res) => {
 
     const [final] = await db.select().from(quotesTable).where(eq(quotesTable.id, quote.id));
 
-    res.status(201).json(final);
+    // Auto-create follow-up task assigned to the responsible salesperson
+    let taskCreated = false;
+    if (final.salespersonId) {
+      try {
+        await createQuoteTask(final.id, number, final.clientId, final.salespersonId, userId);
+        taskCreated = true;
+      } catch (e) {
+        // Non-fatal: quote was saved, task creation failed
+        console.warn("createQuoteTask failed:", e);
+      }
+    }
+
+    res.status(201).json({ ...final, taskCreated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
