@@ -171,14 +171,95 @@ export default function QuoteEdit() {
       .then(d => setLinkedTasks(Array.isArray(d) ? d : []))
       .catch(() => {});
   };
-  const completeLinkedTask = async (taskId: number) => {
-    await fetch(`${API}/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
-    });
-    loadLinkedTasks();
+
+  // Completion modal
+  const [taskToComplete, setTaskToComplete] = useState<any>(null);
+  const [completeNote, setCompleteNote] = useState("");
+  const [savingComplete, setSavingComplete] = useState(false);
+
+  const confirmCompleteTask = async () => {
+    if (!taskToComplete) return;
+    setSavingComplete(true);
+    try {
+      await fetch(`${API}/api/tasks/${taskToComplete.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
+      });
+      const clientId = taskToComplete.clientId || (form.clientId ? parseInt(form.clientId) : null);
+      if (clientId) {
+        const TASK_TO_ACT: Record<string, string> = {
+          call: "call", meeting: "visit", email: "email",
+          followup: "follow_up", task: "task", reminder: "task", visit: "visit",
+        };
+        const quoteRef = `COT-${String(id).padStart(5, "0")}`;
+        await fetch(`${API}/api/activities`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            type: TASK_TO_ACT[taskToComplete.type] || "task",
+            title: taskToComplete.title,
+            description: completeNote.trim() || `Tarea completada — ${quoteRef}`,
+            clientId,
+            outcome: completeNote.trim() || null,
+            completedAt: new Date().toISOString(),
+          }),
+        });
+      }
+      setTaskToComplete(null);
+      setCompleteNote("");
+      loadLinkedTasks();
+      toast({ title: "Tarea completada", description: clientId ? "Actividad registrada en la ficha del cliente" : undefined });
+    } catch {
+      toast({ title: "Error al completar", variant: "destructive" });
+    } finally {
+      setSavingComplete(false);
+    }
+  };
+
+  // New linked task modal
+  const [showNewLinkedTask, setShowNewLinkedTask] = useState(false);
+  const [newLinkedTaskForm, setNewLinkedTaskForm] = useState({ type: "followup", dueDate: "", notes: "" });
+  const [savingLinkedTask, setSavingLinkedTask] = useState(false);
+
+  const saveNewLinkedTask = async () => {
+    if (!newLinkedTaskForm.dueDate) {
+      toast({ title: "La fecha es requerida", variant: "destructive" }); return;
+    }
+    setSavingLinkedTask(true);
+    const TYPE_LABELS: Record<string, string> = {
+      followup: "Seguimiento", call: "Llamada", meeting: "Reunión", visit: "Visita", task: "Tarea",
+    };
+    const clientName = clients.find((c: any) => String(c.id) === form.clientId)?.companyName || "";
+    const quoteRef = `COT-${String(id).padStart(5, "0")}`;
+    try {
+      await fetch(`${API}/api/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: `${TYPE_LABELS[newLinkedTaskForm.type] || "Tarea"} — ${quoteRef}${clientName ? ` (${clientName})` : ""}`,
+          type: newLinkedTaskForm.type,
+          description: newLinkedTaskForm.notes || null,
+          dueDate: new Date(`${newLinkedTaskForm.dueDate}T09:00:00`).toISOString(),
+          clientId: form.clientId ? parseInt(form.clientId) : null,
+          quoteId: id,
+          status: "pending",
+          priority: "high",
+          assignedTo: user?.id || null,
+        }),
+      });
+      setShowNewLinkedTask(false);
+      setNewLinkedTaskForm({ type: "followup", dueDate: "", notes: "" });
+      loadLinkedTasks();
+      toast({ title: "Tarea creada y vinculada a la cotización" });
+    } catch {
+      toast({ title: "Error al crear la tarea", variant: "destructive" });
+    } finally {
+      setSavingLinkedTask(false);
+    }
   };
 
   const followupDateDefault = new Date(Date.now() + 3 * 86400000)
@@ -1586,9 +1667,14 @@ export default function QuoteEdit() {
                   <Badge variant="outline" className="text-xs ml-1">{linkedTasks.length}</Badge>
                 )}
               </h3>
-              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={loadLinkedTasks}>
-                Actualizar
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={loadLinkedTasks}>
+                  Actualizar
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => { setShowNewLinkedTask(true); setNewLinkedTaskForm({ type: "followup", dueDate: "", notes: "" }); }}>
+                  <Plus className="w-3 h-3" />Nueva tarea
+                </Button>
+              </div>
             </div>
 
             {linkedTasks.length === 0 ? (
@@ -1643,8 +1729,8 @@ export default function QuoteEdit() {
                           size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0 shrink-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                          title="Marcar como completada"
-                          onClick={() => completeLinkedTask(t.id)}
+                          title="Completar y agregar nota"
+                          onClick={() => { setTaskToComplete(t); setCompleteNote(""); }}
                         >
                           <CheckCircle2 className="w-4 h-4" />
                         </Button>
@@ -1657,6 +1743,114 @@ export default function QuoteEdit() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Modal: Completar tarea con nota ── */}
+      <Dialog open={!!taskToComplete} onOpenChange={(open) => { if (!open) { setTaskToComplete(null); setCompleteNote(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-400" />
+              Completar tarea
+            </DialogTitle>
+            <DialogDescription>
+              {taskToComplete?.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Nota / resultado <span className="text-muted-foreground/60">(opcional)</span>
+              </label>
+              <textarea
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                rows={3}
+                placeholder="¿Cómo resultó? ¿Qué se acordó? ¿Próximos pasos?"
+                value={completeNote}
+                onChange={e => setCompleteNote(e.target.value)}
+                autoFocus
+              />
+            </div>
+            {form.clientId && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 bg-primary/5 border border-primary/20 rounded-md px-3 py-2">
+                <Activity className="w-3 h-3 text-primary shrink-0" />
+                Esta acción registrará una actividad en la ficha del cliente
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setTaskToComplete(null); setCompleteNote(""); }}>Cancelar</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-500 text-white"
+              onClick={confirmCompleteTask}
+              disabled={savingComplete}
+            >
+              {savingComplete ? "Guardando…" : "Marcar como completada"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Nueva tarea vinculada ── */}
+      <Dialog open={showNewLinkedTask} onOpenChange={setShowNewLinkedTask}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListTodo className="w-5 h-5 text-primary" />
+              Nueva tarea vinculada
+            </DialogTitle>
+            <DialogDescription>
+              La tarea quedará asociada a esta cotización y al cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tipo de tarea</label>
+              <select
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                value={newLinkedTaskForm.type}
+                onChange={e => setNewLinkedTaskForm(f => ({ ...f, type: e.target.value }))}
+              >
+                <option value="followup">Seguimiento</option>
+                <option value="call">Llamada</option>
+                <option value="meeting">Reunión</option>
+                <option value="visit">Visita</option>
+                <option value="task">Tarea</option>
+                <option value="reminder">Recordatorio</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Fecha límite <span className="text-red-400">*</span></label>
+              <input
+                type="date"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                value={newLinkedTaskForm.dueDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={e => setNewLinkedTaskForm(f => ({ ...f, dueDate: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Descripción / notas <span className="text-muted-foreground/60">(opcional)</span></label>
+              <textarea
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                rows={2}
+                placeholder="¿Qué hay que hacer o verificar?"
+                value={newLinkedTaskForm.notes}
+                onChange={e => setNewLinkedTaskForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/30 border border-border/40 rounded-md px-3 py-2">
+              <User className="w-3 h-3 shrink-0" />
+              Se asignará a tu usuario. Podés reasignarla desde el módulo de Tareas.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowNewLinkedTask(false)}>Cancelar</Button>
+            <Button onClick={saveNewLinkedTask} disabled={savingLinkedTask || !newLinkedTaskForm.dueDate}>
+              {savingLinkedTask ? "Creando…" : "Crear tarea"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Modal: Cerrar Cotización (Perdida) ── */}
       <Dialog open={showCloseModal} onOpenChange={(open) => { setShowCloseModal(open); if (!open) { setCloseLostReason(""); setCloseLostDetail(""); } }}>
