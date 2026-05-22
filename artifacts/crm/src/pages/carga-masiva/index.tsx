@@ -3,11 +3,12 @@ import { AppLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import {
   Upload, FileUp, CheckCircle2, AlertCircle, AlertTriangle,
-  ChevronRight, RotateCcw, X, Loader2
+  ChevronRight, RotateCcw, X, Loader2, ListTodo
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -24,7 +25,13 @@ type ConflictRow = {
   tareasPendientes: Array<{ id: number; title: string; status: string; dueDate: string | null }>;
 };
 
-type Resolution = "asociar_y_cerrar" | "solo_bitacora" | null;
+// Per-conflict resolution: which task IDs to close, plus the main action
+type Resolution = {
+  // IDs of tasks the user checked to close
+  tareasACerrar: number[];
+  // "asociar_y_cerrar" = close selected tasks + log; "solo_bitacora" = just log; null = undecided
+  accion: "asociar_y_cerrar" | "solo_bitacora" | null;
+};
 
 export default function CargaMasivaPage() {
   const { toast } = useToast();
@@ -38,9 +45,31 @@ export default function CargaMasivaPage() {
   const [createdTasksDirect, setCreatedTasksDirect] = useState(0);
   const [conflicts, setConflicts] = useState<ConflictRow[]>([]);
   const [errors, setErrors] = useState<{ line: number; error: string }[]>([]);
-  const [resolutions, setResolutions] = useState<Record<number, { tareaId: number; accion: Resolution }>>({});
+  const [resolutions, setResolutions] = useState<Record<number, Resolution>>({});
   const [savedResolved, setSavedResolved] = useState(0);
   const [createdTasksResolved, setCreatedTasksResolved] = useState(0);
+
+  function toggleTask(conflictIdx: number, taskId: number) {
+    setResolutions(prev => {
+      const cur = prev[conflictIdx] ?? { tareasACerrar: [], accion: null };
+      const already = cur.tareasACerrar.includes(taskId);
+      const tareasACerrar = already
+        ? cur.tareasACerrar.filter(id => id !== taskId)
+        : [...cur.tareasACerrar, taskId];
+      // If at least one task selected → force "asociar_y_cerrar"; otherwise reset action
+      const accion = tareasACerrar.length > 0 ? "asociar_y_cerrar" : cur.accion === "asociar_y_cerrar" ? null : cur.accion;
+      return { ...prev, [conflictIdx]: { tareasACerrar, accion } };
+    });
+  }
+
+  function setAccion(conflictIdx: number, accion: "asociar_y_cerrar" | "solo_bitacora") {
+    setResolutions(prev => {
+      const cur = prev[conflictIdx] ?? { tareasACerrar: [], accion: null };
+      // If choosing "solo_bitacora", clear selected tasks
+      const tareasACerrar = accion === "solo_bitacora" ? [] : cur.tareasACerrar;
+      return { ...prev, [conflictIdx]: { tareasACerrar, accion } };
+    });
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -73,9 +102,9 @@ export default function CargaMasivaPage() {
       if ((data.conflicts || []).length === 0) {
         setStep("done");
       } else {
-        const init: Record<number, { tareaId: number; accion: Resolution }> = {};
-        (data.conflicts as ConflictRow[]).forEach((c, i) => {
-          init[i] = { tareaId: c.tareasPendientes[0].id, accion: null };
+        const init: Record<number, Resolution> = {};
+        (data.conflicts as ConflictRow[]).forEach((_, i) => {
+          init[i] = { tareasACerrar: [], accion: null };
         });
         setResolutions(init);
         setStep("conflicts");
@@ -95,18 +124,37 @@ export default function CargaMasivaPage() {
     }
     setResolving(true);
     try {
-      const rows = conflicts.map((c, i) => ({
-        clientId: c.clientId,
-        clientName: c.clientName,
-        fecha: c.fecha,
-        fechaSeguimiento: c.fechaSeguimiento,
-        urgencia: c.urgencia,
-        titulo: c.titulo,
-        novedad: c.novedad,
-        accion: c.accion,
-        tareaId: resolutions[i].tareaId,
-        accion_vendedor: resolutions[i].accion,
-      }));
+      // Expand: one row per task-to-close, or one row with solo_bitacora
+      const rows = conflicts.flatMap((c, i) => {
+        const res = resolutions[i];
+        if (res.accion === "asociar_y_cerrar" && res.tareasACerrar.length > 0) {
+          // One entry per selected task
+          return res.tareasACerrar.map(tareaId => ({
+            clientId: c.clientId,
+            clientName: c.clientName,
+            fecha: c.fecha,
+            fechaSeguimiento: c.fechaSeguimiento,
+            urgencia: c.urgencia,
+            titulo: c.titulo,
+            novedad: c.novedad,
+            accion: c.accion,
+            tareaId,
+            accion_vendedor: "asociar_y_cerrar" as const,
+          }));
+        }
+        return [{
+          clientId: c.clientId,
+          clientName: c.clientName,
+          fecha: c.fecha,
+          fechaSeguimiento: c.fechaSeguimiento,
+          urgencia: c.urgencia,
+          titulo: c.titulo,
+          novedad: c.novedad,
+          accion: c.accion,
+          tareaId: c.tareasPendientes[0]?.id ?? 0,
+          accion_vendedor: "solo_bitacora" as const,
+        }];
+      });
 
       const r = await fetch(`${API}/api/bulk-activities/resolve`, {
         method: "POST",
@@ -139,7 +187,7 @@ export default function CargaMasivaPage() {
   }
 
   const allResolved = conflicts.length > 0 && conflicts.every((_, i) => resolutions[i]?.accion !== null);
-  const pendingCount = conflicts.filter((_, i) => resolutions[i]?.accion === null).length;
+  const pendingCount = conflicts.filter((_, i) => !resolutions[i]?.accion).length;
 
   return (
     <AppLayout>
@@ -262,58 +310,81 @@ export default function CargaMasivaPage() {
               </p>
             </div>
 
-            {/* Conflict table */}
+            {/* Conflict cards */}
             <div className="space-y-3">
               {conflicts.map((c, i) => {
-                const res = resolutions[i];
+                const res = resolutions[i] ?? { tareasACerrar: [], accion: null };
+                const isSoloBitacora = res.accion === "solo_bitacora";
+                const hasSelection = res.tareasACerrar.length > 0;
+                const isResolved = res.accion !== null;
                 return (
-                  <div key={i} className={`bg-card border rounded-xl p-4 transition-colors ${res?.accion ? "border-green-500/30" : "border-yellow-500/30"}`}>
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-sm">{c.clientName}</span>
-                          <span className="text-xs text-muted-foreground">#{c.clientId}</span>
-                          {c.urgencia && (
-                            <Badge variant="outline" className="text-xs">{c.urgencia}</Badge>
-                          )}
-                          <span className="text-xs text-muted-foreground">{c.fecha}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{c.novedad}</p>
-                        {c.accion && (
-                          <p className="text-xs text-cyan-400/80">Acción: {c.accion}</p>
-                        )}
-
-                        {/* Pending tasks */}
-                        <div className="mt-3 space-y-1.5">
-                          <p className="text-xs font-medium text-yellow-400">Tarea(s) pendiente(s):</p>
-                          {c.tareasPendientes.map(t => (
-                            <div key={t.id} className="flex items-center gap-2 text-xs bg-yellow-500/10 rounded-lg px-3 py-1.5">
-                              <AlertTriangle className="w-3 h-3 text-yellow-400 flex-shrink-0" />
-                              <span className="font-medium">{t.title}</span>
-                              {t.dueDate && <span className="text-muted-foreground ml-auto">{new Date(t.dueDate).toLocaleDateString("es-AR")}</span>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="flex flex-col gap-2 min-w-[200px]">
-                        <button
-                          onClick={() => setResolutions(prev => ({ ...prev, [i]: { tareaId: c.tareasPendientes[0].id, accion: "asociar_y_cerrar" } }))}
-                          className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left ${res?.accion === "asociar_y_cerrar" ? "bg-green-500/20 border-green-500/50 text-green-300" : "border-border/50 text-muted-foreground hover:border-green-500/40 hover:bg-green-500/5"}`}
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
-                          Asociar a tarea y cerrarla
-                        </button>
-                        <button
-                          onClick={() => setResolutions(prev => ({ ...prev, [i]: { tareaId: c.tareasPendientes[0].id, accion: "solo_bitacora" } }))}
-                          className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left ${res?.accion === "solo_bitacora" ? "bg-blue-500/20 border-blue-500/50 text-blue-300" : "border-border/50 text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5"}`}
-                        >
-                          <X className="w-3.5 h-3.5 inline mr-1.5" />
-                          Solo guardar en bitácora
-                        </button>
-                      </div>
+                  <div key={i} className={`bg-card border rounded-xl p-4 transition-colors ${isResolved ? "border-green-500/30" : "border-yellow-500/30"}`}>
+                    {/* Header */}
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="font-semibold text-sm">{c.clientName}</span>
+                      <span className="text-xs text-muted-foreground font-mono">#{c.clientId}</span>
+                      {c.urgencia && <Badge variant="outline" className="text-xs">{c.urgencia}</Badge>}
+                      <span className="text-xs text-muted-foreground ml-auto">{c.fecha}</span>
                     </div>
+                    <p className="text-sm text-muted-foreground mb-1 line-clamp-2">{c.novedad}</p>
+                    {c.accion && <p className="text-xs text-cyan-400/80 mb-3">Acción registrada: {c.accion}</p>}
+
+                    {/* Tasks with checkboxes */}
+                    <div className="mt-3 mb-4 space-y-2">
+                      <p className="text-xs font-medium text-yellow-400 flex items-center gap-1.5">
+                        <ListTodo className="w-3.5 h-3.5" />
+                        Tareas pendientes — marcá las que cierra este evento:
+                      </p>
+                      {c.tareasPendientes.map(t => {
+                        const checked = res.tareasACerrar.includes(t.id);
+                        return (
+                          <label
+                            key={t.id}
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${checked ? "bg-green-500/10 border-green-500/40 text-green-300" : "bg-yellow-500/5 border-yellow-500/20 hover:border-yellow-500/40"}`}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={isSoloBitacora}
+                              onCheckedChange={() => toggleTask(i, t.id)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{t.title}</p>
+                              <p className="text-xs text-muted-foreground capitalize">{t.status.replace("_", " ")}</p>
+                            </div>
+                            {t.dueDate && (
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {new Date(t.dueDate).toLocaleDateString("es-AR")}
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    {/* Action selector */}
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => setAccion(i, "asociar_y_cerrar")}
+                        disabled={!hasSelection}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed ${res.accion === "asociar_y_cerrar" ? "bg-green-500/20 border-green-500/50 text-green-300" : "border-border/50 text-muted-foreground hover:border-green-500/40 hover:bg-green-500/5"}`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
+                        Cerrar tarea{res.tareasACerrar.length > 1 ? "s" : ""} seleccionada{res.tareasACerrar.length > 1 ? "s" : ""} y registrar
+                        {res.tareasACerrar.length > 0 && <span className="ml-1 text-green-400">({res.tareasACerrar.length})</span>}
+                      </button>
+                      <button
+                        onClick={() => setAccion(i, "solo_bitacora")}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left ${res.accion === "solo_bitacora" ? "bg-blue-500/20 border-blue-500/50 text-blue-300" : "border-border/50 text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5"}`}
+                      >
+                        <X className="w-3.5 h-3.5 inline mr-1.5" />
+                        Solo guardar en bitácora (sin cerrar tareas)
+                      </button>
+                    </div>
+                    {!isResolved && (
+                      <p className="text-xs text-yellow-500/70 mt-2">
+                        Seleccioná las tareas a cerrar y confirmá, o elegí "Solo bitácora".
+                      </p>
+                    )}
                   </div>
                 );
               })}
