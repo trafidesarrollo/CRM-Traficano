@@ -10,9 +10,11 @@ router.get("/tasks", async (req, res) => {
     const assignedTo = req.query.assignedTo ? parseInt(req.query.assignedTo as string) : undefined;
     const view = req.query.view as string | undefined;
 
+    const priority = req.query.priority as string | undefined;
     const conds: any[] = [];
     if (status) conds.push(eq(tasksTable.status, status as any));
     if (assignedTo) conds.push(eq(tasksTable.assignedTo, assignedTo));
+    if (priority && priority !== "all") conds.push(eq(tasksTable.priority, priority as any));
     if (view === "today") {
       const start = new Date(); start.setHours(0,0,0,0);
       const end = new Date(); end.setHours(23,59,59,999);
@@ -23,11 +25,11 @@ router.get("/tasks", async (req, res) => {
     }
     if (req.query.from) {
       const f = new Date(req.query.from as string);
-      if (!Number.isNaN(f.getTime())) conds.push(gt(tasksTable.dueDate, f));
+      if (!Number.isNaN(f.getTime())) conds.push(gte(tasksTable.dueDate, f));
     }
     if (req.query.to) {
       const t = new Date(req.query.to as string);
-      if (!Number.isNaN(t.getTime())) conds.push(lt(tasksTable.dueDate, t));
+      if (!Number.isNaN(t.getTime())) conds.push(lte(tasksTable.dueDate, t));
     }
     const where = conds.length ? and(...conds) : undefined;
 

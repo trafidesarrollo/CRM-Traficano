@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import {
   Plus, Trash2, Clock, AlertCircle, Calendar, ListTodo, RefreshCw,
   CheckCircle2, Circle, CalendarClock, User, Building2,
-  ChevronRight, Bell, X, FileText, DollarSign, ExternalLink
+  ChevronRight, Bell, X, FileText, DollarSign, ExternalLink, Filter
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -55,10 +55,15 @@ export default function Tasks() {
   const [, navigate] = useLocation();
   const isVendedor = user?.role === "vendedor";
 
+  const isAdmin = user?.role === "admin" || user?.role === "gerente_comercial" || user?.role === "gerente";
+
   const [items, setItems] = useState<any[]>([]);
   const [followups, setFollowups] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
-  const [view, setView] = useState<string>("all");
+  const [quickFilter, setQuickFilter] = useState<"all" | "today">("all");
+  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [newOpen, setNewOpen] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -102,8 +107,14 @@ export default function Tasks() {
   const load = async () => {
     try {
       const params = new URLSearchParams();
-      if (view !== "all") params.set("view", view);
+      if (quickFilter === "today") params.set("view", "today");
       if (isVendedor && user?.id) params.set("assignedTo", String(user.id));
+      if (filterPriority && filterPriority !== "all") params.set("priority", filterPriority);
+      if (dateFrom) params.set("from", new Date(dateFrom).toISOString());
+      if (dateTo) {
+        const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
+        params.set("to", to.toISOString());
+      }
       const r = await fetch(`${API}/api/tasks?${params}`, { credentials: "include" });
       const j = await r.json();
       setItems(Array.isArray(j) ? j : []);
@@ -119,13 +130,10 @@ export default function Tasks() {
     try {
       const now = new Date();
       const params = new URLSearchParams();
-      if (view === "today") {
+      if (quickFilter === "today") {
         params.set("from", startOfDay(now).toISOString());
         params.set("to", endOfDay(now).toISOString());
-      } else if (view === "overdue") {
-        params.set("to", now.toISOString()); // past only
       }
-      // "all" view: no date filter — show everything with followupDate
       if (isVendedor && salespersonId) params.set("salespersonId", String(salespersonId));
       const r = await fetch(`${API}/api/quotes/followups?${params}`, { credentials: "include" });
       if (r.ok) {
@@ -135,8 +143,8 @@ export default function Tasks() {
     } catch { setFollowups([]); }
   };
 
-  useEffect(() => { if (user !== undefined) load(); }, [view, user]);
-  useEffect(() => { if (user !== undefined) loadFollowups(); }, [view, user, salespersonId]);
+  useEffect(() => { if (user !== undefined) load(); }, [quickFilter, filterPriority, dateFrom, dateTo, user]);
+  useEffect(() => { if (user !== undefined) loadFollowups(); }, [quickFilter, user, salespersonId]);
 
   useEffect(() => {
     fetch(`${API}/api/users/assignable`, { credentials: "include" })
@@ -354,24 +362,111 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Stats */}
-      {stats.isTeamView && (
-        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-          <User className="w-3 h-3" />Mostrando métricas de todo el equipo
-        </p>
+      {/* Stats — totales de todo el equipo (admin) o propias (vendedor) */}
+      {isAdmin && (
+        <div className="flex items-center gap-1.5 mb-2 text-xs text-muted-foreground">
+          <User className="w-3 h-3" />
+          <span>Totales de todos los vendedores</span>
+        </div>
       )}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Pendientes</div><div className="text-3xl font-bold">{stats.pending || 0}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground flex items-center gap-1"><AlertCircle className="w-3 h-3 text-red-400" />Vencidas</div><div className="text-3xl font-bold text-red-400">{stats.overdue || 0}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3 text-blue-400" />Hoy</div><div className="text-3xl font-bold text-blue-400">{stats.today || 0}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Completadas</div><div className="text-3xl font-bold text-green-400">{stats.completed || 0}</div></CardContent></Card>
+      <div className="grid grid-cols-4 gap-3 mb-6">
+        <Card className="border-yellow-500/20">
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground mb-1">Pendientes</div>
+            <div className="text-3xl font-bold">{stats.pending ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-red-500/20">
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+              <AlertCircle className="w-3 h-3 text-red-400" />Vencidas
+            </div>
+            <div className="text-3xl font-bold text-red-400">{stats.overdue ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-blue-500/20">
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+              <Calendar className="w-3 h-3 text-blue-400" />Hoy
+            </div>
+            <div className="text-3xl font-bold text-blue-400">{stats.today ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-green-500/20">
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground mb-1">Completadas</div>
+            <div className="text-3xl font-bold text-green-400">{stats.completed ?? 0}</div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
-        {[["all", "Todas"], ["today", "Hoy"], ["overdue", "Vencidas"]].map(([v, l]) => (
-          <Button key={v} size="sm" variant={view === v ? "default" : "outline"} onClick={() => setView(v)}>{l}</Button>
-        ))}
+      {/* Filtros */}
+      <div className="flex flex-wrap items-end gap-3 mb-5 p-3 rounded-xl bg-white/3 border border-border/40">
+        <div className="flex items-center gap-1.5">
+          <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground font-medium">Filtros</span>
+        </div>
+        {/* Quick: Todas / Hoy */}
+        <div className="flex gap-1.5">
+          <Button
+            size="sm"
+            variant={quickFilter === "all" ? "default" : "outline"}
+            className="h-8 text-xs px-3"
+            onClick={() => setQuickFilter("all")}
+          >Todas</Button>
+          <Button
+            size="sm"
+            variant={quickFilter === "today" ? "default" : "outline"}
+            className="h-8 text-xs px-3"
+            onClick={() => setQuickFilter("today")}
+          >Hoy</Button>
+        </div>
+        {/* Priority */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Prioridad:</span>
+          <Select value={filterPriority} onValueChange={v => setFilterPriority(v)}>
+            <SelectTrigger className="h-8 text-xs w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="urgent">Urgente</SelectItem>
+              <SelectItem value="high">Alta</SelectItem>
+              <SelectItem value="medium">Media</SelectItem>
+              <SelectItem value="low">Baja</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Date range */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Desde:</span>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="h-8 text-xs w-36"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Hasta:</span>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="h-8 text-xs w-36"
+          />
+        </div>
+        {/* Clear date filters */}
+        {(dateFrom || dateTo || filterPriority !== "all") && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs text-muted-foreground hover:text-foreground px-2"
+            onClick={() => { setDateFrom(""); setDateTo(""); setFilterPriority("all"); }}
+          >
+            <X className="w-3 h-3 mr-1" />Limpiar
+          </Button>
+        )}
       </div>
 
       {/* ── Task list ── */}
