@@ -574,34 +574,45 @@ export default function ClientDetail() {
                 }
                 // Task item
                 const isCompleted = item.status === "completed";
-                return (
-                  <Card key={`task-${item.id}`} className={isCompleted ? "border-green-500/20" : "border-orange-500/20"}>
-                    <CardContent className="p-3 flex items-start gap-3">
-                      <span className="text-xl mt-0.5">{TASK_TYPE_ICONS[item.type] || "📋"}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <p className="font-medium text-sm truncate">{item.title}</p>
-                            <Badge className={`text-xs shrink-0 ${isCompleted ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
-                              {TASK_STATUS_LABELS[item.status] || item.status}
-                            </Badge>
-                          </div>
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {item._date ? new Date(item._date).toLocaleDateString("es-AR") : "—"}
-                          </span>
+                const taskQuoteId = item.quoteId ?? item.quote_id ?? null;
+                const cardContent = (
+                  <CardContent className="p-3 flex items-start gap-3">
+                    <span className="text-xl mt-0.5">{TASK_TYPE_ICONS[item.type] || "📋"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="font-medium text-sm truncate">{item.title}</p>
+                          <Badge className={`text-xs shrink-0 ${isCompleted ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
+                            {TASK_STATUS_LABELS[item.status] || item.status}
+                          </Badge>
                         </div>
-                        {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
-                        {item.assignee_name && (
-                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
-                            {item.completed_at && <span className="ml-2 text-green-400">· Cerrada el {new Date(item.completed_at).toLocaleDateString("es-AR")}</span>}
-                          </p>
-                        )}
-                        <p className="text-xs text-blue-400/60 mt-0.5 flex items-center gap-1">
-                          <ListTodo className="h-3 w-3" />Tarea
-                        </p>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {item._date ? new Date(item._date).toLocaleDateString("es-AR") : "—"}
+                        </span>
                       </div>
-                    </CardContent>
+                      {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
+                      {item.assignee_name && (
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
+                          {item.completed_at && <span className="ml-2 text-green-400">· Cerrada el {new Date(item.completed_at).toLocaleDateString("es-AR")}</span>}
+                        </p>
+                      )}
+                      <p className={`text-xs mt-0.5 flex items-center gap-1 ${taskQuoteId ? "text-primary/70" : "text-blue-400/60"}`}>
+                        <ListTodo className="h-3 w-3" />
+                        {taskQuoteId ? "Tarea — Ver cotización →" : "Tarea"}
+                      </p>
+                    </div>
+                  </CardContent>
+                );
+                return taskQuoteId ? (
+                  <Link key={`task-${item.id}`} href={`/quotes/${taskQuoteId}`}>
+                    <Card className={`cursor-pointer transition-colors hover:border-primary/40 ${isCompleted ? "border-green-500/20" : "border-orange-500/20"}`}>
+                      {cardContent}
+                    </Card>
+                  </Link>
+                ) : (
+                  <Card key={`task-${item.id}`} className={isCompleted ? "border-green-500/20" : "border-orange-500/20"}>
+                    {cardContent}
                   </Card>
                 );
               })}
