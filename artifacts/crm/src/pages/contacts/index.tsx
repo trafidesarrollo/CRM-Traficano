@@ -4,19 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetContacts, useCreateContact, useDeleteContact, useGetClients } from "@workspace/api-client-react";
-import { Plus, Search, Trash2, Phone, Mail, X, Contact2 } from "lucide-react";
+import { Plus, Search, Trash2, Phone, Mail, X, Contact2, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 
 const API = import.meta.env.VITE_API_URL || "";
 
 export default function Contacts() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [clientFilter, setClientFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", position: "", clientId: "", isPrimary: false });
@@ -39,9 +43,11 @@ export default function Contacts() {
     mutation: { onSuccess: () => { toast({ title: "Contacto eliminado" }); refetch(); } },
   });
 
-  const filtered = (contacts || []).filter((c: any) =>
-    `${c.firstName} ${c.lastName} ${c.email || ""}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = (contacts || []).filter((c: any) => {
+    const matchesSearch = `${c.firstName} ${c.lastName} ${c.email || ""} ${c.companyName || ""}`.toLowerCase().includes(search.toLowerCase());
+    const matchesClient = clientFilter === "all" || String(c.clientId) === clientFilter;
+    return matchesSearch && matchesClient;
+  });
 
   function toggle(id: number) {
     setSelected(prev => {
@@ -92,12 +98,16 @@ export default function Contacts() {
     }
   }
 
+  const clientsWithContacts = allClients.filter(c =>
+    (contacts || []).some((ct: any) => ct.clientId === c.id)
+  );
+
   return (
     <AppLayout>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">Contactos</h1>
-          <p className="text-muted-foreground mt-1">{contacts?.length || 0} contactos registrados</p>
+          <p className="text-muted-foreground mt-1">{filtered.length} de {contacts?.length || 0} contactos</p>
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setClientSearch(""); } }}>
           <DialogTrigger asChild>
@@ -158,9 +168,31 @@ export default function Contacts() {
         </Dialog>
       </div>
 
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar contactos..." className="pl-10 bg-card border-border/50" value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* ── Filtros ── */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Buscar por nombre, email o empresa..." className="pl-10 bg-card border-border/50" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Select value={clientFilter} onValueChange={v => { setClientFilter(v); setSelected(new Set()); }}>
+          <SelectTrigger className="w-full sm:w-64 bg-card border-border/50">
+            <Building2 className="w-4 h-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Filtrar por empresa" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las empresas</SelectItem>
+            {clientsWithContacts.map((c: any) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.companyName || c.company_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {clientFilter !== "all" && (
+          <Button variant="ghost" size="sm" onClick={() => setClientFilter("all")} className="shrink-0">
+            <X className="w-4 h-4 mr-1" />Limpiar filtro
+          </Button>
+        )}
       </div>
 
       {selected.size > 0 && (
@@ -177,10 +209,13 @@ export default function Contacts() {
       {isLoading ? (
         <div className="flex h-[30vh] items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">No se encontraron contactos</div>
+        <div className="text-center py-12 text-muted-foreground">
+          <Contact2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p>No se encontraron contactos{clientFilter !== "all" ? " para esta empresa" : ""}.</p>
+        </div>
       ) : (
         <>
-          <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer w-fit">
+          <label className="mb-3 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer w-fit">
             <Checkbox aria-label="Seleccionar todos los contactos" checked={selected.size > 0 && selected.size === filtered.length} onCheckedChange={toggleAll} />
             <span>Seleccionar todos</span>
           </label>
@@ -191,18 +226,34 @@ export default function Contacts() {
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
                       <Checkbox aria-label={`Seleccionar ${contact.firstName} ${contact.lastName}`} checked={selected.has(contact.id)} onCheckedChange={() => toggle(contact.id)} className="mt-1" />
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-lg truncate">{contact.firstName} {contact.lastName}</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-base truncate">{contact.firstName} {contact.lastName}</h3>
                         {contact.position && <p className="text-sm text-muted-foreground truncate">{contact.position}</p>}
+                        {contact.companyName && (
+                          <Link href={contact.clientId ? `/clients/${contact.clientId}` : "#"}>
+                            <Badge variant="outline" className="mt-1.5 text-xs gap-1 cursor-pointer hover:border-primary/50 transition-colors bg-white/5">
+                              <Building2 className="w-3 h-3" />
+                              {contact.companyName}
+                            </Badge>
+                          </Link>
+                        )}
                       </div>
                     </div>
                     <Button aria-label="Eliminar contacto" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => deleteMut.mutate({ id: contact.id })}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
-                  <div className="mt-4 space-y-2 text-sm">
-                    {contact.email && <div className="flex items-center gap-2 text-muted-foreground"><Mail className="w-3.5 h-3.5" />{contact.email}</div>}
-                    {contact.phone && <div className="flex items-center gap-2 text-muted-foreground"><Phone className="w-3.5 h-3.5" />{contact.phone}</div>}
+                  <div className="mt-3 space-y-1.5 text-sm">
+                    {contact.email && (
+                      <a href={`mailto:${contact.email}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                        <Mail className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{contact.email}</span>
+                      </a>
+                    )}
+                    {contact.phone && (
+                      <a href={`tel:${contact.phone}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                        <Phone className="w-3.5 h-3.5 shrink-0" />{contact.phone}
+                      </a>
+                    )}
                   </div>
                 </CardContent>
               </Card>

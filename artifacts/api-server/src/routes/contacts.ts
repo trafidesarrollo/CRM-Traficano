@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, contactsTable } from "@workspace/db";
-import { eq, ilike, and } from "drizzle-orm";
+import { db, contactsTable, clientsTable } from "@workspace/db";
+import { eq, ilike, and, or } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -16,14 +16,29 @@ router.get("/contacts", async (req, res) => {
     let conditions: any[] = [];
     if (clientId) conditions.push(eq(contactsTable.clientId, clientId));
     if (search) {
-      conditions.push(ilike(contactsTable.firstName, `%${search}%`));
+      conditions.push(or(
+        ilike(contactsTable.firstName, `%${search}%`),
+        ilike(contactsTable.lastName, `%${search}%`),
+        ilike(contactsTable.email, `%${search}%`),
+      ));
     }
 
-    const data = conditions.length > 0
-      ? await db.select().from(contactsTable).where(and(...conditions))
-      : await db.select().from(contactsTable);
+    const query = db.select({
+      contact: contactsTable,
+      companyName: clientsTable.companyName,
+    })
+      .from(contactsTable)
+      .leftJoin(clientsTable, eq(contactsTable.clientId, clientsTable.id));
 
-    res.json(data.map((row: any) => ({ ...row, fullName: contactName(row) })));
+    const data = conditions.length > 0
+      ? await query.where(and(...conditions))
+      : await query;
+
+    res.json(data.map(({ contact, companyName }) => ({
+      ...contact,
+      fullName: contactName(contact),
+      companyName: companyName || null,
+    })));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al listar contactos" });
