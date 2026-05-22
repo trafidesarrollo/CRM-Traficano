@@ -68,6 +68,13 @@ interface Line {
   notes?: string;
 }
 
+const CATALOG_PAGE_SIZE = 50;
+
+const blankFilters = () => ({
+  category: "", seamType: "", shape: "",
+  accessoryType: "", standard: "", hasPrice: false,
+});
+
 const blankLine = (): Line => ({
   productType: "REVENTA",
   catalogType: "",
@@ -285,13 +292,8 @@ export default function QuoteEdit() {
   const [catalogModalPage, setCatalogModalPage] = useState(1);
   const [catalogModalLoading, setCatalogModalLoading] = useState(false);
   const catalogModalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const CATALOG_PAGE_SIZE = 50;
 
-  const blankFilters = () => ({
-    category: "", seamType: "", shape: "",
-    accessoryType: "", standard: "", hasPrice: false,
-  });
-  const [catalogFilters, setCatalogFilters] = useState(blankFilters());
+  const [catalogFilters, setCatalogFilters] = useState(blankFilters);
   const [catalogFilterOpts, setCatalogFilterOpts] = useState<{
     categories: string[]; seamTypes: string[]; shapes: string[];
     accessoryTypes: string[]; accStandards: string[];
