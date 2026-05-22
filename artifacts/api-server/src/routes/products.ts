@@ -122,29 +122,34 @@ router.post("/products/medidas/import", async (req, res) => {
 // GET /api/products/catalog — unified catalog: accesorios + medidas, paginated + filtered
 router.get("/products/catalog", async (req, res) => {
   try {
+    const esc = (v: string) => v.replace(/'/g, "''");
     const search = (req.query.search as string || "").trim();
     const type = req.query.type as string | undefined; // "accesorios" | "medidas"
     const accessoryType = req.query.accessoryType as string | undefined;
+    const standard = req.query.standard as string | undefined;
     const category = req.query.category as string | undefined;
+    const seamType = req.query.seamType as string | undefined;
+    const shape = req.query.shape as string | undefined;
     const hasPrice = req.query.hasPrice === "true";
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
     const offset = (page - 1) * limit;
 
-    const searchLike = `%${search}%`;
-
     // Build accesorios query conditions
     const accConds: string[] = [];
-    if (search) accConds.push(`pa.name ILIKE '%${search.replace(/'/g, "''")}%'`);
-    if (accessoryType) accConds.push(`pa.accessory_type = '${accessoryType.replace(/'/g, "''")}'`);
-    if (hasPrice) accConds.push(`pa.sale_price IS NOT NULL`);
+    if (search) accConds.push(`(pa.name ILIKE '%${esc(search)}%' OR pa.code ILIKE '%${esc(search)}%')`);
+    if (accessoryType) accConds.push(`pa.accessory_type = '${esc(accessoryType)}'`);
+    if (standard) accConds.push(`pa.standard = '${esc(standard)}'`);
+    if (hasPrice) accConds.push(`pa.sale_price IS NOT NULL AND pa.sale_price > 0`);
     const accWhere = accConds.length ? `WHERE ${accConds.join(" AND ")}` : "";
 
     // Build medidas query conditions
     const medConds: string[] = [];
-    if (search) medConds.push(`pm.name ILIKE '%${search.replace(/'/g, "''")}%'`);
-    if (category) medConds.push(`pm.category = '${category.replace(/'/g, "''")}'`);
-    if (hasPrice) medConds.push(`pm.sale_price IS NOT NULL`);
+    if (search) medConds.push(`(pm.name ILIKE '%${esc(search)}%' OR pm.code ILIKE '%${esc(search)}%')`);
+    if (category) medConds.push(`pm.category = '${esc(category)}'`);
+    if (seamType) medConds.push(`pm.seam_type = '${esc(seamType)}'`);
+    if (shape) medConds.push(`pm.shape = '${esc(shape)}'`);
+    if (hasPrice) medConds.push(`pm.sale_price IS NOT NULL AND pm.sale_price > 0`);
     const medWhere = medConds.length ? `WHERE ${medConds.join(" AND ")}` : "";
 
     const accSelect = `
@@ -202,13 +207,19 @@ router.get("/products/catalog", async (req, res) => {
 // GET /api/products/catalog/filters — distinct filter values
 router.get("/products/catalog/filters", async (req, res) => {
   try {
-    const [accTypes, medCats] = await Promise.all([
+    const [accTypes, accStandards, medCats, medSeams, medShapes] = await Promise.all([
       db.execute(sql`SELECT DISTINCT accessory_type FROM products_accesorios WHERE accessory_type IS NOT NULL ORDER BY accessory_type`),
+      db.execute(sql`SELECT DISTINCT standard FROM products_accesorios WHERE standard IS NOT NULL ORDER BY standard`),
       db.execute(sql`SELECT DISTINCT category FROM products_medidas WHERE category IS NOT NULL ORDER BY category`),
+      db.execute(sql`SELECT DISTINCT seam_type FROM products_medidas WHERE seam_type IS NOT NULL ORDER BY seam_type`),
+      db.execute(sql`SELECT DISTINCT shape FROM products_medidas WHERE shape IS NOT NULL ORDER BY shape`),
     ]);
     res.json({
       accessoryTypes: (accTypes.rows as any[]).map(r => r.accessory_type),
+      accStandards: (accStandards.rows as any[]).map(r => r.standard),
       categories: (medCats.rows as any[]).map(r => r.category),
+      seamTypes: (medSeams.rows as any[]).map(r => r.seam_type),
+      shapes: (medShapes.rows as any[]).map(r => r.shape),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

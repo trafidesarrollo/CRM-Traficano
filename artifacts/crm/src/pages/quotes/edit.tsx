@@ -287,12 +287,33 @@ export default function QuoteEdit() {
   const catalogModalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const CATALOG_PAGE_SIZE = 50;
 
+  const blankFilters = () => ({
+    category: "", seamType: "", shape: "",
+    accessoryType: "", standard: "", hasPrice: false,
+  });
+  const [catalogFilters, setCatalogFilters] = useState(blankFilters());
+  const [catalogFilterOpts, setCatalogFilterOpts] = useState<{
+    categories: string[]; seamTypes: string[]; shapes: string[];
+    accessoryTypes: string[]; accStandards: string[];
+  }>({ categories: [], seamTypes: [], shapes: [], accessoryTypes: [], accStandards: [] });
+
   const fetchCatalogModal = useCallback(
-    async (type: string, query: string, page: number) => {
+    async (type: string, query: string, page: number, filters: typeof catalogFilters) => {
       setCatalogModalLoading(true);
       try {
-        const url = `${API}/api/products/catalog?type=${type}&search=${encodeURIComponent(query.trim())}&page=${page}&limit=${CATALOG_PAGE_SIZE}`;
-        const r = await fetch(url, { credentials: "include" });
+        const p = new URLSearchParams({
+          type,
+          search: query.trim(),
+          page: String(page),
+          limit: String(CATALOG_PAGE_SIZE),
+        });
+        if (filters.category) p.set("category", filters.category);
+        if (filters.seamType) p.set("seamType", filters.seamType);
+        if (filters.shape) p.set("shape", filters.shape);
+        if (filters.accessoryType) p.set("accessoryType", filters.accessoryType);
+        if (filters.standard) p.set("standard", filters.standard);
+        if (filters.hasPrice) p.set("hasPrice", "true");
+        const r = await fetch(`${API}/api/products/catalog?${p}`, { credentials: "include" });
         const data = await r.json();
         setCatalogModalResults(data.data || []);
         setCatalogModalTotal(data.total || 0);
@@ -307,18 +328,25 @@ export default function QuoteEdit() {
   );
 
   const openCatalogModal = (type: "medidas" | "accesorios", lineIdx: number) => {
+    const fresh = blankFilters();
     setCatalogModal({ open: true, type, lineIdx });
     setCatalogModalSearch("");
     setCatalogModalPage(1);
     setCatalogModalResults([]);
     setCatalogModalTotal(0);
-    fetchCatalogModal(type, "", 1);
+    setCatalogFilters(fresh);
+    fetchCatalogModal(type, "", 1, fresh);
+    fetch(`${API}/api/products/catalog/filters`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setCatalogFilterOpts(d))
+      .catch(() => {});
   };
 
   const closeCatalogModal = () => {
     setCatalogModal(null);
     setCatalogModalSearch("");
     setCatalogModalResults([]);
+    setCatalogFilters(blankFilters());
   };
 
   const selectCatalogItem = (p: any) => {
@@ -1969,7 +1997,7 @@ export default function QuoteEdit() {
           </DialogHeader>
 
           {/* Search bar */}
-          <div className="px-6 py-3 border-b border-border/30 bg-muted/20">
+          <div className="px-6 py-3 border-b border-border/30 bg-muted/20 space-y-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -1983,10 +2011,124 @@ export default function QuoteEdit() {
                   setCatalogModalPage(1);
                   if (catalogModalTimer.current) clearTimeout(catalogModalTimer.current);
                   catalogModalTimer.current = setTimeout(() => {
-                    if (catalogModal) fetchCatalogModal(catalogModal.type, val, 1);
+                    if (catalogModal) fetchCatalogModal(catalogModal.type, val, 1, catalogFilters);
                   }, 300);
                 }}
               />
+            </div>
+
+            {/* Filters row */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {catalogModal?.type === "medidas" && (
+                <>
+                  <select
+                    className="h-7 rounded border border-border/50 bg-background text-xs px-2 text-foreground focus:outline-none focus:border-border"
+                    value={catalogFilters.category}
+                    onChange={(e) => {
+                      const next = { ...catalogFilters, category: e.target.value };
+                      setCatalogFilters(next);
+                      setCatalogModalPage(1);
+                      if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, 1, next);
+                    }}
+                  >
+                    <option value="">Categoría</option>
+                    {catalogFilterOpts.categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+
+                  <select
+                    className="h-7 rounded border border-border/50 bg-background text-xs px-2 text-foreground focus:outline-none focus:border-border"
+                    value={catalogFilters.seamType}
+                    onChange={(e) => {
+                      const next = { ...catalogFilters, seamType: e.target.value };
+                      setCatalogFilters(next);
+                      setCatalogModalPage(1);
+                      if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, 1, next);
+                    }}
+                  >
+                    <option value="">Tipo de costura</option>
+                    {catalogFilterOpts.seamTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+
+                  <select
+                    className="h-7 rounded border border-border/50 bg-background text-xs px-2 text-foreground focus:outline-none focus:border-border"
+                    value={catalogFilters.shape}
+                    onChange={(e) => {
+                      const next = { ...catalogFilters, shape: e.target.value };
+                      setCatalogFilters(next);
+                      setCatalogModalPage(1);
+                      if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, 1, next);
+                    }}
+                  >
+                    <option value="">Forma</option>
+                    {catalogFilterOpts.shapes.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </>
+              )}
+
+              {catalogModal?.type === "accesorios" && (
+                <>
+                  <select
+                    className="h-7 rounded border border-border/50 bg-background text-xs px-2 text-foreground focus:outline-none focus:border-border"
+                    value={catalogFilters.accessoryType}
+                    onChange={(e) => {
+                      const next = { ...catalogFilters, accessoryType: e.target.value };
+                      setCatalogFilters(next);
+                      setCatalogModalPage(1);
+                      if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, 1, next);
+                    }}
+                  >
+                    <option value="">Tipo de accesorio</option>
+                    {catalogFilterOpts.accessoryTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+
+                  <select
+                    className="h-7 rounded border border-border/50 bg-background text-xs px-2 text-foreground focus:outline-none focus:border-border"
+                    value={catalogFilters.standard}
+                    onChange={(e) => {
+                      const next = { ...catalogFilters, standard: e.target.value };
+                      setCatalogFilters(next);
+                      setCatalogModalPage(1);
+                      if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, 1, next);
+                    }}
+                  >
+                    <option value="">Norma</option>
+                    {catalogFilterOpts.accStandards.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </>
+              )}
+
+              {/* Has price toggle — both types */}
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-3.5 h-3.5 accent-emerald-500"
+                  checked={catalogFilters.hasPrice}
+                  onChange={(e) => {
+                    const next = { ...catalogFilters, hasPrice: e.target.checked };
+                    setCatalogFilters(next);
+                    setCatalogModalPage(1);
+                    if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, 1, next);
+                  }}
+                />
+                <span className="text-xs text-muted-foreground">Con precio</span>
+              </label>
+
+              {/* Active filters count + clear */}
+              {(catalogFilters.category || catalogFilters.seamType || catalogFilters.shape ||
+                catalogFilters.accessoryType || catalogFilters.standard || catalogFilters.hasPrice) && (
+                <button
+                  type="button"
+                  className="ml-auto text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                  onClick={() => {
+                    const fresh = blankFilters();
+                    setCatalogFilters(fresh);
+                    setCatalogModalPage(1);
+                    if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, 1, fresh);
+                  }}
+                >
+                  Limpiar filtros
+                </button>
+              )}
             </div>
           </div>
 
@@ -2089,7 +2231,7 @@ export default function QuoteEdit() {
                   onClick={() => {
                     const p = catalogModalPage - 1;
                     setCatalogModalPage(p);
-                    if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, p);
+                    if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, p, catalogFilters);
                   }}
                 >
                   <ChevronLeft className="w-3 h-3" />
@@ -2102,7 +2244,7 @@ export default function QuoteEdit() {
                   onClick={() => {
                     const p = catalogModalPage + 1;
                     setCatalogModalPage(p);
-                    if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, p);
+                    if (catalogModal) fetchCatalogModal(catalogModal.type, catalogModalSearch, p, catalogFilters);
                   }}
                 >
                   <ChevronRight className="w-3 h-3" />
