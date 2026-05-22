@@ -525,6 +525,8 @@ export default function QuoteEdit() {
           status: q.status || "draft",
           purchaseOrder: q.purchaseOrder || "",
           closeReason: q.closeReason || "",
+          createdBy: q.createdBy ?? null,
+          createdByName: q.createdByName || "",
         });
         setLines(
           (q.lines || []).map((l: any) => ({
@@ -1202,8 +1204,14 @@ export default function QuoteEdit() {
                 Creado por
               </Label>
               <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-border/50 bg-muted/30 text-sm text-muted-foreground">
-                <span className="truncate">{user?.username || "—"}</span>
-                <Badge variant="outline" className="text-xs ml-auto shrink-0">Tú</Badge>
+                <span className="truncate">
+                  {isNew
+                    ? (user?.fullName || user?.username || "—")
+                    : (form.createdByName || user?.fullName || user?.username || "—")}
+                </span>
+                {(isNew || form.createdBy === user?.id) && (
+                  <Badge variant="outline" className="text-xs ml-auto shrink-0">Tú</Badge>
+                )}
               </div>
             </div>
             <div>

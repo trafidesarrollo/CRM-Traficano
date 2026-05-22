@@ -150,10 +150,15 @@ router.get("/quotes/followups", async (req, res) => {
 router.get("/quotes/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [quote] = await db.select().from(quotesTable).where(eq(quotesTable.id, id));
-    if (!quote) { res.status(404).json({ error: "No encontrada" }); return; }
+    const [row] = await db.select({
+      q: quotesTable,
+      createdByName: usersTable.fullName,
+    }).from(quotesTable)
+      .leftJoin(usersTable, eq(quotesTable.createdBy, usersTable.id))
+      .where(eq(quotesTable.id, id));
+    if (!row) { res.status(404).json({ error: "No encontrada" }); return; }
     const lines = await db.select().from(quoteLinesTable).where(eq(quoteLinesTable.quoteId, id)).orderBy(quoteLinesTable.lineNumber);
-    res.json({ ...quote, lines });
+    res.json({ ...row.q, createdByName: row.createdByName, lines });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
