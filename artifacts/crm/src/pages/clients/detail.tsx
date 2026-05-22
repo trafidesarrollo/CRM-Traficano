@@ -409,6 +409,61 @@ export default function ClientDetail() {
           </div>
         </div>
 
+        {/* ── Widget: Consumo propuesto vs. real facturado ── */}
+        {(() => {
+          const proposed = Number(client.consumption_scale ?? client.consumptionScale ?? 0);
+          const invoiced = Number(stats.totalApproved ?? 0);
+          const pct = proposed > 0 ? Math.min((invoiced / proposed) * 100, 100) : 0;
+          const over = proposed > 0 && invoiced > proposed;
+          if (proposed === 0 && invoiced === 0) return null;
+          return (
+            <Card className="border-border/50">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Consumo anual proyectado</span>
+                </div>
+                <div className="flex items-end justify-between gap-4 mb-3 flex-wrap">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Se propuso</p>
+                    <p className="text-2xl font-bold font-mono text-amber-400">
+                      {proposed > 0 ? `u$s ${fmt(proposed)}` : <span className="text-muted-foreground text-base font-normal">Sin definir</span>}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground mb-0.5">
+                      Facturado · {stats.wonQuotes} {stats.wonQuotes === 1 ? "cotización cerrada" : "cotizaciones cerradas"}
+                    </p>
+                    <p className={`text-2xl font-bold font-mono ${over ? "text-emerald-400" : invoiced > 0 ? "text-green-400" : "text-muted-foreground"}`}>
+                      {invoiced > 0 ? `u$s ${fmt(invoiced)}` : "—"}
+                    </p>
+                  </div>
+                </div>
+                {proposed > 0 && (
+                  <>
+                    <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-blue-400"}`}
+                        style={{ width: `${Math.max(pct, invoiced > 0 ? 2 : 0)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1.5">
+                      <span className="text-xs text-muted-foreground">0%</span>
+                      <span className={`text-xs font-medium ${over ? "text-emerald-400" : "text-muted-foreground"}`}>
+                        {over ? `${((invoiced / proposed) * 100).toFixed(0)}% — superado 🎯` : `${pct.toFixed(0)}% del objetivo`}
+                      </span>
+                      <span className="text-xs text-muted-foreground">100%</span>
+                    </div>
+                  </>
+                )}
+                {proposed === 0 && invoiced > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">Sin escala declarada — hay {stats.wonQuotes} cotización{stats.wonQuotes !== 1 ? "es" : ""} cerrada{stats.wonQuotes !== 1 ? "s" : ""} por u$s {fmt(invoiced)}</p>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         <Tabs defaultValue="quotes">
           <TabsList>
             <TabsTrigger value="quotes"><FileText className="h-4 w-4 mr-1.5" />Cotizaciones ({quotes.length})</TabsTrigger>

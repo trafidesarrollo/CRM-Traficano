@@ -130,7 +130,9 @@ router.get("/clients/:id/overview", async (req, res) => {
     const ordersData = orders.rows as any[];
     const totalQuoted = quotesData.reduce((s: number, q: any) => s + Number(q.net_amount || q.total || 0), 0);
     const totalOrdered = ordersData.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
-    const wonQuotes = quotesData.filter((q: any) => q.status === "approved").length;
+    const approvedQuotes = quotesData.filter((q: any) => q.status === "approved" || q.quote_status === "FINALIZADA");
+    const wonQuotes = approvedQuotes.length;
+    const totalApproved = approvedQuotes.reduce((s: number, q: any) => s + Number(q.net_amount || q.total || 0), 0);
     const conversionRate = quotesData.length ? (wonQuotes / quotesData.length) * 100 : 0;
 
     res.json({
@@ -140,7 +142,7 @@ router.get("/clients/:id/overview", async (req, res) => {
       contacts: contacts,
       activities: activities,
       tasks: tasks.rows as any[],
-      stats: { totalQuoted, totalOrdered, quotesCount: quotesData.length, ordersCount: ordersData.length, wonQuotes, conversionRate },
+      stats: { totalQuoted, totalOrdered, totalApproved, quotesCount: quotesData.length, ordersCount: ordersData.length, wonQuotes, conversionRate },
     });
   } catch (err) {
     req.log.error(err);
