@@ -264,6 +264,8 @@ export default function ClientDetail() {
     pending: "Pendiente", in_progress: "En progreso", completed: "Cerrada", deferred: "Diferida",
   };
 
+  const activeQuotes = quotes.filter((q: any) => ["draft", "sent", "partial", "expired"].includes(q.status));
+
   const mergedTimeline = [
     ...activities.map((a: any) => ({ ...a, _kind: "activity" as const, _date: a.createdAt })),
     ...tasks.map((t: any) => ({ ...t, _kind: "task" as const, _date: t.created_at || t.createdAt })),
@@ -297,6 +299,14 @@ export default function ClientDetail() {
             <Building2 className="h-5 w-5 text-primary" />
             <h1 className="text-xl font-bold">{client.company_name || client.companyName}</h1>
             <Badge className={cs.color}>{cs.label}</Badge>
+            {activeQuotes.length > 0 && (
+              <Link href={`/quotes?clientId=${client.id}`}>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors cursor-pointer">
+                  <FileText className="h-3 w-3" />
+                  {activeQuotes.length} cotización{activeQuotes.length !== 1 ? "es" : ""} activa{activeQuotes.length !== 1 ? "s" : ""}
+                </span>
+              </Link>
+            )}
           </div>
           <Button size="sm" variant="outline" onClick={openEdit}>
             <Pencil className="h-4 w-4 mr-1.5" />Editar cliente
