@@ -584,6 +584,7 @@ export default function QuoteEdit() {
           description: followupForm.notes || null,
           dueDate: dueDate.toISOString(),
           clientId: savedQuote?.clientId || null,
+          quoteId: savedQuote?.id || null,
           status: "pending",
           priority: "high",
         }),

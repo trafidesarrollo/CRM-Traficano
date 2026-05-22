@@ -1,6 +1,39 @@
 import { Router, type IRouter } from "express";
-import { db, quotesTable, quoteLinesTable, ordersTable, orderLinesTable, clientsTable, salespeopleTable } from "@workspace/db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { db, quotesTable, quoteLinesTable, ordersTable, orderLinesTable, clientsTable, salespeopleTable, tasksTable, usersTable } from "@workspace/db";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
+
+async function closeQuoteTasks(quoteId: number, tx: any = db) {
+  await tx.update(tasksTable)
+    .set({ status: "completed", completedAt: new Date() })
+    .where(and(
+      eq(tasksTable.quoteId, quoteId),
+      inArray(tasksTable.status, ["pending", "in_progress"] as any[])
+    ));
+}
+
+async function createQuoteTask(quoteId: number, quoteNumber: string, clientId: number | null, salespersonId: number | null, createdBy: number | null, tx: any = db) {
+  let assignedTo: number | null = null;
+  if (salespersonId) {
+    const [sp] = await tx.select({ userId: usersTable.id })
+      .from(usersTable)
+      .innerJoin(salespeopleTable, eq(salespeopleTable.userId, usersTable.id))
+      .where(eq(salespeopleTable.id, salespersonId));
+    if (sp) assignedTo = sp.userId;
+  }
+  const dueDate = new Date(Date.now() + 3 * 86400000);
+  await tx.insert(tasksTable).values({
+    title: `Seguimiento cotización ${quoteNumber}`,
+    type: "followup",
+    priority: "high",
+    status: "pending",
+    quoteId,
+    clientId,
+    assignedTo: assignedTo ?? createdBy,
+    createdBy,
+    dueDate,
+    description: `Tarea de seguimiento generada automáticamente para ${quoteNumber}.`,
+  });
+}
 
 const router: IRouter = Router();
 
@@ -158,6 +191,12 @@ router.post("/quotes", async (req, res) => {
     }
 
     const [final] = await db.select().from(quotesTable).where(eq(quotesTable.id, quote.id));
+
+    // Crear tarea de seguimiento automática vinculada a la cotización
+    try {
+      await createQuoteTask(final.id, final.number || `COT-${String(final.id).padStart(5,"0")}`, final.clientId ?? null, final.salespersonId ?? null, userId ?? null);
+    } catch {}
+
     res.status(201).json(final);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -198,6 +237,12 @@ router.patch("/quotes/:id", async (req, res) => {
       await recalcTotals(id);
     }
     const [row] = await db.select().from(quotesTable).where(eq(quotesTable.id, id));
+
+    // Si la cotización se cierra (aprobada/perdida), cerrar tareas pendientes vinculadas
+    if (data.status === "approved") {
+      try { await closeQuoteTasks(id); } catch {}
+    }
+
     res.json(row);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -260,6 +305,9 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
       if (quote.clientId) {
         await tx.update(clientsTable).set({ status: "final" }).where(eq(clientsTable.id, quote.clientId));
       }
+
+      // Cerrar tareas pendientes vinculadas a la cotización
+      await closeQuoteTasks(id, tx);
 
       return { orderId: order.id, orderNumber: number };
     });
