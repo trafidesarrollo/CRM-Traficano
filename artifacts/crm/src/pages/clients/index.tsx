@@ -371,10 +371,10 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
   const isAdmin = (user as any)?.role === "admin" || (user as any)?.role === "gerente" || (user as any)?.role === "gerente_comercial";
   const [form, setForm] = useState<ClientForm>({ ...BLANK_FORM });
   const [saving, setSaving] = useState(false);
-  // Buyer inline creation
-  const [showBuyerForm, setShowBuyerForm] = useState(false);
-  const [buyerForm, setBuyerForm] = useState({ firstName: "", lastName: "", email: "", phone: "", position: "" });
-  const [savingBuyer, setSavingBuyer] = useState(false);
+  // Contact inline creation (shown as step after save)
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactForm, setContactForm] = useState({ firstName: "", lastName: "", email: "", phone: "", position: "" });
+  const [savingContact, setSavingContact] = useState(false);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
   // Task inline creation
@@ -408,7 +408,8 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
       } else {
         setForm({ ...BLANK_FORM });
       }
-      setShowBuyerForm(false);
+      setShowContactForm(false);
+      setContactForm({ firstName: "", lastName: "", email: "", phone: "", position: "" });
       setCreatedClientId(null);
       setShowTaskForm(false);
       setTaskForm(BLANK_TASK);
@@ -487,8 +488,12 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         }
       }
 
-      if (showBuyerForm && buyerForm.firstName.trim() && savedId) {
-        await saveBuyer(savedId);
+      // If contact form is open and has data, save contact inline (edit mode)
+      // For new clients, open the contact modal after saving
+      if (showContactForm && contactForm.firstName.trim() && savedId && editClient) {
+        await saveContact(savedId);
+      } else if (showContactForm && contactForm.firstName.trim() && savedId && !editClient) {
+        await saveContact(savedId);
       } else {
         onSaved();
         onOpenChange(false);
@@ -500,16 +505,16 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
     }
   };
 
-  const saveBuyer = async (clientId: number) => {
-    if (!buyerForm.firstName.trim()) return;
-    setSavingBuyer(true);
+  const saveContact = async (clientId: number) => {
+    if (!contactForm.firstName.trim()) return;
+    setSavingContact(true);
     try {
       const r = await fetch(`${API}/api/contacts`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ clientId, firstName: buyerForm.firstName.trim(), lastName: buyerForm.lastName.trim(), email: buyerForm.email.trim(), phone: buyerForm.phone.trim(), position: buyerForm.position.trim() || "Comprador" }) });
-      if (!r.ok) throw new Error("Error al crear comprador");
-      toast({ title: "Comprador creado" });
-    } catch { toast({ title: "Comprador no guardado — podés agregarlo luego desde la ficha", variant: "destructive" }); }
-    finally { setSavingBuyer(false); onSaved(); onOpenChange(false); }
+        body: JSON.stringify({ clientId, firstName: contactForm.firstName.trim(), lastName: contactForm.lastName.trim(), email: contactForm.email.trim(), phone: contactForm.phone.trim(), position: contactForm.position.trim() || "Contacto" }) });
+      if (!r.ok) throw new Error("Error al crear contacto");
+      toast({ title: "Contacto creado" });
+    } catch { toast({ title: "Contacto no guardado — podés agregarlo luego desde la ficha", variant: "destructive" }); }
+    finally { setSavingContact(false); onSaved(); onOpenChange(false); }
   };
 
   return (
@@ -622,95 +627,100 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             </div>
           )}
 
-          {/* ── Comprador inline ── */}
-          {!showBuyerForm ? (
-            <button type="button" onClick={() => setShowBuyerForm(true)}
+          {/* ── Contacto inline ── */}
+          {!showContactForm ? (
+            <button type="button" onClick={() => setShowContactForm(true)}
               className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border border-dashed border-border/50 rounded-lg px-3 py-2 hover:border-border transition-colors">
               <UserPlus className="w-4 h-4" />
-              {editClient ? "Agregar comprador a esta empresa" : "Agregar comprador (opcional)"}
+              {editClient ? "Agregar contacto a esta empresa" : "Agregar contacto (opcional)"}
             </button>
           ) : (
             <div className="rounded-lg border border-border/50 p-3 space-y-3 bg-muted/10">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium flex items-center gap-1.5"><UserPlus className="w-4 h-4" />Datos del Comprador</p>
-                <button type="button" onClick={() => setShowBuyerForm(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+                <p className="text-sm font-medium flex items-center gap-1.5"><UserPlus className="w-4 h-4" />Datos del Contacto</p>
+                <button type="button" onClick={() => setShowContactForm(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
               </div>
               {editClient && (
-                <p className="text-xs text-amber-400 bg-amber-500/10 rounded px-2 py-1">El comprador se vincula a la empresa ya guardada.</p>
+                <p className="text-xs text-amber-400 bg-amber-500/10 rounded px-2 py-1">El contacto se vincula a la empresa ya guardada.</p>
+              )}
+              {!editClient && (
+                <p className="text-xs text-muted-foreground bg-muted/20 rounded px-2 py-1">El contacto se creará al guardar el cliente.</p>
               )}
               <div className="grid grid-cols-2 gap-2">
-                <div><Label className="text-xs">Nombre *</Label><Input value={buyerForm.firstName} onChange={e => setBuyerForm(p => ({ ...p, firstName: e.target.value }))} placeholder="Juan" /></div>
-                <div><Label className="text-xs">Apellido</Label><Input value={buyerForm.lastName} onChange={e => setBuyerForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Pérez" /></div>
+                <div><Label className="text-xs">Nombre *</Label><Input value={contactForm.firstName} onChange={e => setContactForm(p => ({ ...p, firstName: e.target.value }))} placeholder="Juan" /></div>
+                <div><Label className="text-xs">Apellido</Label><Input value={contactForm.lastName} onChange={e => setContactForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Pérez" /></div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div><Label className="text-xs">Email</Label><Input type="email" value={buyerForm.email} onChange={e => setBuyerForm(p => ({ ...p, email: e.target.value }))} placeholder="juan@empresa.com" /></div>
-                <div><Label className="text-xs">Teléfono</Label><Input value={buyerForm.phone} onChange={e => setBuyerForm(p => ({ ...p, phone: e.target.value }))} /></div>
+                <div><Label className="text-xs">Email</Label><Input type="email" value={contactForm.email} onChange={e => setContactForm(p => ({ ...p, email: e.target.value }))} placeholder="juan@empresa.com" /></div>
+                <div><Label className="text-xs">Teléfono</Label><Input value={contactForm.phone} onChange={e => setContactForm(p => ({ ...p, phone: e.target.value }))} /></div>
               </div>
-              <div><Label className="text-xs">Rol / Puesto</Label><Input value={buyerForm.position} onChange={e => setBuyerForm(p => ({ ...p, position: e.target.value }))} placeholder="Comprador, Gerente de compras..." /></div>
+              <div><Label className="text-xs">Cargo / Puesto</Label><Input value={contactForm.position} onChange={e => setContactForm(p => ({ ...p, position: e.target.value }))} placeholder="Gerente de compras, Encargado..." /></div>
               {editClient && (
-                <Button type="button" size="sm" className="w-full" disabled={savingBuyer || !buyerForm.firstName.trim()}
-                  onClick={async () => { await saveBuyer(editClient.id); onSaved(); onOpenChange(false); }}>
-                  {savingBuyer ? "Guardando..." : "Guardar comprador"}
+                <Button type="button" size="sm" className="w-full" disabled={savingContact || !contactForm.firstName.trim()}
+                  onClick={async () => { await saveContact(editClient.id); }}>
+                  {savingContact ? "Guardando..." : "Guardar contacto"}
                 </Button>
               )}
             </div>
           )}
 
-          {/* ── Tarea inline ── */}
-          {!showTaskForm ? (
-            <button type="button" onClick={() => setShowTaskForm(true)}
-              className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border border-dashed border-border/50 rounded-lg px-3 py-2 hover:border-border transition-colors">
-              <ListTodo className="w-4 h-4" />
-              Asignar tarea a un vendedor (opcional)
-            </button>
-          ) : (
-            <div className="rounded-lg border border-border/50 p-3 space-y-3 bg-muted/10">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium flex items-center gap-1.5"><ListTodo className="w-4 h-4" />Nueva Tarea</p>
-                <button type="button" onClick={() => setShowTaskForm(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
-              </div>
-              <div>
-                <Label className="text-xs">Descripción de la tarea *</Label>
-                <Input value={taskForm.title} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} placeholder="Ej: Llamar para seguimiento inicial" />
-              </div>
-              <div>
-                <Label className="text-xs">Prioridad</Label>
-                <Select value={taskForm.priority} onValueChange={v => setTaskForm(p => ({ ...p, priority: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baja</SelectItem>
-                    <SelectItem value="medium">Media</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="urgent">Urgente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+          {/* ── Tarea inline — solo si el cliente no tiene vendedor ya asignado ── */}
+          {!editClient?.assignedSalespersonId && (
+            !showTaskForm ? (
+              <button type="button" onClick={() => setShowTaskForm(true)}
+                className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border border-dashed border-border/50 rounded-lg px-3 py-2 hover:border-border transition-colors">
+                <ListTodo className="w-4 h-4" />
+                Asignar tarea a un vendedor (opcional)
+              </button>
+            ) : (
+              <div className="rounded-lg border border-border/50 p-3 space-y-3 bg-muted/10">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium flex items-center gap-1.5"><ListTodo className="w-4 h-4" />Nueva Tarea</p>
+                  <button type="button" onClick={() => setShowTaskForm(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+                </div>
                 <div>
-                  <Label className="text-xs">Asignar a</Label>
-                  <Select
-                    value={taskForm.assignedToUserId || "none"}
-                    onValueChange={v => {
-                      const uid = v === "none" ? "" : v;
-                      setTaskForm(p => ({ ...p, assignedToUserId: uid }));
-                      setForm(p => ({ ...p, assignedUserId: uid ? Number(uid) : undefined }));
-                    }}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                  <Label className="text-xs">Descripción de la tarea *</Label>
+                  <Input value={taskForm.title} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} placeholder="Ej: Llamar para seguimiento inicial" />
+                </div>
+                <div>
+                  <Label className="text-xs">Prioridad</Label>
+                  <Select value={taskForm.priority} onValueChange={v => setTaskForm(p => ({ ...p, priority: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sin asignar</SelectItem>
-                      {users.map((u: any) => (
-                        <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
-                      ))}
+                      <SelectItem value="low">Baja</SelectItem>
+                      <SelectItem value="medium">Media</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-xs">Fecha límite</Label>
-                  <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm(p => ({ ...p, dueDate: e.target.value }))} />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Asignar a</Label>
+                    <Select
+                      value={taskForm.assignedToUserId || "none"}
+                      onValueChange={v => {
+                        const uid = v === "none" ? "" : v;
+                        setTaskForm(p => ({ ...p, assignedToUserId: uid }));
+                        setForm(p => ({ ...p, assignedUserId: uid ? Number(uid) : undefined }));
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        {users.map((u: any) => (
+                          <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Fecha límite</Label>
+                    <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm(p => ({ ...p, dueDate: e.target.value }))} />
+                  </div>
                 </div>
               </div>
-            </div>
+            )
           )}
 
           <div className="flex justify-end gap-3 pt-1">
