@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2, ListTodo, Columns3 } from "lucide-react";
+import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2, ListTodo, Columns3, ChevronsUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { DuplicateWarning } from "@/components/duplicate-warning";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -725,6 +725,25 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
   );
 }
 
+// ─── SortHead helper ──────────────────────────────────────────────────────────
+type SortKey = "company" | "scale" | "status" | "city" | "industry";
+function SortHead({ label, sk, sortKey, sortDir, onSort, inline }: {
+  label: string; sk: SortKey;
+  sortKey: SortKey | null; sortDir: "asc" | "desc";
+  onSort: (k: SortKey) => void; inline?: boolean;
+}) {
+  const active = sortKey === sk;
+  const Icon = active ? (sortDir === "asc" ? ChevronUp : ChevronDown) : ChevronsUpDown;
+  const btn = (
+    <button onClick={() => onSort(sk)}
+      className={`flex items-center gap-1 group select-none ${active ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+      {label}
+      <Icon className={`w-3.5 h-3.5 transition-opacity ${active ? "opacity-100" : "opacity-40 group-hover:opacity-70"}`} />
+    </button>
+  );
+  return inline ? btn : <TableHead>{btn}</TableHead>;
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 const ALL_STATUSES = ["prospect", "potential", "inactive", "final"] as const;
 
@@ -781,7 +800,32 @@ export default function Clients() {
   const [savingContact, setSavingContact] = useState(false);
   const [contactClientSearch, setContactClientSearch] = useState("");
 
+  // ── Sorting ──
+  const [sortKey, setSortKey] = useState<"company" | "scale" | "status" | "city" | "industry" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const toggleSort = (key: typeof sortKey) => {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(key === "scale" ? "desc" : "asc"); }
+  };
+  const STATUS_ORDER: Record<string, number> = { final: 4, potential: 3, inactive: 2, prospect: 1 };
+
   const allClients: any[] = (response as any)?.data || [];
+
+  const sortedClients = useMemo(() => {
+    if (!sortKey) return allClients;
+    return [...allClients].sort((a, b) => {
+      let av: any, bv: any;
+      if (sortKey === "company")  { av = (a.companyName || "").toLowerCase(); bv = (b.companyName || "").toLowerCase(); }
+      if (sortKey === "scale")    { av = a.consumptionScale ?? -1; bv = b.consumptionScale ?? -1; }
+      if (sortKey === "status")   { av = STATUS_ORDER[a.status] ?? 0; bv = STATUS_ORDER[b.status] ?? 0; }
+      if (sortKey === "city")     { av = (a.city || "").toLowerCase(); bv = (b.city || "").toLowerCase(); }
+      if (sortKey === "industry") { av = (a.industry || "").toLowerCase(); bv = (b.industry || "").toLowerCase(); }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [allClients, sortKey, sortDir]);
+
   const filteredForPicker = contactClientSearch.trim()
     ? allClients.filter((c: any) =>
         (c.company_name || c.companyName || "").toLowerCase().includes(contactClientSearch.toLowerCase())
@@ -884,30 +928,30 @@ export default function Clients() {
           <TableHeader className="bg-white/5">
             <TableRow>
               <TableHead className="w-24">Nro.</TableHead>
-              <TableHead>Empresa</TableHead>
+              <SortHead label="Empresa" sk="company" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               {col("emails")      && <TableHead>Emails</TableHead>}
               {col("phone")       && <TableHead>Teléfono</TableHead>}
               {col("cuit")        && <TableHead>CUIT</TableHead>}
-              {col("industry")    && <TableHead>Industria</TableHead>}
-              {col("city")        && <TableHead>Ciudad</TableHead>}
+              {col("industry")    && <TableHead><SortHead label="Industria" sk="industry" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
+              {col("city")        && <TableHead><SortHead label="Ciudad" sk="city" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               {col("country")     && <TableHead>País</TableHead>}
-              {col("scale")       && <TableHead>Escala USD</TableHead>}
+              {col("scale")       && <TableHead><SortHead label="Escala USD" sk="scale" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               {col("salesperson") && <TableHead>Vendedor</TableHead>}
-              {col("status")      && <TableHead>Estado</TableHead>}
+              {col("status")      && <TableHead><SortHead label="Estado" sk="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={totalCols} className="text-center py-8">Cargando...</TableCell></TableRow>
-            ) : !response?.data?.length ? (
+            ) : !sortedClients.length ? (
               <TableRow>
                 <TableCell colSpan={totalCols} className="text-center py-12 text-muted-foreground">
                   <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p>No hay clientes{statusFilter.length ? " con ese filtro" : " todavía"}.</p>
                 </TableCell>
               </TableRow>
-            ) : response.data.map((client: any) => {
+            ) : sortedClients.map((client: any) => {
               const emails: string[] = Array.isArray(client.clientEmails) ? client.clientEmails : [];
               const cfg = CLIENT_STATUS_CONFIG[client.status] || CLIENT_STATUS_CONFIG.prospect;
               const sp = salespeople.find((s: any) => s.id === client.assignedSalespersonId);
