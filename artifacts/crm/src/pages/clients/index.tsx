@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2, ListTodo } from "lucide-react";
@@ -938,9 +939,11 @@ export default function Clients() {
               <Input value={contactForm.phone} onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))} placeholder="+54 9 11 1234-5678" />
             </div>
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="cp-primary" checked={contactForm.isPrimary}
-                onChange={e => setContactForm(f => ({ ...f, isPrimary: e.target.checked }))}
-                className="accent-primary" />
+              <Checkbox
+                id="cp-primary"
+                checked={contactForm.isPrimary}
+                onCheckedChange={v => setContactForm(f => ({ ...f, isPrimary: !!v }))}
+              />
               <Label htmlFor="cp-primary" className="cursor-pointer">Contacto principal</Label>
             </div>
             <div className="flex justify-end gap-2 pt-1">

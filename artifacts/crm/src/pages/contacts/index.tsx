@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useGetContacts, useCreateContact, useDeleteContact } from "@workspace/api-client-react";
-import { Plus, Search, Trash2, Phone, Mail, X } from "lucide-react";
+import { useGetContacts, useCreateContact, useDeleteContact, useGetClients } from "@workspace/api-client-react";
+import { Plus, Search, Trash2, Phone, Mail, X, Contact2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -19,12 +19,19 @@ export default function Contacts() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", position: "", clientId: "" });
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", position: "", clientId: "", isPrimary: false });
+  const [clientSearch, setClientSearch] = useState("");
+
+  const { data: clientsRes } = useGetClients({} as any);
+  const allClients: any[] = (clientsRes as any)?.data || [];
+  const filteredClients = clientSearch.trim()
+    ? allClients.filter((c: any) => (c.companyName || c.company_name || "").toLowerCase().includes(clientSearch.toLowerCase()))
+    : allClients.slice(0, 20);
 
   const { data: contacts, isLoading, refetch } = useGetContacts();
   const createMut = useCreateContact({
     mutation: {
-      onSuccess: () => { toast({ title: "Contacto creado" }); setOpen(false); refetch(); setForm({ firstName: "", lastName: "", email: "", phone: "", position: "", clientId: "" }); },
+      onSuccess: () => { toast({ title: "Contacto creado" }); setOpen(false); refetch(); setForm({ firstName: "", lastName: "", email: "", phone: "", position: "", clientId: "", isPrimary: false }); setClientSearch(""); },
       onError: () => toast({ title: "Error al crear contacto", variant: "destructive" }),
     },
   });
@@ -92,24 +99,60 @@ export default function Contacts() {
           <h1 className="text-3xl font-display font-bold">Contactos</h1>
           <p className="text-muted-foreground mt-1">{contacts?.length || 0} contactos registrados</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setClientSearch(""); } }}>
           <DialogTrigger asChild>
             <Button><Plus className="w-4 h-4 mr-2" />Nuevo Contacto</Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Nuevo Contacto</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>Nombre</Label><Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></div>
-                <div><Label>Apellido</Label><Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></div>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Contact2 className="w-4 h-4" />Nuevo Contacto
+              </DialogTitle>
+              <DialogDescription className="sr-only">Formulario de nuevo contacto</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 mt-1">
+              <div>
+                <Label>Empresa</Label>
+                <Input
+                  placeholder="Buscar empresa..."
+                  value={clientSearch}
+                  onChange={e => { setClientSearch(e.target.value); setForm(f => ({ ...f, clientId: "" })); }}
+                  className="mb-1"
+                />
+                {!form.clientId && clientSearch && (
+                  <div className="border border-border/50 rounded-md max-h-36 overflow-y-auto">
+                    {filteredClients.length === 0
+                      ? <p className="text-xs text-muted-foreground p-2">Sin resultados</p>
+                      : filteredClients.map((c: any) => (
+                        <button key={c.id} type="button"
+                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                          onClick={() => { setForm(f => ({ ...f, clientId: String(c.id) })); setClientSearch(c.companyName || c.company_name || ""); }}>
+                          {c.companyName || c.company_name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+                {form.clientId && <p className="text-xs text-green-400 mt-0.5">✓ {clientSearch}</p>}
               </div>
-              <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div><Label>Cargo</Label><Input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} /></div>
-              <div><Label>ID Cliente</Label><Input type="number" value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} /></div>
-              <Button className="w-full" disabled={createMut.isPending || !form.firstName || !form.lastName} onClick={() => createMut.mutate({ data: { ...form, clientId: form.clientId ? parseInt(form.clientId) : undefined } as any })}>
-                {createMut.isPending ? "Creando..." : "Crear Contacto"}
-              </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Nombre <span className="text-destructive">*</span></Label><Input value={form.firstName} onChange={(e) => setForm(f => ({ ...f, firstName: e.target.value }))} placeholder="Juan" /></div>
+                <div><Label>Apellido</Label><Input value={form.lastName} onChange={(e) => setForm(f => ({ ...f, lastName: e.target.value }))} placeholder="García" /></div>
+              </div>
+              <div><Label>Cargo / Puesto</Label><Input value={form.position} onChange={(e) => setForm(f => ({ ...f, position: e.target.value }))} placeholder="Comprador, Gerente de Planta..." /></div>
+              <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} placeholder="juan@empresa.com" /></div>
+              <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+54 9 11 1234-5678" /></div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="ct-primary" checked={form.isPrimary} onCheckedChange={(v) => setForm(f => ({ ...f, isPrimary: !!v }))} />
+                <Label htmlFor="ct-primary" className="cursor-pointer">Contacto principal</Label>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+                  <X className="w-4 h-4 mr-1" />Cancelar
+                </Button>
+                <Button size="sm" disabled={createMut.isPending || !form.firstName.trim()} onClick={() => createMut.mutate({ data: { ...form, clientId: form.clientId ? parseInt(form.clientId) : undefined } as any })}>
+                  {createMut.isPending ? "Creando..." : "Guardar contacto"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

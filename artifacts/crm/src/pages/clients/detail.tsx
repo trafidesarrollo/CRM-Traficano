@@ -15,6 +15,7 @@ import {
   Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X,
   CheckCircle2, Circle, Clock, ListTodo, UserSquare
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -857,12 +858,10 @@ export default function ClientDetail() {
               <Input value={contactForm.phone} onChange={e => setContactForm(f => ({ ...f, phone: e.target.value }))} placeholder="+54 9 11 1234-5678" />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="isPrimary"
                 checked={contactForm.isPrimary}
-                onChange={e => setContactForm(f => ({ ...f, isPrimary: e.target.checked }))}
-                className="accent-primary"
+                onCheckedChange={v => setContactForm(f => ({ ...f, isPrimary: !!v }))}
               />
               <Label htmlFor="isPrimary" className="cursor-pointer">Contacto principal</Label>
             </div>
