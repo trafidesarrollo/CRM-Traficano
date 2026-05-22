@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Trash2, Shield, ShieldCheck, User, UserCog, Pencil,
-  Search, Star, Lock, LayoutDashboard, CheckSquare
+  Search, Star, Lock, LayoutDashboard, CheckSquare, Globe, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGetUsers, useDeleteUser } from "@workspace/api-client-react";
@@ -101,10 +101,40 @@ export default function Users() {
   const [editModulesDefault, setEditModulesDefault] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [globalDisabled, setGlobalDisabled] = useState<string[]>([]);
+  const [showGlobalModules, setShowGlobalModules] = useState(false);
+  const [savingGlobal, setSavingGlobal] = useState(false);
+
   const { data: users = [], isLoading, refetch } = useGetUsers() as any;
   const deleteMut = useDeleteUser({
     mutation: { onSuccess: () => { toast({ title: "Usuario eliminado" }); refetch(); } },
   });
+
+  useEffect(() => {
+    fetch(`${API}/api/settings/modules`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : { disabled: [] })
+      .then(d => setGlobalDisabled(d.disabled || []));
+  }, []);
+
+  function toggleGlobal(key: string) {
+    setGlobalDisabled(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
+
+  async function saveGlobalModules() {
+    setSavingGlobal(true);
+    try {
+      const r = await fetch(`${API}/api/settings/modules`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ disabled: globalDisabled }),
+      });
+      if (!r.ok) throw new Error("Error al guardar");
+      toast({ title: "Módulos del sistema actualizados", description: "Los cambios se verán al recargar la sesión" });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally { setSavingGlobal(false); }
+  }
 
   const filtered = (users as any[]).filter((u: any) =>
     !search || u.fullName?.toLowerCase().includes(search.toLowerCase()) || u.username?.toLowerCase().includes(search.toLowerCase())
@@ -164,22 +194,15 @@ export default function Users() {
       });
       if (!r.ok) { const e = await r.json(); throw new Error(e.error || "Error al guardar"); }
 
-      if (!PRIVILEGED.includes(editForm.role)) {
-        const modules = editModulesDefault ? [] : editModules;
-        await fetch(`${API}/api/users/${editUser.id}/permissions`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ modules }),
-        });
-      } else {
-        await fetch(`${API}/api/users/${editUser.id}/permissions`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ modules: [] }),
-        });
-      }
+      // Save module permissions for ALL users (including privileged roles)
+      // Empty array = use role defaults (show all for privileged, role rules for others)
+      const modules = editModulesDefault ? [] : editModules;
+      await fetch(`${API}/api/users/${editUser.id}/permissions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ modules }),
+      });
 
       toast({ title: "Usuario actualizado" });
       setEditUser(null);
@@ -222,6 +245,62 @@ export default function Users() {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Global Module Visibility Panel */}
+      <div className="mb-6 border border-border/50 rounded-xl overflow-hidden bg-card/50">
+        <button
+          onClick={() => setShowGlobalModules(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Globe className="w-5 h-5 text-primary" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-sm">Módulos del sistema</p>
+              <p className="text-xs text-muted-foreground">
+                {globalDisabled.length === 0
+                  ? "Todos los módulos están activos"
+                  : `${globalDisabled.length} módulo${globalDisabled.length > 1 ? "s" : ""} desactivado${globalDisabled.length > 1 ? "s" : ""} para todos`}
+              </p>
+            </div>
+          </div>
+          {showGlobalModules ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {showGlobalModules && (
+          <div className="px-5 pb-5 border-t border-border/50 pt-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Los módulos desactivados no se muestran en el menú para <strong>ningún usuario</strong>, sin importar sus permisos individuales.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {ALL_MODULES.map(mod => {
+                const isDisabled = globalDisabled.includes(mod.key);
+                return (
+                  <div
+                    key={mod.key}
+                    onClick={() => toggleGlobal(mod.key)}
+                    className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors text-sm ${
+                      isDisabled
+                        ? "border-destructive/40 bg-destructive/5 text-muted-foreground line-through"
+                        : "border-border/50 hover:border-primary/50 hover:bg-primary/5"
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${isDisabled ? "border-destructive bg-destructive/20" : "border-green-500 bg-green-500/20"}`} />
+                    {mod.label}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" size="sm" onClick={() => setGlobalDisabled([])}>Activar todos</Button>
+              <Button size="sm" disabled={savingGlobal} onClick={saveGlobalModules}>
+                {savingGlobal ? "Guardando..." : "Guardar cambios globales"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mb-4">
@@ -339,52 +418,46 @@ export default function Users() {
           )}
 
           {editTab === "modulos" && (
-            <div>
-              {PRIVILEGED.includes(editForm.role) ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
-                  <ShieldCheck className="w-12 h-12 text-primary/50" />
-                  <p className="font-medium">Acceso completo</p>
-                  <p className="text-sm text-muted-foreground">
-                    El rol <strong>{ROLE_LABELS[editForm.role]}</strong> tiene acceso a todos los módulos del sistema por definición.
-                  </p>
+            <div className="space-y-3">
+              {PRIVILEGED.includes(editForm.role) && (
+                <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20 text-sm text-primary">
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  <span>Rol privilegiado — por defecto ve todos los módulos. Podés restringirlos igual.</span>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                    <div>
-                      <Label className="cursor-pointer">Usar permisos por defecto del rol</Label>
-                      <p className="text-xs text-muted-foreground">Si está activo, usa las reglas estándar del rol seleccionado</p>
-                    </div>
-                    <Switch checked={editModulesDefault} onCheckedChange={v => { setEditModulesDefault(v); if (v) setEditModules([]); }} />
-                  </div>
+              )}
+              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                <div>
+                  <Label className="cursor-pointer">Usar permisos por defecto del rol</Label>
+                  <p className="text-xs text-muted-foreground">Si está activo, usa las reglas estándar del rol seleccionado</p>
+                </div>
+                <Switch checked={editModulesDefault} onCheckedChange={v => { setEditModulesDefault(v); if (v) setEditModules([]); }} />
+              </div>
 
-                  {!editModulesDefault && (
-                    <>
-                      <div className="flex justify-between items-center mb-1">
-                        <p className="text-sm text-muted-foreground">Seleccioná los módulos a los que tendrá acceso este usuario:</p>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditModules(ALL_MODULES.map(m => m.key))}>Todos</Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditModules([])}>Ninguno</Button>
+              {!editModulesDefault && (
+                <>
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-sm text-muted-foreground">Módulos visibles para este usuario:</p>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditModules(ALL_MODULES.map(m => m.key))}>Todos</Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditModules([])}>Ninguno</Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                    {ALL_MODULES.map(mod => (
+                      <div
+                        key={mod.key}
+                        onClick={() => toggleModule(mod.key)}
+                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-sm ${editModules.includes(mod.key) ? "border-primary bg-primary/5 text-foreground" : "border-border/50 text-muted-foreground hover:border-border"}`}
+                      >
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${editModules.includes(mod.key) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
+                          {editModules.includes(mod.key) && <CheckSquare className="w-3 h-3 text-primary-foreground" />}
                         </div>
+                        {mod.label}
                       </div>
-                      <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
-                        {ALL_MODULES.map(mod => (
-                          <div
-                            key={mod.key}
-                            onClick={() => toggleModule(mod.key)}
-                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-sm ${editModules.includes(mod.key) ? "border-primary bg-primary/5 text-foreground" : "border-border/50 text-muted-foreground hover:border-border"}`}
-                          >
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${editModules.includes(mod.key) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
-                              {editModules.includes(mod.key) && <CheckSquare className="w-3 h-3 text-primary-foreground" />}
-                            </div>
-                            {mod.label}
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground text-right">{editModules.length} de {ALL_MODULES.length} módulos habilitados</p>
-                    </>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground text-right">{editModules.length} de {ALL_MODULES.length} módulos habilitados</p>
+                </>
               )}
             </div>
           )}

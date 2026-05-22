@@ -57,6 +57,34 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.get("/modules", async (req, res) => {
+  try {
+    const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "global_disabled_modules")).limit(1);
+    const disabled: string[] = row ? JSON.parse(row.value) : [];
+    res.json({ disabled });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al obtener módulos" });
+  }
+});
+
+router.put("/modules", async (req, res) => {
+  try {
+    const { disabled } = req.body;
+    const value = JSON.stringify(Array.isArray(disabled) ? disabled : []);
+    const existing = await db.select().from(settingsTable).where(eq(settingsTable.key, "global_disabled_modules")).limit(1);
+    if (existing.length > 0) {
+      await db.update(settingsTable).set({ value, updatedAt: new Date() }).where(eq(settingsTable.key, "global_disabled_modules"));
+    } else {
+      await db.insert(settingsTable).values({ key: "global_disabled_modules", value });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al guardar módulos" });
+  }
+});
+
 router.delete("/:key", async (req, res) => {
   try {
     const { key } = req.params;

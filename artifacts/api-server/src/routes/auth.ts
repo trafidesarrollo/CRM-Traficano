@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, userModulePermissionsTable } from "@workspace/db";
+import { db, usersTable, userModulePermissionsTable, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { auditLogin, auditLoginFailed, auditLogout } from "../lib/audit.js";
@@ -80,16 +80,16 @@ router.get("/auth/me", async (req, res) => {
     }
     const { passwordHash: _, ...safeUser } = user;
 
-    let modulePermissions: string[] | null = null;
-    if (user.role !== "admin" && user.role !== "gerente_comercial") {
-      const perms = await db
-        .select({ module: userModulePermissionsTable.module })
+    const [perms, globalRow] = await Promise.all([
+      db.select({ module: userModulePermissionsTable.module })
         .from(userModulePermissionsTable)
-        .where(eq(userModulePermissionsTable.userId, userId));
-      if (perms.length > 0) modulePermissions = perms.map(p => p.module);
-    }
+        .where(eq(userModulePermissionsTable.userId, userId)),
+      db.select().from(settingsTable).where(eq(settingsTable.key, "global_disabled_modules")).limit(1),
+    ]);
+    const modulePermissions: string[] | null = perms.length > 0 ? perms.map(p => p.module) : null;
+    const globalDisabledModules: string[] = globalRow[0] ? JSON.parse(globalRow[0].value) : [];
 
-    res.json({ ...safeUser, modulePermissions });
+    res.json({ ...safeUser, modulePermissions, globalDisabledModules });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error interno del servidor" });

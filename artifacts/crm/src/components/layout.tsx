@@ -411,11 +411,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const NavLinks = ({ mini }: { mini?: boolean }) => {
     const role = user?.role || "";
     const isPrivileged = PRIVILEGED_ROLES.includes(role);
-    const modulePerms: string[] | null = isPrivileged ? null : ((user as any)?.modulePermissions ?? null);
+    const modulePerms: string[] | null = (user as any)?.modulePermissions ?? null;
+    const globalDisabled: string[] = (user as any)?.globalDisabledModules ?? [];
 
     const visible = navItems.filter((item) => {
-      if (isPrivileged) return true;
+      // Always apply global disabled modules (affects everyone including admins)
+      if (item.module && globalDisabled.includes(item.module)) return false;
+      // If user has explicit module permissions set, use them (works for all roles)
       if (modulePerms !== null && item.module) return modulePerms.includes(item.module);
+      // Privileged with no explicit permissions: show everything not globally disabled
+      if (isPrivileged) return true;
       if ((item as any).roles && !(item as any).roles.includes(role)) return false;
       if ((item as any).hiddenFromRoles?.includes(role)) return false;
       return true;
