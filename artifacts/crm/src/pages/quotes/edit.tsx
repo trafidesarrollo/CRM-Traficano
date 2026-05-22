@@ -31,6 +31,10 @@ import {
   ShoppingCart,
   CalendarDays,
   AlertCircle,
+  CheckCircle2,
+  Clock,
+  ListTodo,
+  User,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -158,6 +162,24 @@ export default function QuoteEdit() {
   const [convertForm, setConvertForm] = useState({ purchaseOrder: "", ocFile: null as File | null });
   const [converting, setConverting] = useState(false);
   const [usdRate, setUsdRate] = useState<{ sell: number | null; date: string | null; stale: boolean } | null>(null);
+
+  const [linkedTasks, setLinkedTasks] = useState<any[]>([]);
+  const loadLinkedTasks = () => {
+    if (!id) return;
+    fetch(`${API}/api/tasks?quoteId=${id}`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setLinkedTasks(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  };
+  const completeLinkedTask = async (taskId: number) => {
+    await fetch(`${API}/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
+    });
+    loadLinkedTasks();
+  };
 
   const followupDateDefault = new Date(Date.now() + 3 * 86400000)
     .toISOString()
@@ -381,6 +403,8 @@ export default function QuoteEdit() {
       setCreatingContact(false);
     }
   };
+
+  useEffect(() => { if (!isNew && id) loadLinkedTasks(); }, [id, isNew]);
 
   useEffect(() => {
     if (isNew || !id) return;
@@ -1549,6 +1573,90 @@ export default function QuoteEdit() {
       )}
 
       </div>{/* end isLocked wrapper */}
+
+      {/* ── Tareas vinculadas ── */}
+      {!isNew && id && (
+        <Card className="mt-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <ListTodo className="w-4 h-4 text-primary" />
+                Tareas vinculadas
+                {linkedTasks.length > 0 && (
+                  <Badge variant="outline" className="text-xs ml-1">{linkedTasks.length}</Badge>
+                )}
+              </h3>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={loadLinkedTasks}>
+                Actualizar
+              </Button>
+            </div>
+
+            {linkedTasks.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">Sin tareas vinculadas a esta cotización</p>
+            ) : (
+              <div className="space-y-2">
+                {linkedTasks.map((t: any) => {
+                  const isOverdue = t.status !== "completed" && t.dueDate && new Date(t.dueDate) < new Date();
+                  const statusColor =
+                    t.status === "completed"  ? "bg-green-500/20 text-green-300 border-green-500/30" :
+                    t.status === "in_progress" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" :
+                    isOverdue                  ? "bg-red-500/20 text-red-300 border-red-500/30" :
+                                                 "bg-amber-500/20 text-amber-300 border-amber-500/30";
+                  const statusLabel =
+                    t.status === "completed"   ? "Completada" :
+                    t.status === "in_progress" ? "En progreso" :
+                    isOverdue                  ? "Vencida" : "Pendiente";
+                  const typeLabel: Record<string, string> = {
+                    followup: "Seguimiento", call: "Llamada", meeting: "Reunión",
+                    visit: "Visita", task: "Tarea", reminder: "Recordatorio",
+                  };
+                  return (
+                    <div key={t.id} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5 ${t.status === "completed" ? "opacity-60 border-border/30 bg-white/2" : "border-border/50 bg-white/5"}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-medium truncate max-w-xs">{t.title}</span>
+                          <Badge className={`text-xs shrink-0 ${statusColor}`}>{statusLabel}</Badge>
+                          {typeLabel[t.type] && (
+                            <Badge variant="outline" className="text-xs shrink-0">{typeLabel[t.type]}</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                          {t.dueDate && (
+                            <span className={`flex items-center gap-1 ${isOverdue && t.status !== "completed" ? "text-red-400" : ""}`}>
+                              <Clock className="w-3 h-3" />
+                              {new Date(t.dueDate).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })}
+                            </span>
+                          )}
+                          {t.assigneeName && (
+                            <span className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {t.assigneeName}
+                            </span>
+                          )}
+                          {t.description && (
+                            <span className="truncate max-w-xs">{t.description}</span>
+                          )}
+                        </div>
+                      </div>
+                      {t.status !== "completed" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 shrink-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                          title="Marcar como completada"
+                          onClick={() => completeLinkedTask(t.id)}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Modal: Cerrar Cotización (Perdida) ── */}
       <Dialog open={showCloseModal} onOpenChange={(open) => { setShowCloseModal(open); if (!open) { setCloseLostReason(""); setCloseLostDetail(""); } }}>
