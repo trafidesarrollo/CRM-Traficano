@@ -165,26 +165,33 @@ export default function Tasks() {
       .catch(() => {});
   }, []);
 
+  const [creating, setCreating] = useState(false);
   const create = async () => {
-    const clientName = clients.find((c: any) => String(c.id) === String(form.clientId))?.companyName;
-    const autoTitle = clientName
-      ? `Seguimiento – ${clientName}`
-      : form.description || "Nueva tarea";
-    const body: any = {
-      ...form,
-      title: autoTitle,
-      type: "task",
-      assignedTo: form.assignedTo ? parseInt(form.assignedTo) : (user?.id || null),
-      clientId: form.clientId ? parseInt(form.clientId) : null,
-      dueDate: form.dueDate || null,
-    };
-    const r = await fetch(`${API}/api/tasks`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(body) });
-    if (r.ok) {
-      toast({ title: "Tarea creada" });
-      setNewOpen(false);
-      setForm({ title: "", description: "", type: "task", priority: "medium", assignedTo: "", clientId: "", dueDate: "" });
-      load();
-    } else toast({ title: "Error", variant: "destructive" });
+    if (creating) return;
+    setCreating(true);
+    try {
+      const clientName = clients.find((c: any) => String(c.id) === String(form.clientId))?.companyName;
+      const autoTitle = clientName
+        ? `Seguimiento – ${clientName}`
+        : form.description || "Nueva tarea";
+      const body: any = {
+        ...form,
+        title: autoTitle,
+        type: "task",
+        assignedTo: form.assignedTo ? parseInt(form.assignedTo) : (user?.id || null),
+        clientId: form.clientId ? parseInt(form.clientId) : null,
+        dueDate: form.dueDate || null,
+      };
+      const r = await fetch(`${API}/api/tasks`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(body) });
+      if (r.ok) {
+        toast({ title: "Tarea creada" });
+        setNewOpen(false);
+        setForm({ title: "", description: "", type: "task", priority: "medium", assignedTo: "", clientId: "", dueDate: "" });
+        load();
+      } else toast({ title: "Error", variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
   };
 
   const patch = async (id: number, data: any) => {
@@ -363,7 +370,9 @@ export default function Tasks() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button className="w-full" onClick={create}>Crear tarea</Button>
+                <Button className="w-full" onClick={create} disabled={creating}>
+                  {creating ? "Creando..." : "Crear tarea"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>

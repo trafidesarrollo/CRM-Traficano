@@ -192,11 +192,6 @@ router.post("/quotes", async (req, res) => {
 
     const [final] = await db.select().from(quotesTable).where(eq(quotesTable.id, quote.id));
 
-    // Crear tarea de seguimiento automática vinculada a la cotización
-    try {
-      await createQuoteTask(final.id, final.number || `COT-${String(final.id).padStart(5,"0")}`, final.clientId ?? null, final.salespersonId ?? null, userId ?? null);
-    } catch {}
-
     res.status(201).json(final);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
