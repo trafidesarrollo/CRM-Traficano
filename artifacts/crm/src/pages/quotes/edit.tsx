@@ -1996,6 +1996,9 @@ export default function QuoteEdit() {
                 — {catalogModalTotal.toLocaleString("es-AR")} registros
               </span>
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              {catalogModal?.type === "medidas" ? "Búsqueda en catálogo de medidas" : "Búsqueda en catálogo de accesorios"}
+            </DialogDescription>
           </DialogHeader>
 
           {/* Search bar */}

@@ -488,12 +488,8 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         }
       }
 
-      // If contact form is open and has data, save contact inline (edit mode)
-      // For new clients, open the contact modal after saving
-      if (showContactForm && contactForm.firstName.trim() && savedId && editClient) {
-        await saveContact(savedId);
-      } else if (showContactForm && contactForm.firstName.trim() && savedId && !editClient) {
-        await saveContact(savedId);
+      if (showContactForm && contactForm.firstName.trim() && savedId) {
+        await saveContact(savedId, true);
       } else {
         onSaved();
         onOpenChange(false);
@@ -505,7 +501,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
     }
   };
 
-  const saveContact = async (clientId: number) => {
+  const saveContact = async (clientId: number, closeModal = false) => {
     if (!contactForm.firstName.trim()) return;
     setSavingContact(true);
     try {
@@ -513,8 +509,15 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         body: JSON.stringify({ clientId, firstName: contactForm.firstName.trim(), lastName: contactForm.lastName.trim(), email: contactForm.email.trim(), phone: contactForm.phone.trim(), position: contactForm.position.trim() || "Contacto" }) });
       if (!r.ok) throw new Error("Error al crear contacto");
       toast({ title: "Contacto creado" });
-    } catch { toast({ title: "Contacto no guardado — podés agregarlo luego desde la ficha", variant: "destructive" }); }
-    finally { setSavingContact(false); onSaved(); onOpenChange(false); }
+      setContactForm({ firstName: "", lastName: "", email: "", phone: "", position: "" });
+      setShowContactForm(false);
+      onSaved();
+      if (closeModal) onOpenChange(false);
+    } catch {
+      toast({ title: "Contacto no guardado — podés agregarlo luego desde la ficha", variant: "destructive" });
+    } finally {
+      setSavingContact(false);
+    }
   };
 
   return (
