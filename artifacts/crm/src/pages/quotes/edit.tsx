@@ -757,7 +757,7 @@ export default function QuoteEdit() {
             </Button>
           )}
           {!isNew && !isLocked && (
-            <Button variant="outline" className="text-amber-400 border-amber-500/40 hover:bg-amber-500/10" onClick={() => { setCloseJustification(""); setShowCloseModal(true); }}>
+            <Button variant="outline" className="text-amber-400 border-amber-500/40 hover:bg-amber-500/10" onClick={() => { setCloseLostReason(""); setCloseLostDetail(""); setShowCloseModal(true); }}>
               <AlertCircle className="w-4 h-4 mr-2" />
               Cerrar cotización
             </Button>
