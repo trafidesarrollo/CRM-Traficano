@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -89,6 +90,7 @@ const emptyCreate = { username: "", password: "", fullName: "", email: "", role:
 
 export default function Users() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(emptyCreate);
@@ -130,7 +132,9 @@ export default function Users() {
         body: JSON.stringify({ disabled: globalDisabled }),
       });
       if (!r.ok) throw new Error("Error al guardar");
-      toast({ title: "Módulos del sistema actualizados", description: "Los cambios se verán al recargar la sesión" });
+      // Refresh auth so sidebar updates immediately for current user
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({ title: "Módulos del sistema actualizados" });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally { setSavingGlobal(false); }
@@ -204,6 +208,8 @@ export default function Users() {
         body: JSON.stringify({ modules }),
       });
 
+      // Refresh auth so sidebar updates immediately (handles own-user module changes)
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({ title: "Usuario actualizado" });
       setEditUser(null);
       refetch();
