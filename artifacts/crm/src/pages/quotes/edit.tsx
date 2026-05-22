@@ -2034,7 +2034,7 @@ export default function QuoteEdit() {
                     }}
                   >
                     <option value="">Categoría</option>
-                    {catalogFilterOpts.categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    {(catalogFilterOpts.categories || []).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
 
                   <select
@@ -2048,7 +2048,7 @@ export default function QuoteEdit() {
                     }}
                   >
                     <option value="">Tipo de costura</option>
-                    {catalogFilterOpts.seamTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                    {(catalogFilterOpts.seamTypes || []).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
 
                   <select
@@ -2062,7 +2062,7 @@ export default function QuoteEdit() {
                     }}
                   >
                     <option value="">Forma</option>
-                    {catalogFilterOpts.shapes.map(s => <option key={s} value={s}>{s}</option>)}
+                    {(catalogFilterOpts.shapes || []).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </>
               )}
@@ -2080,7 +2080,7 @@ export default function QuoteEdit() {
                     }}
                   >
                     <option value="">Tipo de accesorio</option>
-                    {catalogFilterOpts.accessoryTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                    {(catalogFilterOpts.accessoryTypes || []).map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
 
                   <select
@@ -2094,7 +2094,7 @@ export default function QuoteEdit() {
                     }}
                   >
                     <option value="">Norma</option>
-                    {catalogFilterOpts.accStandards.map(s => <option key={s} value={s}>{s}</option>)}
+                    {(catalogFilterOpts.accStandards || []).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </>
               )}
