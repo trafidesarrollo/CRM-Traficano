@@ -62,6 +62,7 @@ export default function Tasks() {
   const [stats, setStats] = useState<any>({});
   const [quickFilter, setQuickFilter] = useState<"all" | "today">("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [filterAssignee, setFilterAssignee] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [newOpen, setNewOpen] = useState(false);
@@ -109,6 +110,7 @@ export default function Tasks() {
       const params = new URLSearchParams();
       if (quickFilter === "today") params.set("view", "today");
       if (isVendedor && user?.id) params.set("assignedTo", String(user.id));
+      else if (!isVendedor && filterAssignee !== "all") params.set("assignedTo", filterAssignee);
       if (filterPriority && filterPriority !== "all") params.set("priority", filterPriority);
       if (dateFrom) params.set("from", new Date(dateFrom).toISOString());
       if (dateTo) {
@@ -143,7 +145,7 @@ export default function Tasks() {
     } catch { setFollowups([]); }
   };
 
-  useEffect(() => { if (user !== undefined) load(); }, [quickFilter, filterPriority, dateFrom, dateTo, user]);
+  useEffect(() => { if (user !== undefined) load(); }, [quickFilter, filterPriority, filterAssignee, dateFrom, dateTo, user]);
   useEffect(() => { if (user !== undefined) loadFollowups(); }, [quickFilter, user, salespersonId]);
 
   useEffect(() => {
@@ -421,6 +423,23 @@ export default function Tasks() {
             onClick={() => setQuickFilter("today")}
           >Hoy</Button>
         </div>
+        {/* Vendedor — solo visible para no-vendedores */}
+        {!isVendedor && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Vendedor:</span>
+            <Select value={filterAssignee} onValueChange={v => setFilterAssignee(v)}>
+              <SelectTrigger className="h-8 text-xs w-40">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {users.map((u: any) => (
+                  <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {/* Priority */}
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Prioridad:</span>
@@ -457,12 +476,12 @@ export default function Tasks() {
           />
         </div>
         {/* Clear date filters */}
-        {(dateFrom || dateTo || filterPriority !== "all") && (
+        {(dateFrom || dateTo || filterPriority !== "all" || filterAssignee !== "all") && (
           <Button
             size="sm"
             variant="ghost"
             className="h-8 text-xs text-muted-foreground hover:text-foreground px-2"
-            onClick={() => { setDateFrom(""); setDateTo(""); setFilterPriority("all"); }}
+            onClick={() => { setDateFrom(""); setDateTo(""); setFilterPriority("all"); setFilterAssignee("all"); }}
           >
             <X className="w-3 h-3 mr-1" />Limpiar
           </Button>
