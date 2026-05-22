@@ -84,6 +84,41 @@ const ALL_MODULES = [
   { key: "produccion",       label: "Producción (MES)" },
 ];
 
+// Every individual nav item — used for GLOBAL visibility panel (by href, fully independent)
+const GLOBAL_NAV_ITEMS = [
+  { href: "/dashboard",        label: "Dashboard" },
+  { href: "/inbox",            label: "Inbox Comercial" },
+  { href: "/emails",           label: "Emails (legacy)" },
+  { href: "/opportunities",    label: "Oportunidades" },
+  { href: "/quotes",           label: "Cotizaciones" },
+  { href: "/quotes/pipeline",  label: "Pipeline Visual" },
+  { href: "/orders",           label: "Pedidos" },
+  { href: "/tasks",            label: "Tareas" },
+  { href: "/carga-masiva",     label: "Carga Masiva" },
+  { href: "/calendar",         label: "Calendario" },
+  { href: "/calendar/sync",    label: "Sync Google Calendar" },
+  { href: "/pipelines",        label: "Pipelines" },
+  { href: "/reports",          label: "Reportes" },
+  { href: "/clients",          label: "Clientes" },
+  { href: "/contacts",         label: "Contactos" },
+  { href: "/salespeople",      label: "Vendedores" },
+  { href: "/products",         label: "Productos" },
+  { href: "/price-lists",      label: "Listas de precios" },
+  { href: "/email-templates",  label: "Plantillas Email" },
+  { href: "/automation",       label: "Automatizaciones" },
+  { href: "/custom-fields",    label: "Campos personalizados" },
+  { href: "/imports",          label: "Importar CSV" },
+  { href: "/csv",              label: "Import/Export CSV" },
+  { href: "/followups",        label: "Seguimientos" },
+  { href: "/goals",            label: "Metas" },
+  { href: "/gmail",            label: "Gmail Sync" },
+  { href: "/anura",            label: "Anura Llamadas" },
+  { href: "/prompts",          label: "Prompts IA" },
+  { href: "/audit",            label: "Auditoría" },
+  { href: "/production",       label: "Producción (MES)" },
+  { href: "/users",            label: "Usuarios" },
+];
+
 const PRIVILEGED = ["admin", "gerente_comercial"];
 
 const emptyCreate = { username: "", password: "", fullName: "", email: "", role: "vendedor" };
@@ -276,33 +311,32 @@ export default function Users() {
         </button>
 
         {showGlobalModules && (
-          <div className="px-5 pb-5 border-t border-border/50 pt-4 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Los módulos desactivados no se muestran en el menú para <strong>ningún usuario</strong>, sin importar sus permisos individuales.
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {ALL_MODULES.map(mod => {
-                const isDisabled = globalDisabled.includes(mod.key);
+          <div className="border-t border-border/50">
+            <div className="px-5 pt-4 pb-2">
+              <p className="text-sm text-muted-foreground">
+                Cada ítem se puede activar o desactivar de forma independiente. Los desactivados desaparecen del menú para <strong>todos los usuarios</strong>.
+              </p>
+            </div>
+            <div className="divide-y divide-border/30 max-h-96 overflow-y-auto">
+              {GLOBAL_NAV_ITEMS.map(item => {
+                const isDisabled = globalDisabled.includes(item.href);
                 return (
-                  <div
-                    key={mod.key}
-                    onClick={() => toggleGlobal(mod.key)}
-                    className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors text-sm ${
-                      isDisabled
-                        ? "border-destructive/40 bg-destructive/5 text-muted-foreground line-through"
-                        : "border-border/50 hover:border-primary/50 hover:bg-primary/5"
-                    }`}
-                  >
-                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${isDisabled ? "border-destructive bg-destructive/20" : "border-green-500 bg-green-500/20"}`} />
-                    {mod.label}
+                  <div key={item.href} className="flex items-center justify-between px-5 py-3 hover:bg-white/3 transition-colors">
+                    <span className={`text-sm ${isDisabled ? "text-muted-foreground line-through" : "text-foreground"}`}>
+                      {item.label}
+                    </span>
+                    <Switch
+                      checked={!isDisabled}
+                      onCheckedChange={() => toggleGlobal(item.href)}
+                    />
                   </div>
                 );
               })}
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-between items-center px-5 py-3 border-t border-border/50">
               <Button variant="ghost" size="sm" onClick={() => setGlobalDisabled([])}>Activar todos</Button>
               <Button size="sm" disabled={savingGlobal} onClick={saveGlobalModules}>
-                {savingGlobal ? "Guardando..." : "Guardar cambios globales"}
+                {savingGlobal ? "Guardando..." : "Guardar cambios"}
               </Button>
             </div>
           </div>

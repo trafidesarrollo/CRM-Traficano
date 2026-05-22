@@ -415,8 +415,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
     const globalDisabled: string[] = (user as any)?.globalDisabledModules ?? [];
 
     const visible = navItems.filter((item) => {
-      // Always apply global disabled modules (affects everyone including admins)
-      if (item.module && globalDisabled.includes(item.module)) return false;
+      // Always apply global disabled nav items by href (affects everyone including admins)
+      if (globalDisabled.includes(item.href)) return false;
       // If user has explicit module permissions set, use them (works for all roles)
       if (modulePerms !== null && item.module) return modulePerms.includes(item.module);
       // Privileged with no explicit permissions: show everything not globally disabled
