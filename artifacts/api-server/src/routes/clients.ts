@@ -19,8 +19,6 @@ function computeStatus(data: any, existingStatus?: string): string {
     data.companyName?.trim() &&
     data.taxId?.trim() &&
     data.industry?.trim() &&
-    data.phone?.trim() &&
-    (data.clientEmails?.length > 0) &&
     data.city?.trim();
 
   if (!requiredFilled) return "prospect";
@@ -171,16 +169,13 @@ router.patch("/clients/:id", async (req, res) => {
     let newStatus: string;
     if (statusIntentionallyChanged) {
       newStatus = existing.status === "final" ? "final" : body.status;
-    } else if ("consumptionScale" in body && existing.status !== "final") {
-      const scale = parseFloat(body.consumptionScale ?? "");
-      if (isNaN(scale) || body.consumptionScale === "" || body.consumptionScale == null) {
+    } else if (existing.status !== "final") {
+      // Merge body with existing to evaluate full record
+      const merged = { ...existing, ...body };
+      newStatus = computeStatus(merged, existing.status);
+      // Never auto-downgrade an already-promoted client (potential/active) back to prospect
+      if (newStatus === "prospect" && (existing.status === "potential" || existing.status === "active")) {
         newStatus = existing.status;
-      } else if (scale === 0) {
-        // scale = 0 → inactive (but never downgrade from potential+ unless explicitly)
-        newStatus = existing.status === "potential" ? "potential" : "inactive";
-      } else {
-        // scale > 0 → at least potential
-        newStatus = existing.status === "prospect" || existing.status === "inactive" ? "potential" : existing.status;
       }
     } else {
       newStatus = existing.status;
