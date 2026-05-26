@@ -74,10 +74,24 @@ export default function Tasks() {
   const [newOpen, setNewOpen] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [clientTeamMembers, setClientTeamMembers] = useState<any[]>([]);
+  const [teamAssignees, setTeamAssignees] = useState<Set<number>>(new Set());
   const [form, setForm] = useState<any>({
     title: "", description: "", type: "task", priority: "medium",
     assignedTo: "", clientId: "", dueDate: "",
   });
+
+  const handleClientChange = (clientId: string) => {
+    setForm((f: any) => ({ ...f, clientId, assignedTo: "" }));
+    if (!clientId) { setClientTeamMembers([]); setTeamAssignees(new Set()); return; }
+    const client = clients.find((c: any) => String(c.id) === clientId);
+    if (!client?.assignedTeamId) { setClientTeamMembers([]); setTeamAssignees(new Set()); return; }
+    const team = teams.find((t: any) => t.id === client.assignedTeamId);
+    const members = (team?.members || []).filter((m: any) => m.userId != null);
+    setClientTeamMembers(members);
+    setTeamAssignees(new Set(members.map((m: any) => m.userId as number)));
+  };
 
   // Task detail modal
   const [selected, setSelected] = useState<any>(null);
@@ -163,6 +177,10 @@ export default function Tasks() {
       .then(r => r.json())
       .then(d => setClients(Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []))
       .catch(() => {});
+    fetch(`${API}/api/commercial-teams`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setTeams(Array.isArray(d) ? d : []))
+      .catch(() => {});
   }, []);
 
   const [creating, setCreating] = useState(false);
@@ -174,21 +192,41 @@ export default function Tasks() {
       const autoTitle = clientName
         ? `Seguimiento – ${clientName}`
         : form.description || "Nueva tarea";
-      const body: any = {
+      const base: any = {
         ...form,
         title: autoTitle,
         type: "task",
-        assignedTo: form.assignedTo ? parseInt(form.assignedTo) : (user?.id || null),
         clientId: form.clientId ? parseInt(form.clientId) : null,
         dueDate: form.dueDate || null,
       };
-      const r = await fetch(`${API}/api/tasks`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(body) });
-      if (r.ok) {
-        toast({ title: "Tarea creada" });
+
+      // If the client has a team and members are checked → create one task per assignee
+      const assigneeIds = teamAssignees.size > 0
+        ? Array.from(teamAssignees)
+        : form.assignedTo
+          ? [parseInt(form.assignedTo)]
+          : [user?.id];
+
+      const results = await Promise.all(
+        assigneeIds.filter(Boolean).map(uid =>
+          fetch(`${API}/api/tasks`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ ...base, assignedTo: uid }),
+          })
+        )
+      );
+
+      if (results.every(r => r.ok)) {
+        const count = assigneeIds.filter(Boolean).length;
+        toast({ title: count > 1 ? `${count} tareas creadas` : "Tarea creada" });
         setNewOpen(false);
         setForm({ title: "", description: "", type: "task", priority: "medium", assignedTo: "", clientId: "", dueDate: "" });
+        setClientTeamMembers([]);
+        setTeamAssignees(new Set());
         load();
-      } else toast({ title: "Error", variant: "destructive" });
+      } else toast({ title: "Error al crear", variant: "destructive" });
     } finally {
       setCreating(false);
     }
@@ -341,7 +379,7 @@ export default function Tasks() {
               <div className="space-y-3">
                 {!isVendedor && (
                   <div><Label>Cliente relacionado</Label>
-                    <Select value={form.clientId} onValueChange={v => setForm({ ...form, clientId: v })}>
+                    <Select value={form.clientId} onValueChange={handleClientChange}>
                       <SelectTrigger><SelectValue placeholder="Sin cliente" /></SelectTrigger>
                       <SelectContent>{clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}</SelectContent>
                     </Select>
@@ -360,18 +398,62 @@ export default function Tasks() {
                   </Select>
                 </div>
                 <div><Label>Vencimiento</Label><Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
-                <div><Label>Asignar a</Label>
-                  <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
-                    <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
-                    <SelectContent>
-                      {users.map((u: any) => (
-                        <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full" onClick={create} disabled={creating}>
-                  {creating ? "Creando..." : "Crear tarea"}
+
+                {clientTeamMembers.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label>Asignar al equipo comercial</Label>
+                    <div className="rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
+                      {clientTeamMembers.map((m: any) => {
+                        const checked = teamAssignees.has(m.userId);
+                        return (
+                          <label key={m.userId} className="flex items-center gap-3 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setTeamAssignees(prev => {
+                                  const next = new Set(prev);
+                                  checked ? next.delete(m.userId) : next.add(m.userId);
+                                  return next;
+                                });
+                              }}
+                              className="w-4 h-4 rounded accent-primary"
+                            />
+                            <div>
+                              <span className="text-sm font-medium">{m.fullName || m.username}</span>
+                              <span className="text-xs text-muted-foreground ml-2">{m.role === "vendedor" ? "Vendedor" : "Apoyo"}</span>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {teamAssignees.size === 0 && (
+                      <p className="text-xs text-muted-foreground">Seleccioná al menos un miembro.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div><Label>Asignar a</Label>
+                    <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
+                      <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
+                      <SelectContent>
+                        {users.map((u: any) => (
+                          <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <Button
+                  className="w-full"
+                  onClick={create}
+                  disabled={creating || (clientTeamMembers.length > 0 && teamAssignees.size === 0)}
+                >
+                  {creating
+                    ? "Creando..."
+                    : teamAssignees.size > 1
+                      ? `Crear ${teamAssignees.size} tareas`
+                      : "Crear tarea"}
                 </Button>
               </div>
             </DialogContent>
