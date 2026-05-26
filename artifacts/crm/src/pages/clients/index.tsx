@@ -785,6 +785,14 @@ export default function Clients() {
   const { data: salespeopleRes } = useGetSalespeople();
   const salespeople = (salespeopleRes as any) || [];
 
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  useEffect(() => {
+    fetch(`${API}/api/users/assignable`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setAssignableUsers(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+
   const { toast } = useToast();
   const { user } = useAuth();
   const canBulkImport = ["admin", "gerente", "gerente_comercial"].includes((user as any)?.role);
@@ -813,11 +821,24 @@ export default function Clients() {
 
   const allClients: any[] = (response as any)?.data || [];
 
+  // Build userId → [salespersonId] map for filtering
+  const userToSpIds = useMemo(() => {
+    const map: Record<string, number[]> = {};
+    for (const sp of salespeople) {
+      if (sp.userId) {
+        const key = String(sp.userId);
+        map[key] = [...(map[key] || []), sp.id];
+      }
+    }
+    return map;
+  }, [salespeople]);
+
   const filteredClients = useMemo(() => {
     if (spFilter === "all") return allClients;
     if (spFilter === "none") return allClients.filter((c: any) => !c.assignedSalespersonId);
-    return allClients.filter((c: any) => String(c.assignedSalespersonId) === spFilter);
-  }, [allClients, spFilter]);
+    const spIds = userToSpIds[spFilter] || [];
+    return allClients.filter((c: any) => spIds.includes(c.assignedSalespersonId));
+  }, [allClients, spFilter, userToSpIds]);
 
   const sortedClients = useMemo(() => {
     if (!sortKey) return filteredClients;
@@ -905,20 +926,18 @@ export default function Clients() {
         </div>
 
         {/* ── Filtro por vendedor ── */}
-        {salespeople.length > 0 && (
-          <Select value={spFilter} onValueChange={setSpFilter}>
-            <SelectTrigger className="h-8 text-xs w-44">
-              <SelectValue placeholder="Todos los vendedores" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los vendedores</SelectItem>
-              <SelectItem value="none">Sin vendedor</SelectItem>
-              {salespeople.filter((s: any) => s.isActive !== false).map((s: any) => (
-                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <Select value={spFilter} onValueChange={setSpFilter}>
+          <SelectTrigger className="h-8 text-xs w-44">
+            <SelectValue placeholder="Todos los vendedores" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los vendedores</SelectItem>
+            <SelectItem value="none">Sin vendedor</SelectItem>
+            {assignableUsers.map((u: any) => (
+              <SelectItem key={u.id} value={String(u.id)}>{u.fullName || u.username}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* ── Column picker ── */}
         <div className="relative ml-auto" ref={colPickerRef}>
