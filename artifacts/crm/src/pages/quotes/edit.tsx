@@ -202,6 +202,8 @@ export default function QuoteEdit() {
   const [products, setProducts] = useState<any[]>([]);
   const [priceLists, setPriceLists] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
+  // Lista activa: "venta" | "revendedor" | "compra" — controla qué precio carga al agregar líneas
+  const [activePriceList, setActivePriceList] = useState<"venta" | "revendedor" | "compra">("venta");
 
   const today = new Date().toISOString().slice(0, 10);
   const dueDefault = new Date(Date.now() + 5 * 86400000)
@@ -379,6 +381,7 @@ export default function QuoteEdit() {
           search: query.trim(),
           page: String(page),
           limit: String(CATALOG_PAGE_SIZE),
+          priceList: activePriceList,
         });
         if (filters.category) p.set("category", filters.category);
         if (filters.seamType) p.set("seamType", filters.seamType);
@@ -397,7 +400,7 @@ export default function QuoteEdit() {
         setCatalogModalLoading(false);
       }
     },
-    [],
+    [activePriceList],
   );
 
   const openCatalogModal = (type: "medidas" | "accesorios", lineIdx: number) => {
@@ -424,7 +427,11 @@ export default function QuoteEdit() {
 
   const selectCatalogItem = (p: any) => {
     if (!catalogModal) return;
-    const price = p.sale_price ?? p.price ?? null;
+    // Pick price from the active list: venta→sale_price, revendedor→reseller_price, compra→purchase_price
+    const price =
+      activePriceList === "revendedor" ? (p.reseller_price ?? p.sale_price ?? p.price ?? null)
+      : activePriceList === "compra" ? (p.purchase_price ?? p.sale_price ?? p.price ?? null)
+      : (p.sale_price ?? p.price ?? null);
     updateLine(catalogModal.lineIdx, {
       catalogType: catalogModal.type,
       productId: p.id,
@@ -1277,18 +1284,31 @@ export default function QuoteEdit() {
             <div>
               <Label>Lista de precios *</Label>
               <Select
-                value={form.priceListId}
-                onValueChange={(v) => setForm({ ...form, priceListId: v })}
+                value={activePriceList}
+                onValueChange={(v) => setActivePriceList(v as "venta" | "revendedor" | "compra")}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {priceLists.map((p: any) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="venta">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                      Venta
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="revendedor">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" />
+                      Revendedor
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="compra">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                      Compra
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2474,12 +2494,28 @@ export default function QuoteEdit() {
                         <th className="px-4 py-2 w-28">Norma</th>
                       </>
                     )}
-                    <th className="px-4 py-2 w-28 text-right">Precio</th>
+                    <th className="px-4 py-2 w-36 text-right">
+                      Precio{" "}
+                      <span className={
+                        activePriceList === "revendedor" ? "text-violet-400" :
+                        activePriceList === "compra" ? "text-amber-400" :
+                        "text-emerald-400"
+                      }>
+                        ({activePriceList === "venta" ? "Venta" : activePriceList === "revendedor" ? "Revendedor" : "Compra"})
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {catalogModalResults.map((p: any, idx: number) => {
-                    const price = p.sale_price ?? p.price ?? null;
+                    const price =
+                      activePriceList === "revendedor" ? (p.reseller_price ?? p.sale_price ?? p.price ?? null)
+                      : activePriceList === "compra" ? (p.purchase_price ?? p.sale_price ?? p.price ?? null)
+                      : (p.sale_price ?? p.price ?? null);
+                    const priceColor =
+                      activePriceList === "revendedor" ? "text-violet-400" :
+                      activePriceList === "compra" ? "text-amber-400" :
+                      "text-emerald-400";
                     return (
                       <tr
                         key={`${p.source}-${p.id}-${idx}`}
@@ -2511,7 +2547,7 @@ export default function QuoteEdit() {
                         )}
                         <td className="px-4 py-2 text-right">
                           {price != null && Number(price) > 0 ? (
-                            <span className="text-emerald-400 font-medium">
+                            <span className={`${priceColor} font-medium`}>
                               {Number(price).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                             </span>
                           ) : (
