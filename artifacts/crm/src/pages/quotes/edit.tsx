@@ -43,6 +43,10 @@ import {
   ChevronRight,
   Loader2,
   Package,
+  Building2,
+  X,
+  MapPin,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -104,6 +108,15 @@ export default function QuoteEdit() {
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [clientSearchResults, setClientSearchResults] = useState<any[]>([]);
+
+  // ── Client picker modal ──────────────────────────────────────────────────
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
+  const [clientPickerSearch, setClientPickerSearch] = useState("");
+  const [clientPickerStatus, setClientPickerStatus] = useState("all");
+  const [clientPickerCity, setClientPickerCity] = useState("");
+  const [clientPickerResults, setClientPickerResults] = useState<any[]>([]);
+  const [clientPickerTotal, setClientPickerTotal] = useState(0);
+  const [clientPickerLoading, setClientPickerLoading] = useState(false);
   const [contacts, setContacts] = useState<any[]>([]);
   const [newContactOpen, setNewContactOpen] = useState(false);
   const [newContactForm, setNewContactForm] = useState({
@@ -462,7 +475,6 @@ export default function QuoteEdit() {
         const res = await r.json();
         setClientSearchResults(res.data || res || []);
       } catch {
-        // fallback to local filter
         const lower = term.toLowerCase();
         setClientSearchResults(
           clients.filter((c: any) =>
@@ -474,6 +486,33 @@ export default function QuoteEdit() {
     }, 200);
     return () => clearTimeout(timer);
   }, [clientSearch, clients]);
+
+  // Client picker modal search
+  useEffect(() => {
+    if (!clientPickerOpen) return;
+    setClientPickerLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const p = new URLSearchParams({ limit: "50" });
+        if (clientPickerSearch.trim()) p.set("search", clientPickerSearch.trim());
+        if (clientPickerStatus !== "all") p.set("status", clientPickerStatus);
+        const r = await fetch(`${API}/api/clients?${p}`, { credentials: "include" });
+        const res = await r.json();
+        const data: any[] = res.data || res || [];
+        const filtered = clientPickerCity.trim()
+          ? data.filter((c: any) => String(c.city || "").toLowerCase().includes(clientPickerCity.toLowerCase()))
+          : data;
+        setClientPickerResults(filtered);
+        setClientPickerTotal(filtered.length);
+      } catch {
+        setClientPickerResults([]);
+        setClientPickerTotal(0);
+      } finally {
+        setClientPickerLoading(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [clientPickerOpen, clientPickerSearch, clientPickerStatus, clientPickerCity]);
 
   // Auto-fill CUIT only for NEW quotes (editing preserves the saved value)
   useEffect(() => {
@@ -1018,44 +1057,42 @@ export default function QuoteEdit() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Cliente *</Label>
-              <div className="relative">
-                <Input
-                  value={clientSearch}
-                  onChange={(e) => setClientSearch(e.target.value)}
-                  onFocus={() => setClientSearchResults(clients.slice(0, 20))}
-                  placeholder="Buscar cliente..."
-                />
-                {!!clientSearchResults.length && (
-                  <div className="absolute z-20 mt-1 w-full border rounded-md bg-background max-h-56 overflow-auto shadow">
-                    {clientSearchResults.map((c: any) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="w-full text-left px-3 py-2 hover:bg-muted"
-                        onClick={() => {
-                          setForm((prev: any) => ({
-                            ...prev,
-                            clientId: String(c.id),
-                            cuit: c.taxId || "",
-                          }));
-                          setClientSearch(c.companyName || c.title || "");
-                          setClientSearchResults([]);
-                        }}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium">{c.companyName || c.title}</span>
-                          {c.status === "prospect" && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 shrink-0">Prospecto</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {c.taxId || "Sin CUIT"}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+              {/* ── Client picker trigger ── */}
+              <button
+                type="button"
+                disabled={isLocked}
+                onClick={() => {
+                  setClientPickerOpen(true);
+                  setClientPickerSearch("");
+                  setClientPickerStatus("all");
+                  setClientPickerCity("");
+                }}
+                className="w-full flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-input bg-background text-sm hover:border-primary/60 transition-colors disabled:opacity-60 disabled:pointer-events-none"
+              >
+                {form.clientId ? (
+                  <span className="flex items-center gap-2 min-w-0">
+                    <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="truncate font-medium">
+                      {clients.find((c: any) => String(c.id) === form.clientId)?.companyName || clientSearch || "—"}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <Building2 className="w-4 h-4 shrink-0" />
+                    <span>Seleccionar cliente...</span>
+                  </span>
                 )}
-              </div>
+                <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              {form.clientId && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-destructive mt-1 flex items-center gap-1 transition-colors"
+                  onClick={() => { setForm((p: any) => ({ ...p, clientId: "", cuit: "", contactId: "" })); setClientSearch(""); }}
+                >
+                  <X className="w-3 h-3" /> Quitar cliente
+                </button>
+              )}
               {/* Prospect warning banner */}
               {(() => {
                 const sel = clients.find((c: any) => String(c.id) === String(form.clientId));
@@ -1381,6 +1418,143 @@ export default function QuoteEdit() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Client Picker Modal ─────────────────────────────────────────── */}
+      <Dialog open={clientPickerOpen} onOpenChange={(v) => { setClientPickerOpen(v); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b border-border/50 shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Buscar cliente
+            </DialogTitle>
+            <DialogDescription className="sr-only">Búsqueda avanzada de clientes</DialogDescription>
+          </DialogHeader>
+
+          {/* Filters */}
+          <div className="px-6 py-3 border-b border-border/40 shrink-0 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                autoFocus
+                placeholder="Buscar por nombre o CUIT..."
+                className="pl-9"
+                value={clientPickerSearch}
+                onChange={(e) => setClientPickerSearch(e.target.value)}
+              />
+              {clientPickerSearch && (
+                <button type="button" onClick={() => setClientPickerSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Filtrar por ciudad..."
+                    className="pl-8 h-8 text-sm"
+                    value={clientPickerCity}
+                    onChange={(e) => setClientPickerCity(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Select value={clientPickerStatus} onValueChange={setClientPickerStatus}>
+                <SelectTrigger className="w-40 h-8 text-sm">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="potential">Potenciales</SelectItem>
+                  <SelectItem value="final">Finales</SelectItem>
+                  <SelectItem value="prospect">Prospectos</SelectItem>
+                  <SelectItem value="inactive">Inactivos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Results */}
+          <div className="overflow-y-auto flex-1 min-h-0">
+            {clientPickerLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : clientPickerResults.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                No se encontraron clientes
+              </div>
+            ) : (
+              <>
+                <div className="px-6 py-2 text-xs text-muted-foreground border-b border-border/30">
+                  {clientPickerTotal} resultado{clientPickerTotal !== 1 ? "s" : ""}
+                </div>
+                <div className="divide-y divide-border/30">
+                  {clientPickerResults.map((c: any) => {
+                    const statusColors: Record<string, string> = {
+                      prospect: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+                      potential: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+                      final: "bg-green-500/15 text-green-400 border-green-500/30",
+                      inactive: "bg-gray-500/15 text-gray-400 border-gray-500/30",
+                    };
+                    const statusLabels: Record<string, string> = {
+                      prospect: "Prospecto", potential: "Potencial",
+                      final: "Final", inactive: "Inactivo",
+                    };
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-6 py-3 hover:bg-accent/40 transition-colors flex items-center gap-4"
+                        onClick={() => {
+                          setForm((prev: any) => ({
+                            ...prev,
+                            clientId: String(c.id),
+                            cuit: c.taxId || "",
+                            contactId: "",
+                          }));
+                          setClientSearch(c.companyName || "");
+                          setClientPickerOpen(false);
+                        }}
+                      >
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Building2 className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm truncate">{c.companyName}</span>
+                            {c.status && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full border ${statusColors[c.status] || ""}`}>
+                                {statusLabels[c.status] || c.status}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                            {c.taxId && <span>CUIT: {c.taxId}</span>}
+                            {c.city && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />{c.city}
+                              </span>
+                            )}
+                            {c.industry && <span className="truncate">{c.industry}</span>}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="px-6 py-3 border-t border-border/50 shrink-0 flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setClientPickerOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={newContactOpen} onOpenChange={setNewContactOpen}>
         <DialogContent aria-describedby="new-contact-description">
