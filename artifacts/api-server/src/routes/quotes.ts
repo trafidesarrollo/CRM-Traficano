@@ -14,11 +14,20 @@ async function closeQuoteTasks(quoteId: number, tx: any = db) {
 async function createQuoteTask(quoteId: number, quoteNumber: string, clientId: number | null, salespersonId: number | null, createdBy: number | null, tx: any = db) {
   let assignedTo: number | null = null;
   if (salespersonId) {
+    // First try: salespersonId is a salesperson table ID
     const [sp] = await tx.select({ userId: usersTable.id })
       .from(usersTable)
       .innerJoin(salespeopleTable, eq(salespeopleTable.userId, usersTable.id))
       .where(eq(salespeopleTable.id, salespersonId));
-    if (sp) assignedTo = sp.userId;
+    if (sp) {
+      assignedTo = sp.userId;
+    } else {
+      // Fallback: salespersonId is a direct user ID
+      const [u] = await tx.select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.id, salespersonId));
+      if (u) assignedTo = u.id;
+    }
   }
   const dueDate = new Date(Date.now() + 3 * 86400000);
   await tx.insert(tasksTable).values({

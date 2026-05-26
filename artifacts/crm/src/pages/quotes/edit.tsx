@@ -54,6 +54,58 @@ import { useAuth } from "@/hooks/use-auth";
 
 const API = import.meta.env.VITE_API_URL || "";
 
+const SALE_CONDITIONS: { id: number; name: string }[] = [
+  { id: 1,  name: "10 DIAS FECHA FACT." },
+  { id: 2,  name: "15 DIAS CON VALORES A 30/60 DIAS." },
+  { id: 3,  name: "15 DIAS DE ENTREGA, CHEQUE A 60 DIAS." },
+  { id: 4,  name: "15 DIAS FECHA FACT." },
+  { id: 5,  name: "15 DIAS FECHA FACT. CHEQUE A 30 DIAS." },
+  { id: 6,  name: "15 DIAS FECHA FACT. CON VALORES" },
+  { id: 7,  name: "20% ANTICIPADO, SALDO CONTRA ENTREGA CHEQUE 15 DIAS" },
+  { id: 8,  name: "21 DIAS" },
+  { id: 9,  name: "30 DIAS FECHA FACT." },
+  { id: 10, name: "30 DIAS FECHA FACT. CON VALORES" },
+  { id: 11, name: "30% ANT. CON CH/A 30 DIAS, RESTO C/ENT. CH/ 30 DIAS" },
+  { id: 12, name: "30% ANTICIPADO CON PEDIDO CH/ A 15 DIAS, SALDO CONTRA AVISO DE ENTREGA CH/A 30 DIAS" },
+  { id: 13, name: "30% ANTICIPADO CON PEDIDO, SALDO CHEQUE AL DIA" },
+  { id: 14, name: "30% ANTICIPADO CON PEDIDO, SALDO CONTRA AVISO DE ENT. CH/30 DIAS." },
+  { id: 15, name: "40% ANTICIPADO CON LA OC, SALDO 30FF." },
+  { id: 16, name: "45 DIAS FECHA FACT." },
+  { id: 17, name: "50% ANTICIPADO, 50% CONTRAENTREGA CHEQUE 15 DIAS." },
+  { id: 18, name: "50% ANTICIPADO, RESTO ANTICIP. ENTREGA" },
+  { id: 19, name: "50% ANTICIPADO, SALDO 90 FF" },
+  { id: 20, name: "50% ANTICIPADO, SALDO CONTRA ENTREGA CHEQUE 20 DIAS." },
+  { id: 21, name: "50% ANTICIPADO, SALDO CONTRA ENTREGA CHEQUE AL DIA." },
+  { id: 22, name: "50% ANTICIPADO, SALDO CONTRA ENTREGA CON CH/30 DIAS." },
+  { id: 23, name: "50% ANTICIPADO, SALDO CONTRA ENTREGA." },
+  { id: 24, name: "60 DIAS FECHA FACT." },
+  { id: 25, name: "7 DIAS CON CHEQUE 15 DIAS." },
+  { id: 26, name: "7 DIAS." },
+  { id: 27, name: "90 DIAS FECHA FACT." },
+  { id: 28, name: "ANTICIPADO" },
+  { id: 29, name: "ANTICIPADO (OTRAS CONSULTAR)." },
+  { id: 30, name: "ANTICIPADO CHEQUE A 15 DIAS." },
+  { id: 31, name: "ANTICIPADO CHEQUE A 30 DIAS." },
+  { id: 32, name: "ANTICIPADO CHEQUE A 45 DIAS." },
+  { id: 33, name: "C/AVISO DE ENTREGA CH A 45 D" },
+  { id: 34, name: "CHEQUE 29 DIAS ANTICIPADO A LA ENTREGA" },
+  { id: 35, name: "CHEQUE A 15 DIAS ANTICIP. A LA ENTREGA." },
+  { id: 36, name: "CHEQUE ANTICIP. ENTREGA, 29 DIAS." },
+  { id: 37, name: "CHEQUE CONTRA ENTREGA 45 DIAS." },
+  { id: 38, name: "CONTADO" },
+  { id: 39, name: "CONTRA AVISO DE ENT CHQ AL DIA" },
+  { id: 40, name: "CONTRA AVISO DE ENTREGA CHEQUE A 15 DIAS." },
+  { id: 41, name: "CONTRA AVISO DE ENTREGA CHEQUE A 30 DIAS." },
+  { id: 42, name: "CONTRA AVISO DE ENTREGA CHEQUE A 60 DIAS" },
+  { id: 43, name: "CONTRA ENTREGA CHEQUE 15 DIAS." },
+  { id: 44, name: "CONTRA REEMBOLSO" },
+  { id: 45, name: "CONTRAENTREGA" },
+  { id: 46, name: "CREDITO 20 DIAS" },
+  { id: 47, name: "QUINCENA Y 30 DIAS." },
+  { id: 48, name: "SEMANA DE ENTREGA CHEQUE 20 DIAS." },
+  { id: 49, name: "SEMANA DE ENTREGA CHEQUE 30 DIAS." },
+];
+
 interface Line {
   id?: number;
   productType?: string;
@@ -131,6 +183,9 @@ export default function QuoteEdit() {
   });
   const [creatingContact, setCreatingContact] = useState(false);
   const [salespeople, setSalespeople] = useState<any[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const [otrosOpen, setOtrosOpen] = useState(false);
+  const [otrosText, setOtrosText] = useState("");
   const isPrivilegedUser = user?.role === "admin" || user?.role === "gerente_comercial";
 
   const computeQuoteStatus = (status: string, purchaseOrder: string, closeReason: string) => {
@@ -146,7 +201,6 @@ export default function QuoteEdit() {
     ) || null;
   const [products, setProducts] = useState<any[]>([]);
   const [priceLists, setPriceLists] = useState<any[]>([]);
-  const [saleConditions, setSaleConditions] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -426,7 +480,7 @@ export default function QuoteEdit() {
         [],
       ),
       safe(
-        fetch(`${API}/api/sale-conditions`, { credentials: "include" }).then(
+        fetch(`${API}/api/users/assignable`, { credentials: "include" }).then(
           (r) => r.json(),
         ),
         [],
@@ -437,13 +491,13 @@ export default function QuoteEdit() {
         ),
         { data: [] },
       ),
-    ]).then(([cl, sp, pr, pl, sc, op]) => {
+    ]).then(([cl, sp, pr, pl, users, op]) => {
       const spData: any[] = Array.isArray(sp) ? sp : [];
       setClients(cl.data || cl || []);
       setSalespeople(spData);
       setProducts(Array.isArray(pr) ? pr : pr.data || []);
       setPriceLists(pl || []);
-      setSaleConditions(sc || []);
+      setAssignableUsers(Array.isArray(users) ? users : []);
       setOpportunities(op.data || op || []);
       const def = (pl || []).find((x: any) => x.isDefault);
       if (def && isNew)
@@ -726,10 +780,14 @@ export default function QuoteEdit() {
       return;
     }
 
+    const hasCondition = form.saleConditionId === "otros" ? !!otrosText.trim() : !!form.saleConditionId;
+    if (!hasCondition) {
+      toast({ title: "Condición de venta es requerida", variant: "destructive" });
+      return;
+    }
     const required = [
       ["clientId", "Cliente"],
       ["cuit", "CUIT"],
-      ["saleConditionId", "Condición de venta"],
       ["date", "Fecha"],
       ["exchangeRate", "Tasa de cambio"],
       ["status", "Estado"],
@@ -743,13 +801,14 @@ export default function QuoteEdit() {
       toast({ title: `${missing[1]} es requerido`, variant: "destructive" });
       return;
     }
+    const scId = form.saleConditionId && form.saleConditionId !== "otros" ? parseInt(form.saleConditionId) : null;
     const body: any = {
       clientId: parseInt(form.clientId),
       contactId: form.contactId ? parseInt(form.contactId) : null,
       opportunityId: form.opportunityId ? parseInt(form.opportunityId) : null,
       salespersonId: form.salespersonId ? parseInt(form.salespersonId) : null,
       priceListId: form.priceListId ? parseInt(form.priceListId) : null,
-      saleConditionId: form.saleConditionId ? parseInt(form.saleConditionId) : null,
+      saleConditionId: scId,
       cuit: form.cuit,
       date: form.date,
       deliveryDate: form.deliveryDate || null,
@@ -794,10 +853,11 @@ export default function QuoteEdit() {
       if (isNew) {
         setSavedQuote({ id: data.id, number: data.number || `#${data.id}`, clientId: data.clientId });
         if (data.taskCreated) {
-          const spName = salespeople.find((s: any) => String(s.id) === form.salespersonId)?.name;
+          const spName = assignableUsers.find((u: any) => String(u.id) === form.salespersonId)?.fullName
+            || salespeople.find((s: any) => String(s.id) === form.salespersonId)?.name;
           toast({
             title: "Cotización creada",
-            description: `Tarea de seguimiento asignada a ${spName || "el vendedor responsable"}`,
+            description: `Tarea de seguimiento asignada a ${spName || "el responsable"}`,
           });
           setLocation(`/quotes/${data.id}`);
         } else {
@@ -1120,21 +1180,42 @@ export default function QuoteEdit() {
 
             <div>
               <Label>Condición de venta *</Label>
-              <Select
-                value={form.saleConditionId}
-                onValueChange={(v) => setForm({ ...form, saleConditionId: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {saleConditions.map((s: any) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {form.saleConditionId === "otros" ? (
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-background text-sm truncate">
+                    <span className="truncate text-muted-foreground italic">{otrosText || "OTROS (sin texto)"}</span>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setOtrosOpen(true)}>Editar</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setForm((f: any) => ({ ...f, saleConditionId: "" }))}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={form.saleConditionId}
+                  onValueChange={(v) => {
+                    if (v === "otros") {
+                      setOtrosText("");
+                      setOtrosOpen(true);
+                      setForm((f: any) => ({ ...f, saleConditionId: "otros" }));
+                    } else {
+                      setForm({ ...form, saleConditionId: v });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {SALE_CONDITIONS.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="otros">+ OTROS (ingresar manualmente)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="col-span-2">
               <div className="flex items-center justify-between gap-2 mb-2">
@@ -1378,14 +1459,21 @@ export default function QuoteEdit() {
                 onValueChange={(v) => setForm({ ...form, salespersonId: v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar vendedor..." />
+                  <SelectValue placeholder="Seleccionar responsable..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {salespeople.map((s: any) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
+                  {assignableUsers.length > 0
+                    ? assignableUsers.map((u: any) => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.fullName || u.username}
+                        </SelectItem>
+                      ))
+                    : salespeople.map((s: any) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.name}
+                        </SelectItem>
+                      ))
+                  }
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">Se le asignará una tarea de seguimiento automáticamente</p>
@@ -1418,6 +1506,35 @@ export default function QuoteEdit() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── OTROS condición modal ───────────────────────────────────────── */}
+      <Dialog open={otrosOpen} onOpenChange={setOtrosOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Condición de venta — OTROS</DialogTitle>
+            <DialogDescription>Ingresá la condición de pago manualmente. No se guardará en la base de datos.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              placeholder="Ej: 60% anticipado, 40% contra entrega..."
+              value={otrosText}
+              onChange={(e) => setOtrosText(e.target.value)}
+              rows={3}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setOtrosOpen(false);
+              if (!otrosText.trim()) setForm((f: any) => ({ ...f, saleConditionId: "" }));
+            }}>Cancelar</Button>
+            <Button onClick={() => {
+              if (!otrosText.trim()) return;
+              setOtrosOpen(false);
+            }}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Client Picker Modal ─────────────────────────────────────────── */}
       <Dialog open={clientPickerOpen} onOpenChange={(v) => { setClientPickerOpen(v); }}>
