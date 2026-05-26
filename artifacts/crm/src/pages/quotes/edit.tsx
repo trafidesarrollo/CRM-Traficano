@@ -493,7 +493,7 @@ export default function QuoteEdit() {
     setClientPickerLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const p = new URLSearchParams({ limit: "50" });
+        const p = new URLSearchParams({ limit: "500" });
         if (clientPickerSearch.trim()) p.set("search", clientPickerSearch.trim());
         if (clientPickerStatus !== "all") p.set("status", clientPickerStatus);
         const r = await fetch(`${API}/api/clients?${p}`, { credentials: "include" });
@@ -503,7 +503,7 @@ export default function QuoteEdit() {
           ? data.filter((c: any) => String(c.city || "").toLowerCase().includes(clientPickerCity.toLowerCase()))
           : data;
         setClientPickerResults(filtered);
-        setClientPickerTotal(filtered.length);
+        setClientPickerTotal(res.total ?? filtered.length);
       } catch {
         setClientPickerResults([]);
         setClientPickerTotal(0);
