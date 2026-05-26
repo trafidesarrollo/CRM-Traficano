@@ -25,6 +25,7 @@ export default function Salespeople() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", userId: "", functionalRole: "" });
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
   const [panelSp, setPanelSp] = useState<any>(null);
@@ -38,7 +39,7 @@ export default function Salespeople() {
   const { data: salespeople, isLoading, refetch } = useGetSalespeople();
   const createMut = useCreateSalesperson({
     mutation: {
-      onSuccess: () => { toast({ title: "Vendedor creado" }); setOpen(false); refetch(); setForm({ name: "", email: "", phone: "", userId: "", functionalRole: "" }); },
+      onSuccess: () => { toast({ title: "Vendedor creado" }); setOpen(false); refetch(); setForm({ name: "", email: "", phone: "", userId: "", functionalRole: "" }); setSelectedUserId(""); },
       onError: () => toast({ title: "Error al crear vendedor", variant: "destructive" }),
     },
   });
@@ -247,24 +248,53 @@ export default function Salespeople() {
           <DialogContent>
             <DialogHeader><DialogTitle>Nuevo Vendedor</DialogTitle></DialogHeader>
             <div className="space-y-4">
-              <div><Label>Nombre completo</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div>
-                <Label>Rol funcional</Label>
-                <Select value={form.functionalRole} onValueChange={(v) => setForm({ ...form, functionalRole: v })}>
-                  <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                <Label>Usuario del sistema</Label>
+                <Select
+                  value={selectedUserId}
+                  onValueChange={(v) => {
+                    setSelectedUserId(v);
+                    const u = teamUsers.find((u: any) => String(u.id) === v);
+                    if (u) setForm({ ...form, name: u.fullName || u.username || "", email: u.email || "", phone: u.phone || "", userId: String(u.id) });
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Seleccionar usuario..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Sin asignar</SelectItem>
-                    <SelectItem value="hunter">Hunter</SelectItem>
-                    <SelectItem value="farmer">Farmer</SelectItem>
-                    <SelectItem value="admin_ventas">Admin Ventas</SelectItem>
+                    {teamUsers.map((u: any) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.fullName || u.username}
+                        {u.email ? ` — ${u.email}` : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>ID Usuario (opcional)</Label><Input type="number" value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })} /></div>
-              <Button className="w-full" disabled={createMut.isPending || !form.name} onClick={() => createMut.mutate({ data: { ...form, userId: form.userId ? parseInt(form.userId) : undefined, functionalRole: form.functionalRole && form.functionalRole !== "none" ? form.functionalRole : undefined } as any })}>
-                {createMut.isPending ? "Creando..." : "Crear Vendedor"}
+
+              {selectedUserId && (
+                <>
+                  <div><Label>Nombre en el CRM</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                  <div><Label>Teléfono</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(opcional)" /></div>
+                  <div>
+                    <Label>Rol funcional</Label>
+                    <Select value={form.functionalRole} onValueChange={(v) => setForm({ ...form, functionalRole: v })}>
+                      <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        <SelectItem value="hunter">Hunter</SelectItem>
+                        <SelectItem value="farmer">Farmer</SelectItem>
+                        <SelectItem value="admin_ventas">Admin Ventas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+
+              <Button
+                className="w-full"
+                disabled={createMut.isPending || !form.name || !selectedUserId}
+                onClick={() => createMut.mutate({ data: { ...form, userId: parseInt(form.userId), functionalRole: form.functionalRole && form.functionalRole !== "none" ? form.functionalRole : undefined } as any })}
+              >
+                {createMut.isPending ? "Creando..." : "Agregar Vendedor"}
               </Button>
             </div>
           </DialogContent>
