@@ -189,9 +189,10 @@ export default function QuoteEdit() {
   const isPrivilegedUser = user?.role === "admin" || user?.role === "gerente_comercial";
 
   const computeQuoteStatus = (status: string, purchaseOrder: string, closeReason: string) => {
-    if (status === "approved" && purchaseOrder) return { label: "Finalizada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
+    if (status === "approved" && purchaseOrder) return { label: "Ganada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
+    if (status === "approved" && closeReason?.startsWith("DESISTIDA")) return { label: "Desistida", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" };
     if (status === "approved" && closeReason) return { label: "Perdida", color: "bg-red-500/20 text-red-300 border-red-500/30" };
-    if (status === "approved") return { label: "Finalizada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
+    if (status === "approved") return { label: "Ganada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
     if (status === "sent") return { label: "Enviada", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" };
     return { label: "En proceso", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" };
   };
@@ -236,8 +237,10 @@ export default function QuoteEdit() {
   });
   const isLocked = !isNew && form.status === "approved";
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeTab, setCloseTab] = useState<"ganada" | "perdida" | "desistida">("ganada");
   const [closeLostReason, setCloseLostReason] = useState("");
   const [closeLostDetail, setCloseLostDetail] = useState("");
+  const [closeDesistidaDetail, setCloseDesistidaDetail] = useState("");
   const [closingQuote, setClosingQuote] = useState(false);
   const [lines, setLines] = useState<Line[]>([blankLine()]);
 
@@ -974,6 +977,34 @@ export default function QuoteEdit() {
     }
   };
 
+  const handleCloseDesistida = async () => {
+    setClosingQuote(true);
+    try {
+      const closeReason = closeDesistidaDetail.trim()
+        ? `DESISTIDA: ${closeDesistidaDetail.trim()}`
+        : "DESISTIDA";
+      const r = await fetch(`${API}/api/quotes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "approved", closeReason }),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e.error || "Error al cerrar");
+      }
+      const updated = await r.json();
+      setForm((prev: any) => ({ ...prev, status: updated.status, quoteStatus: updated.quoteStatus || "DESISTIDA", closeReason: updated.closeReason || closeReason }));
+      setShowCloseModal(false);
+      setCloseDesistidaDetail("");
+      toast({ title: "Cotización marcada como desistida" });
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setClosingQuote(false);
+    }
+  };
+
   const doConvertToOrder = async () => {
     if (!convertForm.purchaseOrder.trim()) {
       toast({ title: "El número de OC es obligatorio", variant: "destructive" });
@@ -1025,12 +1056,14 @@ export default function QuoteEdit() {
         // PDF upload failed but order was created — inform the user
         toast({ title: `Pedido ${j.orderNumber} creado (el PDF no se pudo subir)`, variant: "destructive" });
         setShowConvertModal(false);
+        setShowCloseModal(false);
         setLocation(`/orders/${j.orderId}`);
         return;
       }
 
       toast({ title: `Pedido ${j.orderNumber} creado con OC adjunta` });
       setShowConvertModal(false);
+      setShowCloseModal(false);
       setLocation(`/orders/${j.orderId}`);
     } catch (e: any) {
       toast({ title: e.message || "Error al convertir", variant: "destructive" });
@@ -1079,13 +1112,17 @@ export default function QuoteEdit() {
             </Button>
           )}
           {!isNew && !isLocked && (
-            <Button variant="outline" onClick={convertToOrder}>
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Confirmar pedido
-            </Button>
-          )}
-          {!isNew && !isLocked && (
-            <Button variant="outline" className="text-amber-400 border-amber-500/40 hover:bg-amber-500/10" onClick={() => { setCloseLostReason(""); setCloseLostDetail(""); setShowCloseModal(true); }}>
+            <Button
+              variant="outline"
+              className="text-amber-400 border-amber-500/40 hover:bg-amber-500/10"
+              onClick={() => {
+                setCloseTab("ganada");
+                setCloseLostReason("");
+                setCloseLostDetail("");
+                setCloseDesistidaDetail("");
+                setShowCloseModal(true);
+              }}
+            >
               <AlertCircle className="w-4 h-4 mr-2" />
               Cerrar cotización
             </Button>
@@ -1403,20 +1440,27 @@ export default function QuoteEdit() {
             </div>
             <div>
               <Label>Estado *</Label>
-              <Select
-                value={form.status}
-                onValueChange={(v) => setForm({ ...form, status: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Borrador</SelectItem>
-                  <SelectItem value="sent">Enviada</SelectItem>
-                  <SelectItem value="approved">Aprobada</SelectItem>
-                  <SelectItem value="rejected">Rechazada</SelectItem>
-                </SelectContent>
-              </Select>
+              {isLocked ? (
+                <div className="mt-1.5">
+                  <Badge className={`text-sm px-3 py-1 ${computeQuoteStatus(form.status, form.purchaseOrder, form.closeReason).color}`}>
+                    {computeQuoteStatus(form.status, form.purchaseOrder, form.closeReason).label}
+                  </Badge>
+                  <p className="text-xs text-muted-foreground mt-1">Cotización cerrada — no se puede reabrir</p>
+                </div>
+              ) : (
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => setForm({ ...form, status: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Borrador</SelectItem>
+                    <SelectItem value="sent">Enviada</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div>
@@ -2182,64 +2226,174 @@ export default function QuoteEdit() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Modal: Cerrar Cotización (Perdida) ── */}
-      <Dialog open={showCloseModal} onOpenChange={(open) => { setShowCloseModal(open); if (!open) { setCloseLostReason(""); setCloseLostDetail(""); } }}>
-        <DialogContent className="sm:max-w-md">
+      {/* ── Modal: Cerrar Cotización (unificado) ── */}
+      <Dialog open={showCloseModal} onOpenChange={(open) => {
+        setShowCloseModal(open);
+        if (!open) { setCloseLostReason(""); setCloseLostDetail(""); setCloseDesistidaDetail(""); }
+      }}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-400" />
-              Marcar cotización como perdida
+              <AlertCircle className="w-5 h-5 text-amber-400" />
+              Cerrar cotización
             </DialogTitle>
             <DialogDescription>
-              Esta acción cierra la cotización sin OC. Seleccioná el motivo principal.
+              Seleccioná cómo se resolvió esta cotización.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div>
-              <Label className="text-sm">Motivo de pérdida <span className="text-destructive">*</span></Label>
-              <Select value={closeLostReason} onValueChange={setCloseLostReason}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Seleccioná el motivo..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PRECIO">PRECIO — competidor más barato</SelectItem>
-                  <SelectItem value="FLETE">FLETE — costo de envío fuera de rango</SelectItem>
-                  <SelectItem value="PLAZO DE ENTREGA">PLAZO DE ENTREGA — el cliente necesitaba antes</SelectItem>
-                  <SelectItem value="CONDICIÓN DE PAGO">CONDICIÓN DE PAGO — no se adaptó al crédito</SelectItem>
-                  <SelectItem value="COMPETENCIA">COMPETENCIA — fue con otro proveedor</SelectItem>
-                  <SelectItem value="ESPECIFICACIÓN TÉCNICA">ESPECIFICACIÓN TÉCNICA — el producto no cumplía requisitos</SelectItem>
-                  <SelectItem value="CLIENTE DESISTIÓ">CLIENTE DESISTIÓ — proyecto cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-sm">Descripción adicional <span className="text-muted-foreground">(opcional)</span></Label>
-              <Textarea
-                className="mt-1"
-                rows={3}
-                placeholder="Detalle adicional o contexto del cierre..."
-                value={closeLostDetail}
-                onChange={(e) => setCloseLostDetail(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowCloseModal(false)} disabled={closingQuote}>
-                Cancelar
-              </Button>
-              <Button
-                className="bg-red-600 hover:bg-red-700"
-                onClick={handleCloseQuote}
-                disabled={closingQuote || !closeLostReason}
-              >
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {closingQuote ? "Cerrando..." : "Confirmar pérdida"}
-              </Button>
-            </div>
+
+          {/* Selector de tipo de cierre */}
+          <div className="flex gap-2 mt-1">
+            {(["ganada", "perdida", "desistida"] as const).map((tab) => {
+              const labels = { ganada: "Ganada", perdida: "Perdida", desistida: "Desistida" };
+              const colors = {
+                ganada: closeTab === "ganada" ? "bg-green-600 text-white border-green-600" : "border-border text-muted-foreground hover:border-green-500/50 hover:text-green-300",
+                perdida: closeTab === "perdida" ? "bg-red-600 text-white border-red-600" : "border-border text-muted-foreground hover:border-red-500/50 hover:text-red-300",
+                desistida: closeTab === "desistida" ? "bg-amber-600 text-white border-amber-600" : "border-border text-muted-foreground hover:border-amber-500/50 hover:text-amber-300",
+              };
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setCloseTab(tab)}
+                  className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${colors[tab]}`}
+                >
+                  {labels[tab]}
+                </button>
+              );
+            })}
           </div>
+
+          {/* Ganada */}
+          {closeTab === "ganada" && (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">Ingresá el número de Orden de Compra y adjuntá el PDF. Ambos son obligatorios.</p>
+              <div>
+                <Label className="text-sm font-medium mb-1.5">
+                  Número de OC <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  placeholder="Ej: OC-2024-00123"
+                  value={convertForm.purchaseOrder}
+                  onChange={(e) => setConvertForm((p) => ({ ...p, purchaseOrder: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-1.5">
+                  PDF de la OC <span className="text-destructive">*</span>
+                </Label>
+                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/40 transition-colors">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      setConvertForm((p) => ({ ...p, ocFile: f }));
+                    }}
+                  />
+                  {convertForm.ocFile ? (
+                    <div className="flex items-center gap-2 text-sm text-primary">
+                      <FileText className="w-5 h-5" />
+                      <span className="truncate max-w-[220px]">{convertForm.ocFile.name}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-muted-foreground text-sm">
+                      <FileText className="w-6 h-6" />
+                      <span>Hacé click para seleccionar el PDF</span>
+                    </div>
+                  )}
+                </label>
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <Button variant="outline" onClick={() => setShowCloseModal(false)} disabled={converting}>
+                  Cancelar
+                </Button>
+                <Button className="bg-green-600 hover:bg-green-700" onClick={doConvertToOrder} disabled={converting}>
+                  <ShoppingCart className="w-4 h-4 mr-1" />
+                  {converting ? "Creando pedido..." : "Confirmar ganada"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Perdida */}
+          {closeTab === "perdida" && (
+            <div className="space-y-4 pt-1">
+              <div>
+                <Label className="text-sm">Motivo de pérdida <span className="text-destructive">*</span></Label>
+                <Select value={closeLostReason} onValueChange={setCloseLostReason}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Seleccioná el motivo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PRECIO">PRECIO — competidor más barato</SelectItem>
+                    <SelectItem value="FLETE">FLETE — costo de envío fuera de rango</SelectItem>
+                    <SelectItem value="PLAZO DE ENTREGA">PLAZO DE ENTREGA — el cliente necesitaba antes</SelectItem>
+                    <SelectItem value="CONDICIÓN DE PAGO">CONDICIÓN DE PAGO — no se adaptó al crédito</SelectItem>
+                    <SelectItem value="COMPETENCIA">COMPETENCIA — fue con otro proveedor</SelectItem>
+                    <SelectItem value="ESPECIFICACIÓN TÉCNICA">ESPECIFICACIÓN TÉCNICA — el producto no cumplía requisitos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Descripción adicional <span className="text-muted-foreground">(opcional)</span></Label>
+                <Textarea
+                  className="mt-1"
+                  rows={3}
+                  placeholder="Detalle adicional o contexto del cierre..."
+                  value={closeLostDetail}
+                  onChange={(e) => setCloseLostDetail(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setShowCloseModal(false)} disabled={closingQuote}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={handleCloseQuote}
+                  disabled={closingQuote || !closeLostReason}
+                >
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  {closingQuote ? "Cerrando..." : "Confirmar pérdida"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Desistida */}
+          {closeTab === "desistida" && (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">El cliente o la empresa decidió no continuar con la cotización, sin que implique una pérdida competitiva.</p>
+              <div>
+                <Label className="text-sm">Motivo o contexto <span className="text-muted-foreground">(opcional)</span></Label>
+                <Textarea
+                  className="mt-1"
+                  rows={3}
+                  placeholder="Ej: el proyecto fue suspendido, el cliente postergó la decisión..."
+                  value={closeDesistidaDetail}
+                  onChange={(e) => setCloseDesistidaDetail(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setShowCloseModal(false)} disabled={closingQuote}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700"
+                  onClick={handleCloseDesistida}
+                  disabled={closingQuote}
+                >
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  {closingQuote ? "Cerrando..." : "Confirmar desistida"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* ── Modal: Convertir a Pedido ── */}
+      {/* ── Modal: Convertir a Pedido (ya integrado en modal de cierre, se mantiene por compatibilidad) ── */}
       <Dialog open={showConvertModal} onOpenChange={setShowConvertModal}>
         <DialogContent>
           <DialogHeader>
