@@ -349,4 +349,93 @@ router.post("/products/accesorios/import", async (req, res) => {
   }
 });
 
+// POST /api/products/prices/import
+// Body: { rows: Array<{ listName, product, uom, supplier, price }> }
+// Matches products by exact name (case-insensitive, trimmed) across both tables
+// Updates sale_price for matched products; returns matched/unmatched counts
+router.post("/products/prices/import", async (req, res) => {
+  try {
+    const rows: any[] = req.body.rows;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      res.status(400).json({ error: "Se requiere un array 'rows' con al menos un elemento" });
+      return;
+    }
+
+    // Build name→price map (case-insensitive, trimmed)
+    const priceMap = new Map<string, string>();
+    for (const r of rows) {
+      const name = (r.product || "").trim().toLowerCase();
+      const price = r.price != null && r.price !== "" ? String(r.price).replace(",", ".") : null;
+      if (name && price) priceMap.set(name, price);
+    }
+
+    // Fetch all product names from both tables
+    const [medidas, accesorios] = await Promise.all([
+      db.execute(sql`SELECT id, name FROM products_medidas WHERE is_active = true`),
+      db.execute(sql`SELECT id, name FROM products_accesorios WHERE is_active = true`),
+    ]);
+
+    let matchedMedidas = 0;
+    let matchedAccesorios = 0;
+    const unmatched: string[] = [];
+
+    // Match and update medidas
+    const medidasUpdates: { id: number; price: string }[] = [];
+    for (const row of medidas.rows as any[]) {
+      const key = (row.name || "").trim().toLowerCase();
+      if (priceMap.has(key)) {
+        medidasUpdates.push({ id: row.id, price: priceMap.get(key)! });
+      }
+    }
+
+    // Match and update accesorios
+    const accesoriosUpdates: { id: number; price: string }[] = [];
+    for (const row of accesorios.rows as any[]) {
+      const key = (row.name || "").trim().toLowerCase();
+      if (priceMap.has(key)) {
+        accesoriosUpdates.push({ id: row.id, price: priceMap.get(key)! });
+      }
+    }
+
+    // Determine unmatched names
+    const allProductKeys = new Set([
+      ...(medidas.rows as any[]).map((r: any) => (r.name || "").trim().toLowerCase()),
+      ...(accesorios.rows as any[]).map((r: any) => (r.name || "").trim().toLowerCase()),
+    ]);
+    for (const [key] of priceMap) {
+      if (!allProductKeys.has(key)) unmatched.push(key);
+    }
+
+    // Bulk update in chunks
+    const CHUNK = 50;
+    for (let i = 0; i < medidasUpdates.length; i += CHUNK) {
+      const chunk = medidasUpdates.slice(i, i + CHUNK);
+      for (const u of chunk) {
+        await db.update(productsMedidasTable).set({ salePrice: u.price, updatedAt: new Date() }).where(eq(productsMedidasTable.id, u.id));
+      }
+      matchedMedidas += chunk.length;
+    }
+    for (let i = 0; i < accesoriosUpdates.length; i += CHUNK) {
+      const chunk = accesoriosUpdates.slice(i, i + CHUNK);
+      for (const u of chunk) {
+        await db.update(productsAccesoriosTable).set({ salePrice: u.price, updatedAt: new Date() }).where(eq(productsAccesoriosTable.id, u.id));
+      }
+      matchedAccesorios += chunk.length;
+    }
+
+    res.json({
+      ok: true,
+      total: rows.length,
+      matched: matchedMedidas + matchedAccesorios,
+      matchedMedidas,
+      matchedAccesorios,
+      unmatched: unmatched.length,
+      unmatchedSample: unmatched.slice(0, 10),
+    });
+  } catch (err: any) {
+    req.log.error(err);
+    res.status(500).json({ error: err.message || "Error al importar precios" });
+  }
+});
+
 export default router;

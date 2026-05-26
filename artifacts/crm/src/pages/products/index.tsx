@@ -84,6 +84,184 @@ function csvToAccesorios(rows: string[][]): any[] {
   }));
 }
 
+// Parser for price list CSV: "Lista de precios","Producto","UOM","Proveedor","Precio"
+function csvToPrecios(rows: string[][]): any[] {
+  if (rows.length < 2) return [];
+  const h = rows[0];
+  const idx = (n: string) => h.findIndex(x => x.trim().toLowerCase() === n.toLowerCase());
+  const iL = idx("Lista de precios");
+  const iP = idx("Producto");
+  const iU = idx("UOM");
+  const iProv = idx("Proveedor");
+  const iPr = idx("Precio");
+  if (iP === -1 || iPr === -1) return [];
+  return rows.slice(1)
+    .filter(r => r[iP]?.trim() && r[iPr]?.trim())
+    .map(r => ({
+      listName: iL >= 0 ? (r[iL]?.trim() || "") : "",
+      product: r[iP]?.trim() || "",
+      uom: iU >= 0 ? (r[iU]?.trim() || "") : "",
+      supplier: iProv >= 0 ? (r[iProv]?.trim() || "") : "",
+      price: r[iPr]?.trim() || "",
+    }));
+}
+
+// ─── Price import dialog (specialized for price list CSV) ─────────────────────
+function PriceImportDialog({ onDone }: { onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<"idle" | "preview" | "importing" | "done" | "error">("idle");
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [result, setResult] = useState<any>(null);
+  const [err, setErr] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const reset = () => { setState("idle"); setParsed([]); setFileName(""); setResult(null); setErr(""); if (fileRef.current) fileRef.current.value = ""; };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const rows = parseCSV(ev.target?.result as string);
+      const data = csvToPrecios(rows);
+      if (!data.length) { setErr("No se encontraron filas válidas. Verificá que el CSV tenga columnas: Lista de precios, Producto, Precio"); setState("error"); return; }
+      setParsed(data); setState("preview");
+    };
+    reader.readAsText(file, "utf-8");
+  };
+
+  const handleImport = async () => {
+    setState("importing");
+    try {
+      const r = await fetch(`${API}/api/products/prices/import`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: parsed }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error del servidor");
+      setResult(data);
+      setState("done");
+      onDone();
+    } catch (e: any) { setErr(e.message); setState("error"); }
+  };
+
+  // Group by list name for preview
+  const listNames = [...new Set(parsed.map(r => r.listName || "(sin nombre)"))];
+
+  return (
+    <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="text-green-400 border-green-500/30 hover:bg-green-500/10">
+          <DollarSign className="w-4 h-4 mr-2" />Importar Precios
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Importar Lista de Precios</DialogTitle></DialogHeader>
+
+        {state === "idle" && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Columnas requeridas: <span className="font-mono text-xs bg-muted px-1 rounded">Lista de precios, Producto, Precio</span>
+            </p>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-border/60 rounded-lg p-8 cursor-pointer hover:border-green-500/50 transition-colors gap-3">
+              <DollarSign className="w-10 h-10 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Seleccioná el archivo CSV de precios</span>
+              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+            </label>
+          </div>
+        )}
+
+        {state === "preview" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm flex-wrap">
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>{fileName}</span>
+              <Badge variant="secondary">{parsed.length.toLocaleString()} filas</Badge>
+              {listNames.map(l => <Badge key={l} className="text-xs bg-green-500/20 text-green-300 border-green-500/30">{l}</Badge>)}
+            </div>
+            <div className="overflow-x-auto rounded border border-border/40 text-xs">
+              <table className="w-full">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="px-2 py-1 text-left">Lista</th>
+                    <th className="px-2 py-1 text-left">Producto</th>
+                    <th className="px-2 py-1 text-right">Precio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsed.slice(0, 6).map((r, i) => (
+                    <tr key={i} className="border-t border-border/20">
+                      <td className="px-2 py-1 text-muted-foreground">{r.listName || "—"}</td>
+                      <td className="px-2 py-1 max-w-[200px] truncate" title={r.product}>{r.product}</td>
+                      <td className="px-2 py-1 text-right font-mono">{r.price}</td>
+                    </tr>
+                  ))}
+                  {parsed.length > 6 && <tr><td colSpan={3} className="px-2 py-1 text-muted-foreground text-center">... y {parsed.length - 6} más</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground">La coincidencia se hace por nombre exacto del producto (sin distinguir mayúsculas). Los que no coincidan quedarán sin actualizar.</p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={reset}>Cancelar</Button>
+              <Button onClick={handleImport} className="bg-green-600 hover:bg-green-700">
+                <DollarSign className="w-4 h-4 mr-2" />Importar {parsed.length.toLocaleString()} precios
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {state === "importing" && (
+          <div className="py-8 text-center space-y-3">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500 mx-auto" />
+            <p className="text-sm text-muted-foreground">Actualizando precios...</p>
+          </div>
+        )}
+
+        {state === "done" && result && (
+          <div className="py-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-10 h-10 text-green-500 shrink-0" />
+              <div>
+                <p className="font-semibold">Importación completada</p>
+                <p className="text-sm text-muted-foreground">Se procesaron {result.total.toLocaleString()} filas del CSV</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-green-400">{result.matched}</p>
+                <p className="text-muted-foreground text-xs mt-0.5">Precios actualizados</p>
+                <p className="text-xs text-muted-foreground">{result.matchedMedidas} caños · {result.matchedAccesorios} accesorios</p>
+              </div>
+              <div className={`border rounded-lg p-3 text-center ${result.unmatched > 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-muted/20 border-border/20"}`}>
+                <p className={`text-2xl font-bold ${result.unmatched > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{result.unmatched}</p>
+                <p className="text-muted-foreground text-xs mt-0.5">Sin coincidencia</p>
+              </div>
+            </div>
+            {result.unmatchedSample?.length > 0 && (
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p className="font-medium text-amber-400">Productos no encontrados (muestra):</p>
+                {result.unmatchedSample.map((n: string, i: number) => <p key={i} className="truncate pl-2 border-l border-amber-500/30">· {n}</p>)}
+              </div>
+            )}
+            <Button className="w-full" onClick={() => { reset(); setOpen(false); }}>Cerrar</Button>
+          </div>
+        )}
+
+        {state === "error" && (
+          <div className="py-6 text-center space-y-3">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
+            <p className="font-semibold">Error</p>
+            <p className="text-sm text-muted-foreground">{err}</p>
+            <Button variant="outline" onClick={reset}>Reintentar</Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Import dialogs ────────────────────────────────────────────────────────────
 type ImportState = "idle" | "preview" | "importing" | "done" | "error";
 
@@ -324,6 +502,7 @@ export default function Products() {
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <PriceImportDialog onDone={loadCatalog} />
             <CsvImportDialog
               label="Importar Accesorios"
               color="text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
