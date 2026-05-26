@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, activitiesTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
+import { notifyTeam } from "../lib/notify-team.js";
 
 const router: IRouter = Router();
 
@@ -57,6 +58,24 @@ router.post("/activities", async (req, res) => {
 
     const [activity] = await db.insert(activitiesTable).values(insertData).returning();
     res.status(201).json(activity);
+
+    if (insertData.clientId) {
+      const actorUserId = (req as any).session?.userId;
+      const typeLabel: Record<string, string> = {
+        call: "Llamada", visit: "Visita", email: "Email",
+        task: "Tarea", note: "Nota", follow_up: "Seguimiento",
+      };
+      notifyTeam({
+        clientId: insertData.clientId,
+        excludeUserId: actorUserId,
+        type: "client_activity",
+        title: `Nueva actividad: ${typeLabel[type] ?? type}`,
+        body: String(title),
+        link: `/clients/${insertData.clientId}`,
+        entityType: "activity",
+        entityId: activity.id,
+      });
+    }
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al crear actividad" });

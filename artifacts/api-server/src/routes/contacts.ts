@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, contactsTable, clientsTable } from "@workspace/db";
 import { eq, ilike, and, or } from "drizzle-orm";
+import { notifyTeam } from "../lib/notify-team.js";
 
 const router: IRouter = Router();
 
@@ -68,6 +69,20 @@ router.post("/contacts", async (req, res) => {
     }
     const [contact] = await db.insert(contactsTable).values(payload).returning();
     res.status(201).json({ ...contact, fullName: contactName(contact) });
+
+    if (payload.clientId) {
+      const actorUserId = (req as any).session?.userId;
+      notifyTeam({
+        clientId: payload.clientId,
+        excludeUserId: actorUserId,
+        type: "client_contact",
+        title: "Nuevo contacto agregado",
+        body: contactName(contact),
+        link: `/clients/${payload.clientId}`,
+        entityType: "contact",
+        entityId: contact.id,
+      });
+    }
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al crear contacto" });

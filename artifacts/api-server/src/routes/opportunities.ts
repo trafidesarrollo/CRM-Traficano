@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, opportunitiesTable, salespeopleTable, quotesTable, clientsTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { notifyTeam } from "../lib/notify-team.js";
 
 const router: IRouter = Router();
 
@@ -44,6 +45,20 @@ router.post("/opportunities", async (req, res) => {
   try {
     const [opp] = await db.insert(opportunitiesTable).values(req.body).returning();
     res.status(201).json(opp);
+
+    if (opp.clientId) {
+      const actorUserId = (req as any).session?.userId;
+      notifyTeam({
+        clientId: opp.clientId,
+        excludeUserId: actorUserId,
+        type: "client_opportunity",
+        title: "Nueva oportunidad",
+        body: opp.title ?? undefined,
+        link: `/clients/${opp.clientId}`,
+        entityType: "opportunity",
+        entityId: opp.id,
+      });
+    }
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al crear oportunidad" });
