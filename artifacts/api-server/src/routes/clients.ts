@@ -82,7 +82,21 @@ router.get("/clients/:id", async (req, res) => {
       res.status(404).json({ error: "Cliente no encontrado" });
       return;
     }
-    res.json(clients[0]);
+    const client = clients[0];
+    // Enrich with salesperson + support user
+    let salespersonInfo: any = null;
+    if (client.assignedSalespersonId) {
+      const rows = await db.execute(sql`
+        SELECT s.id, s.name, s.email, s.phone, s.functional_role, s.support_user_id,
+               u.full_name AS support_user_name, u.username AS support_user_username
+        FROM salespeople s
+        LEFT JOIN users u ON u.id = s.support_user_id
+        WHERE s.id = ${client.assignedSalespersonId}
+        LIMIT 1
+      `);
+      if (rows.rows[0]) salespersonInfo = rows.rows[0];
+    }
+    res.json({ ...client, salespersonInfo });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al obtener cliente" });
@@ -153,10 +167,29 @@ router.patch("/clients/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const body = req.body;
+    const session = (req as any).session;
+    const callerRole = session?.role;
+    const callerUserId = session?.userId;
 
     // Load existing to preserve final status
     const [existing] = await db.select().from(clientsTable).where(eq(clientsTable.id, id)).limit(1);
     if (!existing) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
+
+    // Salesperson assignment permission check
+    if ("assignedSalespersonId" in body) {
+      const isAdminOrManager = callerRole === "admin" || callerRole === "gerente" || callerRole === "gerente_comercial";
+      if (!isAdminOrManager) {
+        // A vendedor can only self-assign (their own salesperson record)
+        const [mySp] = await db.select().from(salespeopleTable).where(eq(salespeopleTable.userId, callerUserId)).limit(1);
+        const targetSpId = body.assignedSalespersonId ? Number(body.assignedSalespersonId) : null;
+        const isSelfAssign = mySp && targetSpId === mySp.id;
+        const isUnassign = targetSpId === null && existing.assignedSalespersonId === (mySp?.id ?? null);
+        if (!isSelfAssign && !isUnassign) {
+          res.status(403).json({ error: "Solo podés asignarte a vos mismo como vendedor de un cliente" });
+          return;
+        }
+      }
+    }
 
     // Status logic for PATCH:
     // 1. "status" in body AND different from existing → intentional override, honor it

@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, ArrowLeft, FileText, ShoppingCart, Contact2, Activity,
   Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X,
-  CheckCircle2, Circle, Clock, ListTodo, UserSquare
+  CheckCircle2, Circle, Clock, ListTodo, UserSquare, Users, UserCheck, Loader2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
@@ -163,6 +163,35 @@ export default function ClientDetail() {
       .then(setAssignableUsers)
       .catch(() => {});
   }, []);
+
+  // ── Asignación de vendedor ──
+  const isAdminOrManager = role === "admin" || role === "gerente" || role === "gerente_comercial";
+  const [assigningVendedor, setAssigningVendedor] = useState(false);
+  const [savingVendedor, setSavingVendedor] = useState(false);
+  const [selectedSpId, setSelectedSpId] = useState<string>("");
+
+  const assignVendedor = async (spId: number | null) => {
+    setSavingVendedor(true);
+    try {
+      const r = await fetch(`${API}/api/clients/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ assignedSalespersonId: spId }),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e.error || "Error al asignar vendedor");
+      }
+      toast({ title: spId ? "Vendedor asignado" : "Vendedor desasignado" });
+      setAssigningVendedor(false);
+      load();
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setSavingVendedor(false);
+    }
+  };
 
   // ── Filtros de cotizaciones ──
   const [quoteDateFrom, setQuoteDateFrom] = useState("");
@@ -423,6 +452,94 @@ export default function ClientDetail() {
               )}
               {client.notes && (
                 <div className="text-muted-foreground text-xs italic border-t border-border/50 pt-2 mt-2">{client.notes}</div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Equipo comercial ── */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <Users className="w-4 h-4" />Equipo comercial
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {/* Vendedor asignado */}
+              {client.salespersonInfo ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                        {(client.salespersonInfo.name || "?")[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium leading-tight">{client.salespersonInfo.name}</p>
+                        <p className="text-xs text-muted-foreground">Vendedor asignado</p>
+                      </div>
+                    </div>
+                    {(isAdminOrManager) && (
+                      <button
+                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                        onClick={() => { setSelectedSpId(String(client.salespersonInfo.id)); setAssigningVendedor(true); }}
+                      >
+                        Cambiar
+                      </button>
+                    )}
+                  </div>
+                  {/* Apoyo heredado del vendedor */}
+                  {client.salespersonInfo.support_user_name && (
+                    <div className="flex items-center gap-2.5 pl-0.5 border-l-2 border-border/50 ml-4">
+                      <UserCheck className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="font-medium leading-tight">{client.salespersonInfo.support_user_name}</p>
+                        <p className="text-xs text-muted-foreground">Apoyo comercial</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs">Sin vendedor asignado</p>
+                  {!assigningVendedor ? (
+                    <button
+                      className="text-xs text-primary hover:underline"
+                      onClick={() => { setSelectedSpId(""); setAssigningVendedor(true); }}
+                    >
+                      + Asignar vendedor
+                    </button>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Panel de asignación */}
+              {assigningVendedor && (
+                <div className="rounded-lg border border-border/60 bg-muted/10 p-3 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Seleccionar vendedor</p>
+                  <Select value={selectedSpId} onValueChange={setSelectedSpId}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="— Sin vendedor —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Sin vendedor —</SelectItem>
+                      {salespeople.filter((s: any) => s.isActive !== false).map((s: any) => (
+                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={savingVendedor}
+                      onClick={() => assignVendedor(selectedSpId && selectedSpId !== "none" ? Number(selectedSpId) : null)}
+                    >
+                      {savingVendedor ? <Loader2 className="w-3 h-3 animate-spin" /> : "Guardar"}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAssigningVendedor(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

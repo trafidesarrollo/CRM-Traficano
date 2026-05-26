@@ -647,6 +647,15 @@ export default function QuoteEdit() {
       .then((d) => setContacts(Array.isArray(d) ? d : d.data || []));
   }, [form.clientId]);
 
+  // Pre-fill salesperson from client's assigned salesperson when creating a new quote
+  useEffect(() => {
+    if (!isNew || !form.clientId) return;
+    const client = clients.find((c: any) => String(c.id) === form.clientId);
+    if (client?.assignedSalespersonId && !form.salespersonId) {
+      setForm((prev: any) => ({ ...prev, salespersonId: String(client.assignedSalespersonId) }));
+    }
+  }, [isNew, form.clientId, clients]);
+
   const createContact = async () => {
     if (
       !form.clientId ||

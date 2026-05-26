@@ -751,8 +751,10 @@ export default function Clients() {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [spFilter, setSpFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [editClient, setEditClient] = useState<any>(null);
+
 
   // ── Column visibility ──
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(loadCols);
@@ -811,9 +813,15 @@ export default function Clients() {
 
   const allClients: any[] = (response as any)?.data || [];
 
+  const filteredClients = useMemo(() => {
+    if (spFilter === "all") return allClients;
+    if (spFilter === "none") return allClients.filter((c: any) => !c.assignedSalespersonId);
+    return allClients.filter((c: any) => String(c.assignedSalespersonId) === spFilter);
+  }, [allClients, spFilter]);
+
   const sortedClients = useMemo(() => {
-    if (!sortKey) return allClients;
-    return [...allClients].sort((a, b) => {
+    if (!sortKey) return filteredClients;
+    return [...filteredClients].sort((a, b) => {
       let av: any, bv: any;
       if (sortKey === "company")  { av = (a.companyName || "").toLowerCase(); bv = (b.companyName || "").toLowerCase(); }
       if (sortKey === "scale")    { av = a.consumptionScale ?? -1; bv = b.consumptionScale ?? -1; }
@@ -895,6 +903,22 @@ export default function Clients() {
             </button>
           )}
         </div>
+
+        {/* ── Filtro por vendedor ── */}
+        {salespeople.length > 0 && (
+          <Select value={spFilter} onValueChange={setSpFilter}>
+            <SelectTrigger className="h-8 text-xs w-44">
+              <SelectValue placeholder="Todos los vendedores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los vendedores</SelectItem>
+              <SelectItem value="none">Sin vendedor</SelectItem>
+              {salespeople.filter((s: any) => s.isActive !== false).map((s: any) => (
+                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* ── Column picker ── */}
         <div className="relative ml-auto" ref={colPickerRef}>
