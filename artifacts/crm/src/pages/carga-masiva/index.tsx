@@ -109,6 +109,13 @@ export default function CargaMasivaPage() {
     });
   }
 
+  function setAccionCerrarSinAgendar(conflictIdx: number) {
+    setResolutions(prev => {
+      const cur = prev[conflictIdx] ?? { tareasACerrar: [], accion: null, followup: null };
+      return { ...prev, [conflictIdx]: { ...cur, accion: "asociar_y_cerrar", followup: null } };
+    });
+  }
+
   function openScheduleModal(conflictIdx: number) {
     const c = conflicts[conflictIdx];
     setScheduleForm(defaultFollowup(c, currentUserId));
@@ -444,28 +451,37 @@ export default function CargaMasivaPage() {
 
                     {/* Action buttons — only shown when not yet resolved */}
                     {!isResolved && (
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => setAccionCerrarSinAgendar(i)}
+                          disabled={!hasSelection}
+                          className="w-full px-3 py-2.5 rounded-lg text-xs font-medium border transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed border-border/50 text-muted-foreground hover:border-green-500/40 hover:bg-green-500/5"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5 text-green-400" />
+                          Guardar en bitácora y cerrar la tarea sin agendar
+                          {res.tareasACerrar.length > 0 && <span className="ml-1 text-green-400">({res.tareasACerrar.length} tarea{res.tareasACerrar.length !== 1 ? "s" : ""})</span>}
+                        </button>
                         <button
                           onClick={() => openScheduleModal(i)}
                           disabled={!hasSelection}
-                          className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed border-border/50 text-muted-foreground hover:border-green-500/40 hover:bg-green-500/5`}
+                          className="w-full px-3 py-2.5 rounded-lg text-xs font-medium border transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed border-border/50 text-muted-foreground hover:border-cyan-500/40 hover:bg-cyan-500/5"
                         >
-                          <CalendarCheck2 className="w-3.5 h-3.5 inline mr-1.5" />
-                          Cerrar tarea{res.tareasACerrar.length > 1 ? "s" : ""} seleccionada{res.tareasACerrar.length > 1 ? "s" : ""} y agendar seguimiento
-                          {res.tareasACerrar.length > 0 && <span className="ml-1 text-green-400">({res.tareasACerrar.length})</span>}
+                          <CalendarCheck2 className="w-3.5 h-3.5 inline mr-1.5 text-cyan-400" />
+                          Cerrar tarea y agendar seguimiento
+                          {res.tareasACerrar.length > 0 && <span className="ml-1 text-cyan-400">({res.tareasACerrar.length} tarea{res.tareasACerrar.length !== 1 ? "s" : ""})</span>}
                         </button>
                         <button
                           onClick={() => setAccionSoloBitacora(i)}
-                          className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-border/50 text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left"
+                          className="w-full px-3 py-2.5 rounded-lg text-xs font-medium border border-border/50 text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left"
                         >
-                          <X className="w-3.5 h-3.5 inline mr-1.5" />
-                          Solo guardar en bitácora (sin cerrar tareas)
+                          <X className="w-3.5 h-3.5 inline mr-1.5 text-blue-400" />
+                          Guardar en bitácora sin cerrar tareas
                         </button>
                       </div>
                     )}
                     {!isResolved && !hasSelection && (
                       <p className="text-xs text-yellow-500/70 mt-2">
-                        Marcá al menos una tarea para cerrarla, o elegí "Solo bitácora".
+                        Marcá al menos una tarea para poder cerrarla, o usá "Guardar en bitácora sin cerrar tareas".
                       </p>
                     )}
                   </div>
