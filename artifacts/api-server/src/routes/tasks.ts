@@ -313,8 +313,16 @@ router.get("/tasks/stats/summary", async (req, res) => {
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
 
-    // Managers see team-wide stats; vendedores see only their own
-    const userFilter = isManager ? undefined : eq(tasksTable.assignedTo, userId);
+    // Managers can filter by a specific assignee via ?assignedTo=userId
+    const assignedToParam = req.query.assignedTo ? Number(req.query.assignedTo) : null;
+    let userFilter: any;
+    if (!isManager) {
+      userFilter = eq(tasksTable.assignedTo, userId);
+    } else if (assignedToParam) {
+      userFilter = eq(tasksTable.assignedTo, assignedToParam);
+    } else {
+      userFilter = undefined;
+    }
 
     const [pending, overdue, today, completed] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(tasksTable)

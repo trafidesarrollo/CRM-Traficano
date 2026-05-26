@@ -141,7 +141,9 @@ export default function Tasks() {
       const r = await fetch(`${API}/api/tasks?${params}`, { credentials: "include" });
       const j = await r.json();
       setItems(Array.isArray(j) ? j : []);
-      const s = await fetch(`${API}/api/tasks/stats/summary`, { credentials: "include" });
+      const statsParams = new URLSearchParams();
+      if (!isVendedor && filterAssignee !== "all") statsParams.set("assignedTo", filterAssignee);
+      const s = await fetch(`${API}/api/tasks/stats/summary?${statsParams}`, { credentials: "include" });
       if (s.ok) {
         const sj = await s.json();
         setStats(sj && typeof sj === "object" && !Array.isArray(sj) ? sj : {});
@@ -464,7 +466,10 @@ export default function Tasks() {
       {isAdmin && (
         <div className="flex items-center gap-1.5 mb-2 text-xs text-muted-foreground">
           <User className="w-3 h-3" />
-          <span>Totales de todos los vendedores</span>
+          {filterAssignee !== "all"
+            ? <span>Total de <strong className="text-foreground">{users.find((u: any) => String(u.id) === filterAssignee)?.fullName ?? "vendedor"}</strong></span>
+            : <span>Totales de todos los vendedores</span>
+          }
         </div>
       )}
       <div className="grid grid-cols-4 gap-3 mb-6">
