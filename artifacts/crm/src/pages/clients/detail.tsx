@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { AppLayout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +31,9 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const getQuoteStatusBadge = (q: any): { label: string; color: string } => {
-  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada", color: "bg-green-500/20 text-green-300" };
-  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",    color: "bg-red-500/20 text-red-300" };
+  if (q.quoteStatus === "APROBADA" || q.quoteStatus === "FINALIZADA") return { label: "APROBADA",  color: "bg-green-500/20 text-green-300" };
+  if (q.quoteStatus === "PERDIDA")   return { label: "PERDIDA",   color: "bg-red-500/20 text-red-300" };
+  if (q.quoteStatus === "DESISTIDA") return { label: "DESISTIDA", color: "bg-amber-500/20 text-amber-300" };
   return STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
 };
 
@@ -72,6 +73,7 @@ export default function ClientDetail() {
   const role = (user as any)?.role;
   const canEdit = role === "admin" || role === "gerente" || role === "gerente_comercial";
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -161,6 +163,11 @@ export default function ClientDetail() {
       .then(setAssignableUsers)
       .catch(() => {});
   }, []);
+
+  // ── Filtros de cotizaciones ──
+  const [quoteDateFrom, setQuoteDateFrom] = useState("");
+  const [quoteDateTo, setQuoteDateTo] = useState("");
+  const [quoteStatusFilter, setQuoteStatusFilter] = useState("all");
 
   // ── Filtro de actividades por vendedor ──
   const [activitySpFilter, setActivitySpFilter] = useState<number | "all">("all");
@@ -265,6 +272,27 @@ export default function ClientDetail() {
   };
 
   const activeQuotes = quotes.filter((q: any) => ["draft", "sent", "partial", "expired"].includes(q.status));
+
+  const filteredQuotes = quotes.filter((q: any) => {
+    if (quoteStatusFilter !== "all") {
+      const qs = (q.quoteStatus || "").toUpperCase();
+      const st = q.status || "";
+      if (quoteStatusFilter === "APROBADA" && qs !== "APROBADA" && qs !== "FINALIZADA") return false;
+      if (quoteStatusFilter === "PERDIDA" && qs !== "PERDIDA") return false;
+      if (quoteStatusFilter === "DESISTIDA" && qs !== "DESISTIDA") return false;
+      if (quoteStatusFilter === "draft" && st !== "draft") return false;
+      if (quoteStatusFilter === "sent" && st !== "sent") return false;
+    }
+    if (quoteDateFrom) {
+      const qDate = q.date ? new Date(q.date) : null;
+      if (!qDate || qDate < new Date(quoteDateFrom)) return false;
+    }
+    if (quoteDateTo) {
+      const qDate = q.date ? new Date(q.date) : null;
+      if (!qDate || qDate > new Date(quoteDateTo + "T23:59:59")) return false;
+    }
+    return true;
+  });
 
   const mergedTimeline = [
     ...activities.map((a: any) => ({ ...a, _kind: "activity" as const, _date: a.createdAt })),
@@ -469,33 +497,89 @@ export default function ClientDetail() {
           </TabsList>
 
           <TabsContent value="quotes" className="mt-4">
+            {/* ── Filtros ── */}
+            <div className="flex flex-wrap items-end gap-3 mb-3 p-3 bg-card/60 border border-border/40 rounded-xl">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground font-medium">Desde</label>
+                <Input
+                  type="date"
+                  value={quoteDateFrom}
+                  onChange={e => setQuoteDateFrom(e.target.value)}
+                  className="h-8 text-sm w-36"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground font-medium">Hasta</label>
+                <Input
+                  type="date"
+                  value={quoteDateTo}
+                  onChange={e => setQuoteDateTo(e.target.value)}
+                  className="h-8 text-sm w-36"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground font-medium">Estado</label>
+                <Select value={quoteStatusFilter} onValueChange={setQuoteStatusFilter}>
+                  <SelectTrigger className="h-8 text-sm w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="draft">Borrador</SelectItem>
+                    <SelectItem value="sent">Enviada</SelectItem>
+                    <SelectItem value="APROBADA">APROBADA</SelectItem>
+                    <SelectItem value="PERDIDA">PERDIDA</SelectItem>
+                    <SelectItem value="DESISTIDA">DESISTIDA</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {(quoteDateFrom || quoteDateTo || quoteStatusFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground"
+                  onClick={() => { setQuoteDateFrom(""); setQuoteDateTo(""); setQuoteStatusFilter("all"); }}
+                >
+                  Limpiar filtros
+                </Button>
+              )}
+              <span className="text-xs text-muted-foreground ml-auto self-end pb-1">
+                {filteredQuotes.length} de {quotes.length}
+              </span>
+            </div>
+
             <Card>
               <CardContent className="p-0 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="border-b border-border/50">
                     <tr className="text-xs text-muted-foreground uppercase text-left">
                       <th className="p-3">Número</th><th className="p-3">Fecha</th><th className="p-3">Vendedor</th>
-                      <th className="p-3">Mon.</th><th className="p-3 text-right">Monto</th><th className="p-3">Estado</th><th className="p-3 w-16"></th>
+                      <th className="p-3">Mon.</th><th className="p-3 text-right">Monto</th><th className="p-3">Estado</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {quotes.map((q: any) => {
+                    {filteredQuotes.map((q: any) => {
                       const s = getQuoteStatusBadge(q);
                       return (
-                        <tr key={q.id} className="border-b border-border/30 hover:bg-white/5">
-                          <td className="p-3 font-mono">{q.number || `#${q.id}`}</td>
+                        <tr
+                          key={q.id}
+                          className="border-b border-border/30 hover:bg-white/5 cursor-pointer transition-colors"
+                          onClick={() => navigate(`/quotes/${q.id}`)}
+                        >
+                          <td className="p-3 font-mono text-primary/90">{q.number || `#${q.id}`}</td>
                           <td className="p-3 text-muted-foreground">{q.date ? new Date(q.date).toLocaleDateString("es-AR") : "—"}</td>
                           <td className="p-3">{q.salesperson_name || "—"}</td>
                           <td className="p-3 text-xs">{q.currency === "ARS" ? "$" : "u$s"}</td>
                           <td className="p-3 text-right font-mono">{fmt(Number(q.net_amount || q.total || 0))}</td>
                           <td className="p-3"><Badge className={s.color}>{s.label}</Badge></td>
-                          <td className="p-3">
-                            <Link href={`/quotes/${q.id}`}><Button size="sm" variant="ghost" className="text-xs">Ver</Button></Link>
-                          </td>
                         </tr>
                       );
                     })}
-                    {quotes.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Sin cotizaciones</td></tr>}
+                    {filteredQuotes.length === 0 && (
+                      <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        {quotes.length === 0 ? "Sin cotizaciones" : "Sin resultados para los filtros aplicados"}
+                      </td></tr>
+                    )}
                   </tbody>
                 </table>
               </CardContent>
