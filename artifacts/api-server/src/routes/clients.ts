@@ -77,11 +77,15 @@ router.get("/clients", async (req, res) => {
           (SELECT t.title
              FROM tasks t
             WHERE t.client_id = c.id
-            ORDER BY t.created_at DESC LIMIT 1) AS ultima_tarea,
+              AND t.status NOT IN ('done','completed','cancelled')
+              AND t.due_date IS NOT NULL
+            ORDER BY t.due_date ASC LIMIT 1) AS ultima_tarea,
           (SELECT t.due_date
              FROM tasks t
             WHERE t.client_id = c.id
-            ORDER BY t.created_at DESC LIMIT 1) AS ultima_tarea_fecha,
+              AND t.status NOT IN ('done','completed','cancelled')
+              AND t.due_date IS NOT NULL
+            ORDER BY t.due_date ASC LIMIT 1) AS ultima_tarea_fecha,
           (SELECT a.created_at
              FROM activities a
             WHERE a.client_id = c.id

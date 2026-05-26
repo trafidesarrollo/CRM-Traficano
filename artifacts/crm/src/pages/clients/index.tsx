@@ -30,7 +30,7 @@ const TOGGLEABLE_COLUMNS = [
   { key: "salesperson",      label: "Vendedor",            default: true  },
   { key: "importance",       label: "Importancia",         default: true  },
   { key: "totalCotizado",    label: "Total Cotizado Abto", default: true  },
-  { key: "ultimaTarea",      label: "Última Tarea",        default: true  },
+  { key: "ultimaTarea",      label: "Próxima Tarea",       default: true  },
   { key: "ultimoContacto",   label: "Último Contacto",     default: true  },
   { key: "status",           label: "Estado",              default: true  },
 ] as const;
@@ -1023,7 +1023,7 @@ export default function Clients() {
               {col("salesperson")    && <TableHead>Vendedor</TableHead>}
               {col("importance")     && <TableHead>Importancia</TableHead>}
               {col("totalCotizado")  && <TableHead>Tot. Cotizado Abierto</TableHead>}
-              {col("ultimaTarea")    && <TableHead>Última Tarea</TableHead>}
+              {col("ultimaTarea")    && <TableHead>Próxima Tarea</TableHead>}
               {col("ultimoContacto") && <TableHead>Último Contacto</TableHead>}
               {col("status")         && <TableHead><SortHead label="Estado" sk="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               <TableHead className="w-12"></TableHead>
@@ -1101,10 +1101,17 @@ export default function Clients() {
                     </TableCell>
                   )}
                   {col("ultimaTarea") && (
-                    <TableCell className="text-xs text-muted-foreground max-w-[140px]">
+                    <TableCell className="text-xs max-w-[160px]">
                       {client.ultimaTarea ? (
-                        <span className="truncate block" title={client.ultimaTarea}>{client.ultimaTarea}</span>
-                      ) : "—"}
+                        <>
+                          <span className="truncate block text-foreground/80" title={client.ultimaTarea}>{client.ultimaTarea}</span>
+                          {client.ultimaTareaFecha && (
+                            <span className={`font-medium ${new Date(client.ultimaTareaFecha) < new Date() ? "text-red-400" : "text-amber-400"}`}>
+                              {new Date(client.ultimaTareaFecha).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                            </span>
+                          )}
+                        </>
+                      ) : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   )}
                   {col("ultimoContacto") && (
