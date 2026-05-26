@@ -350,15 +350,48 @@ const SOURCE_COLORS: Record<string, string> = {
 
 const fmt = (n: any) => n != null ? `u$s ${Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null;
 
+type PriceListType = "venta" | "revendedor" | "compra";
+
+const PRICE_FIELD: Record<PriceListType, string> = {
+  venta: "sale_price",
+  revendedor: "reseller_price",
+  compra: "purchase_price",
+};
+
+const PRICE_BODY_KEY: Record<PriceListType, string> = {
+  venta: "salePrice",
+  revendedor: "resellerPrice",
+  compra: "purchasePrice",
+};
+
+const PRICE_COLORS: Record<PriceListType, string> = {
+  venta: "text-green-400",
+  revendedor: "text-sky-400",
+  compra: "text-amber-400",
+};
+
 // ─── Inline price editor cell ──────────────────────────────────────────────────
-function PriceCell({ item, onSaved }: { item: any; onSaved: (id: number, source: string, newPrice: string | null) => void }) {
+function PriceCell({ item, priceList, onSaved }: {
+  item: any;
+  priceList: PriceListType;
+  onSaved: (id: number, source: string, field: string, newPrice: string | null) => void;
+}) {
+  const field = PRICE_FIELD[priceList];
+  const bodyKey = PRICE_BODY_KEY[priceList];
+  const colorClass = PRICE_COLORS[priceList];
+  const currentPrice = item[field];
+
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(item.sale_price ? String(Number(item.sale_price).toFixed(2)) : "");
+  const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const startEdit = () => { setEditing(true); setValue(item.sale_price ? String(Number(item.sale_price).toFixed(2)) : ""); setTimeout(() => inputRef.current?.select(), 50); };
+  const startEdit = () => {
+    setValue(currentPrice ? String(Number(currentPrice).toFixed(2)) : "");
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 50);
+  };
   const cancel = () => setEditing(false);
 
   const save = async () => {
@@ -369,9 +402,13 @@ function PriceCell({ item, onSaved }: { item: any; onSaved: (id: number, source:
     setSaving(true);
     try {
       const url = `${API}/api/products/${item.source}/${item.id}`;
-      const r = await fetch(url, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ salePrice: parsed }) });
+      const r = await fetch(url, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [bodyKey]: parsed }),
+      });
       if (!r.ok) throw new Error((await r.json()).error || "Error");
-      onSaved(item.id, item.source, parsed !== null ? String(parsed) : null);
+      onSaved(item.id, item.source, field, parsed !== null ? String(parsed) : null);
       toast({ title: "Precio actualizado" });
       setEditing(false);
     } catch (e: any) {
@@ -401,8 +438,8 @@ function PriceCell({ item, onSaved }: { item: any; onSaved: (id: number, source:
 
   return (
     <div className="flex items-center gap-1 justify-end group">
-      {item.sale_price ? (
-        <span className="text-green-400 font-mono text-sm font-semibold">{fmt(item.sale_price)}</span>
+      {currentPrice ? (
+        <span className={`${colorClass} font-mono text-sm font-semibold`}>{fmt(currentPrice)}</span>
       ) : (
         <span className="text-muted-foreground text-xs">—</span>
       )}
@@ -423,6 +460,7 @@ export default function Products() {
   const [accessoryType, setAccessoryType] = useState("all");
   const [category, setCategory] = useState("all");
   const [priceFilter, setPriceFilter] = useState<"all" | "with" | "without">("all");
+  const [priceList, setPriceList] = useState<PriceListType>("venta");
   const [page, setPage] = useState(1);
   const [catalog, setCatalog] = useState<any>({ data: [], total: 0, pages: 1 });
   const [loading, setLoading] = useState(false);
@@ -444,26 +482,27 @@ export default function Products() {
     if (category && category !== "all") params.set("category", category);
     if (priceFilter === "with") params.set("hasPrice", "true");
     if (priceFilter === "without") params.set("noPrice", "true");
+    params.set("priceList", priceList);
     params.set("page", String(page));
     params.set("limit", "50");
     try {
       const r = await fetch(`${API}/api/products/catalog?${params}`, { credentials: "include" });
       if (r.ok) setCatalog(await r.json());
     } finally { setLoading(false); }
-  }, [type, debouncedSearch, accessoryType, category, priceFilter, page]);
+  }, [type, debouncedSearch, accessoryType, category, priceFilter, priceList, page]);
 
   useEffect(() => { loadFilters(); }, [loadFilters]);
-  useEffect(() => { setPage(1); }, [type, debouncedSearch, accessoryType, category, priceFilter]);
+  useEffect(() => { setPage(1); }, [type, debouncedSearch, accessoryType, category, priceFilter, priceList]);
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
 
   const resetFilters = () => { setSearch(""); setAccessoryType("all"); setCategory("all"); setPriceFilter("all"); setPage(1); };
   const hasActiveFilters = search || (accessoryType && accessoryType !== "all") || (category && category !== "all") || priceFilter !== "all";
 
-  const handlePriceSaved = (id: number, source: string, newPrice: string | null) => {
+  const handlePriceSaved = (id: number, source: string, field: string, newPrice: string | null) => {
     setCatalog((prev: any) => ({
       ...prev,
       data: prev.data.map((item: any) =>
-        item.id === id && item.source === source ? { ...item, sale_price: newPrice } : item
+        item.id === id && item.source === source ? { ...item, [field]: newPrice } : item
       ),
     }));
   };
@@ -565,14 +604,26 @@ export default function Products() {
             </Select>
           )}
 
+          {/* Price list tabs */}
+          <div className="flex gap-0.5 p-0.5 bg-muted/40 rounded-lg border border-border/30">
+            {([["venta", "Venta", "text-green-400"], ["revendedor", "Revendedor", "text-sky-400"], ["compra", "Compra", "text-amber-400"]] as const).map(([v, label, color]) => (
+              <button
+                key={v}
+                onClick={() => setPriceList(v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${priceList === v ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <DollarSign className={`w-3 h-3 ${priceList === v ? color : ""}`} />{label}
+              </button>
+            ))}
+          </div>
+
           <Select value={priceFilter} onValueChange={(v) => setPriceFilter(v as "all" | "with" | "without")}>
-            <SelectTrigger className="w-44">
-              <DollarSign className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="Lista de precios" />
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Precio" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los precios</SelectItem>
-              <SelectItem value="with">Con precio cargado</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="with">Con precio</SelectItem>
               <SelectItem value="without">Sin precio</SelectItem>
             </SelectContent>
           </Select>
@@ -605,7 +656,11 @@ export default function Products() {
                       <th className="p-3">Nombre</th>
                       <th className="p-3">Tipo / Categoría</th>
                       <th className="p-3">Norma</th>
-                      <th className="p-3 text-right">Lista de Precios</th>
+                      <th className="p-3 text-right">
+                        <span className={PRICE_COLORS[priceList]}>
+                          {priceList === "venta" ? "Precio Venta" : priceList === "revendedor" ? "Precio Revendedor" : "Precio Compra"}
+                        </span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -641,7 +696,7 @@ export default function Products() {
                         </td>
                         <td className="p-3 text-xs text-muted-foreground max-w-[140px] truncate" title={item.standard || ""}>{item.standard || "—"}</td>
                         <td className="p-3 text-right">
-                          <PriceCell item={item} onSaved={handlePriceSaved} />
+                          <PriceCell item={item} priceList={priceList} onSaved={handlePriceSaved} />
                         </td>
                       </tr>
                     ))}

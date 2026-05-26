@@ -130,8 +130,10 @@ router.get("/products/catalog", async (req, res) => {
     const category = req.query.category as string | undefined;
     const seamType = req.query.seamType as string | undefined;
     const shape = req.query.shape as string | undefined;
+    const priceList = req.query.priceList as string | undefined; // "venta" | "revendedor" | "compra"
     const hasPrice = req.query.hasPrice === "true";
     const noPrice = req.query.noPrice === "true";
+    const priceCol = priceList === "revendedor" ? "reseller_price" : priceList === "compra" ? "purchase_price" : "sale_price";
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
     const offset = (page - 1) * limit;
@@ -141,8 +143,8 @@ router.get("/products/catalog", async (req, res) => {
     if (search) accConds.push(`(pa.name ILIKE '%${esc(search)}%' OR pa.code ILIKE '%${esc(search)}%')`);
     if (accessoryType) accConds.push(`pa.accessory_type = '${esc(accessoryType)}'`);
     if (standard) accConds.push(`pa.standard = '${esc(standard)}'`);
-    if (hasPrice) accConds.push(`pa.sale_price IS NOT NULL AND pa.sale_price > 0`);
-    if (noPrice) accConds.push(`(pa.sale_price IS NULL OR pa.sale_price = 0)`);
+    if (hasPrice) accConds.push(`pa.${priceCol} IS NOT NULL AND pa.${priceCol} > 0`);
+    if (noPrice) accConds.push(`(pa.${priceCol} IS NULL OR pa.${priceCol} = 0)`);
     const accWhere = accConds.length ? `WHERE ${accConds.join(" AND ")}` : "";
 
     // Build medidas query conditions
@@ -151,12 +153,15 @@ router.get("/products/catalog", async (req, res) => {
     if (category) medConds.push(`pm.category = '${esc(category)}'`);
     if (seamType) medConds.push(`pm.seam_type = '${esc(seamType)}'`);
     if (shape) medConds.push(`pm.shape = '${esc(shape)}'`);
-    if (hasPrice) medConds.push(`pm.sale_price IS NOT NULL AND pm.sale_price > 0`);
-    if (noPrice) medConds.push(`(pm.sale_price IS NULL OR pm.sale_price = 0)`);
+    if (hasPrice) medConds.push(`pm.${priceCol} IS NOT NULL AND pm.${priceCol} > 0`);
+    if (noPrice) medConds.push(`(pm.${priceCol} IS NULL OR pm.${priceCol} = 0)`);
     const medWhere = medConds.length ? `WHERE ${medConds.join(" AND ")}` : "";
 
     const accSelect = `
-      SELECT pa.id, pa.code, pa.name, pa.standard, pa.sale_price::text AS sale_price,
+      SELECT pa.id, pa.code, pa.name, pa.standard,
+             pa.sale_price::text AS sale_price,
+             pa.purchase_price::text AS purchase_price,
+             pa.reseller_price::text AS reseller_price,
              pa.accessory_type AS sub_type, pa.subtype AS sub_type2,
              pa.weight::text AS weight, NULL::text AS category,
              NULL::text AS outer_diameter, NULL::text AS nominal_thickness,
@@ -165,7 +170,10 @@ router.get("/products/catalog", async (req, res) => {
     `;
 
     const medSelect = `
-      SELECT pm.id, pm.code, pm.name, pm.standard, pm.sale_price::text AS sale_price,
+      SELECT pm.id, pm.code, pm.name, pm.standard,
+             pm.sale_price::text AS sale_price,
+             pm.purchase_price::text AS purchase_price,
+             pm.reseller_price::text AS reseller_price,
              pm.category AS sub_type, NULL::text AS sub_type2,
              NULL::text AS weight, pm.category,
              pm.outer_diameter::text AS outer_diameter, pm.nominal_thickness::text AS nominal_thickness,
@@ -229,12 +237,14 @@ router.get("/products/catalog/filters", async (req, res) => {
   }
 });
 
-// PATCH /api/products/medidas/:id — update medidas fields (price etc.)
+// PATCH /api/products/medidas/:id — update medidas fields (any price column etc.)
 router.patch("/products/medidas/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const allowed: any = {};
     if (req.body.salePrice !== undefined) allowed.salePrice = req.body.salePrice ? String(req.body.salePrice) : null;
+    if (req.body.purchasePrice !== undefined) allowed.purchasePrice = req.body.purchasePrice ? String(req.body.purchasePrice) : null;
+    if (req.body.resellerPrice !== undefined) allowed.resellerPrice = req.body.resellerPrice ? String(req.body.resellerPrice) : null;
     if (req.body.isActive !== undefined) allowed.isActive = req.body.isActive;
     const [updated] = await db.update(productsMedidasTable).set({ ...allowed, updatedAt: new Date() }).where(eq(productsMedidasTable.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Producto no encontrado" }); return; }
@@ -245,12 +255,14 @@ router.patch("/products/medidas/:id", async (req, res) => {
   }
 });
 
-// PATCH /api/products/accesorios/:id — update accesorios fields (price etc.)
+// PATCH /api/products/accesorios/:id — update accesorios fields (any price column etc.)
 router.patch("/products/accesorios/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const allowed: any = {};
     if (req.body.salePrice !== undefined) allowed.salePrice = req.body.salePrice ? String(req.body.salePrice) : null;
+    if (req.body.purchasePrice !== undefined) allowed.purchasePrice = req.body.purchasePrice ? String(req.body.purchasePrice) : null;
+    if (req.body.resellerPrice !== undefined) allowed.resellerPrice = req.body.resellerPrice ? String(req.body.resellerPrice) : null;
     if (req.body.isActive !== undefined) allowed.isActive = req.body.isActive;
     const [updated] = await db.update(productsAccesoriosTable).set({ ...allowed, updatedAt: new Date() }).where(eq(productsAccesoriosTable.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Producto no encontrado" }); return; }
@@ -361,12 +373,27 @@ router.post("/products/prices/import", async (req, res) => {
       return;
     }
 
-    // Build name→price map (case-insensitive, trimmed)
-    const priceMap = new Map<string, string>();
+    // Detect which price column each row targets based on "Lista de precios"
+    // Normalize: VENTA → salePrice, REVENDEDOR → resellerPrice, COMPRA → purchasePrice
+    function resolveField(listName: string): "salePrice" | "resellerPrice" | "purchasePrice" {
+      const n = (listName || "").trim().toUpperCase();
+      if (n.includes("REVENDEDOR") || n.includes("RESELL")) return "resellerPrice";
+      if (n.includes("COMPRA") || n.includes("PURCHASE") || n.includes("COSTO")) return "purchasePrice";
+      return "salePrice";
+    }
+
+    // Build name → { price, field } map (case-insensitive, trimmed)
+    // If same product appears in multiple lists, store all of them
+    const priceMap = new Map<string, { price: string; field: "salePrice" | "resellerPrice" | "purchasePrice" }[]>();
     for (const r of rows) {
       const name = (r.product || "").trim().toLowerCase();
       const price = r.price != null && r.price !== "" ? String(r.price).replace(",", ".") : null;
-      if (name && price) priceMap.set(name, price);
+      if (name && price) {
+        const field = resolveField(r.listName || "");
+        const entry = priceMap.get(name) || [];
+        entry.push({ price, field });
+        priceMap.set(name, entry);
+      }
     }
 
     // Fetch all product names from both tables
@@ -380,20 +407,24 @@ router.post("/products/prices/import", async (req, res) => {
     const unmatched: string[] = [];
 
     // Match and update medidas
-    const medidasUpdates: { id: number; price: string }[] = [];
+    const medidasUpdates: { id: number; fields: Record<string, string> }[] = [];
     for (const row of medidas.rows as any[]) {
       const key = (row.name || "").trim().toLowerCase();
       if (priceMap.has(key)) {
-        medidasUpdates.push({ id: row.id, price: priceMap.get(key)! });
+        const fields: Record<string, string> = {};
+        for (const { price, field } of priceMap.get(key)!) fields[field] = price;
+        medidasUpdates.push({ id: row.id, fields });
       }
     }
 
     // Match and update accesorios
-    const accesoriosUpdates: { id: number; price: string }[] = [];
+    const accesoriosUpdates: { id: number; fields: Record<string, string> }[] = [];
     for (const row of accesorios.rows as any[]) {
       const key = (row.name || "").trim().toLowerCase();
       if (priceMap.has(key)) {
-        accesoriosUpdates.push({ id: row.id, price: priceMap.get(key)! });
+        const fields: Record<string, string> = {};
+        for (const { price, field } of priceMap.get(key)!) fields[field] = price;
+        accesoriosUpdates.push({ id: row.id, fields });
       }
     }
 
@@ -411,14 +442,14 @@ router.post("/products/prices/import", async (req, res) => {
     for (let i = 0; i < medidasUpdates.length; i += CHUNK) {
       const chunk = medidasUpdates.slice(i, i + CHUNK);
       for (const u of chunk) {
-        await db.update(productsMedidasTable).set({ salePrice: u.price, updatedAt: new Date() }).where(eq(productsMedidasTable.id, u.id));
+        await db.update(productsMedidasTable).set({ ...u.fields, updatedAt: new Date() } as any).where(eq(productsMedidasTable.id, u.id));
       }
       matchedMedidas += chunk.length;
     }
     for (let i = 0; i < accesoriosUpdates.length; i += CHUNK) {
       const chunk = accesoriosUpdates.slice(i, i + CHUNK);
       for (const u of chunk) {
-        await db.update(productsAccesoriosTable).set({ salePrice: u.price, updatedAt: new Date() }).where(eq(productsAccesoriosTable.id, u.id));
+        await db.update(productsAccesoriosTable).set({ ...u.fields, updatedAt: new Date() } as any).where(eq(productsAccesoriosTable.id, u.id));
       }
       matchedAccesorios += chunk.length;
     }

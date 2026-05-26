@@ -52,6 +52,10 @@ export const productsAccesoriosTable = pgTable("products_accesorios", {
   standard: text("standard"),
   // Precio de venta (lista VENTA importada del ERP)
   salePrice: numeric("sale_price", { precision: 12, scale: 2 }),
+  // Precio de compra (lista COMPRA)
+  purchasePrice: numeric("purchase_price", { precision: 12, scale: 2 }),
+  // Precio revendedor (lista REVENDEDOR)
+  resellerPrice: numeric("reseller_price", { precision: 12, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
@@ -94,6 +98,10 @@ export const productsMedidasTable = pgTable("products_medidas", {
   rawMaterial: text("raw_material"),
   // Precio de venta (lista VENTA importada del ERP)
   salePrice: numeric("sale_price", { precision: 12, scale: 2 }),
+  // Precio de compra (lista COMPRA)
+  purchasePrice: numeric("purchase_price", { precision: 12, scale: 2 }),
+  // Precio revendedor (lista REVENDEDOR)
+  resellerPrice: numeric("reseller_price", { precision: 12, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
