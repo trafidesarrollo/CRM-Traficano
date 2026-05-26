@@ -67,6 +67,7 @@ export default function Tasks() {
   const [followups, setFollowups] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [quickFilter, setQuickFilter] = useState<"all" | "today">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "programadas" | "atrasadas" | "cerradas">("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -535,6 +536,21 @@ export default function Tasks() {
             </Select>
           </div>
         )}
+        {/* Estado */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Estado:</span>
+          <Select value={filterStatus} onValueChange={v => setFilterStatus(v as any)}>
+            <SelectTrigger className="h-8 text-xs w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="programadas">Programadas</SelectItem>
+              <SelectItem value="atrasadas">Atrasadas</SelectItem>
+              <SelectItem value="cerradas">Cerradas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         {/* Priority */}
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Prioridad:</span>
@@ -571,12 +587,12 @@ export default function Tasks() {
           />
         </div>
         {/* Clear date filters */}
-        {(dateFrom || dateTo || filterPriority !== "all" || filterAssignee !== "all") && (
+        {(dateFrom || dateTo || filterPriority !== "all" || filterAssignee !== "all" || filterStatus !== "all") && (
           <Button
             size="sm"
             variant="ghost"
             className="h-8 text-xs text-muted-foreground hover:text-foreground px-2"
-            onClick={() => { setDateFrom(""); setDateTo(""); setFilterPriority("all"); setFilterAssignee("all"); }}
+            onClick={() => { setDateFrom(""); setDateTo(""); setFilterPriority("all"); setFilterAssignee("all"); setFilterStatus("all"); }}
           >
             <X className="w-3 h-3 mr-1" />Limpiar
           </Button>
@@ -584,42 +600,79 @@ export default function Tasks() {
       </div>
 
       {/* ── Task list ── */}
-      <div className="space-y-2 mb-8">
-        {items.map(t => (
-          <Card key={t.id} className={`transition-all cursor-pointer hover:bg-white/5 ${isOverdue(t) ? "border-red-500/40" : ""} ${(t.deferCount ?? 0) > 0 ? "border-orange-500/20" : ""} ${t.status === "completed" ? "opacity-60" : ""}`} onClick={() => openDetail(t)}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div onClick={e => { e.stopPropagation(); patch(t.id, { status: t.status === "completed" ? "pending" : "completed" }).then(load); }}>
-                {t.status === "completed"
-                  ? <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
-                  : <Circle className="w-5 h-5 text-muted-foreground hover:text-primary shrink-0 transition-colors" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`font-medium ${t.status === "completed" ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
-                  <Badge className={`text-xs ${PRIORITY_COLORS[t.priority]}`}>{PRIORITY_LABELS[t.priority]}</Badge>
-                  <Badge variant="outline" className="text-xs">{TYPE_LABELS[t.type] || t.type}</Badge>
-                  {t.clientName && <span className="text-xs text-muted-foreground">· {t.clientName}</span>}
-                  {!isVendedor && t.assigneeName && <span className="text-xs text-muted-foreground">· {t.assigneeName}</span>}
-                  {(t.deferCount ?? 0) > 0 && <span className="text-xs text-orange-400 flex items-center gap-0.5"><RefreshCw className="w-3 h-3" />Diferida {t.deferCount}x</span>}
-                </div>
-                {t.description && <p className="text-xs text-muted-foreground mt-1 truncate max-w-xl">{t.description}</p>}
-                {t.dueDate && (
-                  <div className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(t) ? "text-red-400 font-medium" : "text-muted-foreground"}`}>
-                    <Clock className="w-3 h-3" />{format(parseISO(t.dueDate), "EEE d MMM, HH:mm", { locale: es })}{isOverdue(t) && " · VENCIDA"}
-                  </div>
-                )}
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </CardContent>
-          </Card>
-        ))}
-        {items.length === 0 && (
-          <Card><CardContent className="p-8 text-center">
-            <ListTodo className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
-            <p className="text-muted-foreground text-sm">{isVendedor ? "No tenés tareas asignadas por el momento." : "Sin tareas para mostrar."}</p>
-          </CardContent></Card>
-        )}
-      </div>
+      {(() => {
+        const now = new Date();
+        const visibleItems = items.filter(t => {
+          const done = t.status === "completed" || t.status === "cancelled";
+          const overdue = !done && t.dueDate && new Date(t.dueDate) < now;
+          if (filterStatus === "cerradas")   return done;
+          if (filterStatus === "atrasadas")  return !!overdue;
+          if (filterStatus === "programadas") return !done && !overdue;
+          return true;
+        });
+
+        const getFlag = (t: any) => {
+          const done = t.status === "completed" || t.status === "cancelled";
+          const overdue = !done && t.dueDate && new Date(t.dueDate) < now;
+          if (done)    return { label: "Cerrada",    cls: "bg-green-500/15 text-green-400 border-green-500/30",  left: "border-l-green-500/60"  };
+          if (overdue) return { label: "Atrasada",   cls: "bg-red-500/15 text-red-400 border-red-500/30",        left: "border-l-red-500/70"    };
+          return       { label: "Programada",  cls: "bg-blue-500/15 text-blue-400 border-blue-500/30",       left: "border-l-blue-500/40"   };
+        };
+
+        return (
+          <div className="space-y-2 mb-8">
+            {visibleItems.map(t => {
+              const flag = getFlag(t);
+              const done = t.status === "completed" || t.status === "cancelled";
+              return (
+                <Card key={t.id} className={`transition-all cursor-pointer hover:bg-white/5 border-l-2 ${flag.left} ${done ? "opacity-70" : ""} ${(t.deferCount ?? 0) > 0 ? "border-orange-500/20" : ""}`} onClick={() => openDetail(t)}>
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div onClick={e => { e.stopPropagation(); patch(t.id, { status: done ? "pending" : "completed" }).then(load); }}>
+                      {done
+                        ? <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
+                        : <Circle className="w-5 h-5 text-muted-foreground hover:text-primary shrink-0 transition-colors" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`font-medium ${done ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
+                        {/* Bandera de estado */}
+                        <Badge variant="outline" className={`text-xs font-semibold ${flag.cls}`}>{flag.label}</Badge>
+                        <Badge className={`text-xs ${PRIORITY_COLORS[t.priority]}`}>{PRIORITY_LABELS[t.priority]}</Badge>
+                        <Badge variant="outline" className="text-xs">{TYPE_LABELS[t.type] || t.type}</Badge>
+                        {t.clientName && <span className="text-xs text-muted-foreground">· {t.clientName}</span>}
+                        {!isVendedor && t.assigneeName && <span className="text-xs text-muted-foreground">· {t.assigneeName}</span>}
+                        {(t.deferCount ?? 0) > 0 && <span className="text-xs text-orange-400 flex items-center gap-0.5"><RefreshCw className="w-3 h-3" />Diferida {t.deferCount}x</span>}
+                      </div>
+                      {t.description && <p className="text-xs text-muted-foreground mt-1 truncate max-w-xl">{t.description}</p>}
+                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                        {t.dueDate && (
+                          <span className={`text-xs flex items-center gap-1 ${!done && new Date(t.dueDate) < now ? "text-red-400 font-medium" : "text-muted-foreground"}`}>
+                            <Calendar className="w-3 h-3" />Programada: {format(parseISO(t.dueDate), "dd/MM/yy HH:mm", { locale: es })}
+                          </span>
+                        )}
+                        {t.completedAt && (
+                          <span className="text-xs flex items-center gap-1 text-green-400">
+                            <CheckCircle2 className="w-3 h-3" />Cerrada: {format(parseISO(t.completedAt), "dd/MM/yy HH:mm", { locale: es })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {visibleItems.length === 0 && (
+              <Card><CardContent className="p-8 text-center">
+                <ListTodo className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
+                <p className="text-muted-foreground text-sm">
+                  {filterStatus !== "all" ? `No hay tareas ${filterStatus}.` : isVendedor ? "No tenés tareas asignadas por el momento." : "Sin tareas para mostrar."}
+                </p>
+              </CardContent></Card>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Quote followups section ── */}
       <div className="mb-2">
