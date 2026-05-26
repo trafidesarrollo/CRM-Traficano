@@ -20,6 +20,14 @@ import {
 
 const API = import.meta.env.VITE_API_URL || "";
 
+type SinFechaRow = {
+  clientId: number;
+  clientName: string;
+  titulo: string | null;
+  novedad: string;
+  urgencia: string | null;
+};
+
 type ConflictRow = {
   clientId: number;
   clientName: string;
@@ -60,6 +68,44 @@ function defaultFollowup(c: ConflictRow, currentUserId?: string): FollowupTask {
   };
 }
 
+function SinFechaSection({ rows, onAsignar }: { rows: SinFechaRow[]; onAsignar: (r: SinFechaRow) => void }) {
+  return (
+    <div className="bg-amber-500/8 border border-amber-500/30 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+        <p className="text-sm font-semibold text-amber-300">
+          {rows.length} {rows.length === 1 ? "fila guardada sin" : "filas guardadas sin"} fecha de seguimiento
+        </p>
+      </div>
+      <p className="text-xs text-muted-foreground -mt-1">
+        La novedad quedó en la bitácora, pero no se creó tarea. Podés asignar una fecha ahora.
+      </p>
+      <div className="space-y-2">
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-center gap-3 bg-white/4 border border-amber-500/20 rounded-lg px-3 py-2.5">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{r.clientName}</p>
+              {r.titulo && <p className="text-xs text-muted-foreground truncate">{r.titulo}</p>}
+            </div>
+            {r.urgencia && (
+              <Badge variant="outline" className="text-xs shrink-0">{r.urgencia}</Badge>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 h-7 text-xs border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+              onClick={() => onAsignar(r)}
+            >
+              <CalendarCheck2 className="w-3 h-3 mr-1" />
+              Asignar fecha
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CargaMasivaPage() {
   const { toast } = useToast();
   const [csvText, setCsvText] = useState("");
@@ -80,11 +126,21 @@ export default function CargaMasivaPage() {
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
-  // Schedule modal
+  // Rows guardadas sin fecha de seguimiento
+  const [sinFecha, setSinFecha] = useState<SinFechaRow[]>([]);
+
+  // Schedule modal (for conflicts)
   const [scheduleModal, setScheduleModal] = useState<{ open: boolean; conflictIdx: number } | null>(null);
   const [scheduleForm, setScheduleForm] = useState<FollowupTask>({
     title: "", tipo: "Seguimiento", dueDate: "", priority: "medium", status: "pending", assignedTo: "", description: "",
   });
+
+  // Sin-fecha modal
+  const [sinFechaModal, setSinFechaModal] = useState<{ open: boolean; row: SinFechaRow } | null>(null);
+  const [sinFechaForm, setSinFechaForm] = useState<FollowupTask>({
+    title: "", tipo: "Seguimiento", dueDate: "", priority: "medium", status: "pending", assignedTo: "", description: "",
+  });
+  const [savingFecha, setSavingFecha] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -176,6 +232,7 @@ export default function CargaMasivaPage() {
       setCreatedTasksDirect(data.createdTasks || 0);
       setConflicts(data.conflicts || []);
       setErrors(data.errors || []);
+      setSinFecha(data.sinFecha || []);
 
       if ((data.conflicts || []).length === 0) {
         setStep("done");
@@ -237,6 +294,51 @@ export default function CargaMasivaPage() {
     }
   }
 
+  function openSinFechaModal(row: SinFechaRow) {
+    setSinFechaForm({
+      title: row.titulo || row.clientName,
+      tipo: "Seguimiento",
+      dueDate: "",
+      priority: row.urgencia?.toLowerCase() === "alta" ? "high" : row.urgencia?.toLowerCase() === "baja" ? "low" : "medium",
+      status: "pending",
+      assignedTo: currentUserId,
+      description: row.novedad,
+    });
+    setSinFechaModal({ open: true, row });
+  }
+
+  async function handleSinFechaConfirm() {
+    if (!sinFechaModal || !sinFechaForm.dueDate) return;
+    setSavingFecha(true);
+    try {
+      const { row } = sinFechaModal;
+      const due = new Date(sinFechaForm.dueDate);
+      due.setHours(12, 0, 0, 0);
+      await fetch(`${API}/api/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: sinFechaForm.title || row.clientName,
+          description: sinFechaForm.description || row.novedad,
+          type: "task",
+          priority: sinFechaForm.priority,
+          status: sinFechaForm.status,
+          clientId: row.clientId,
+          assignedTo: sinFechaForm.assignedTo || currentUserId,
+          dueDate: due.toISOString(),
+        }),
+      });
+      setSinFecha(prev => prev.filter(r => r.clientId !== row.clientId));
+      toast({ title: "Seguimiento agendado", description: `Para ${row.clientName}` });
+      setSinFechaModal(null);
+    } catch {
+      toast({ title: "Error al agendar", variant: "destructive" });
+    } finally {
+      setSavingFecha(false);
+    }
+  }
+
   function reset() {
     setCsvText("");
     setStep("upload");
@@ -247,6 +349,7 @@ export default function CargaMasivaPage() {
     setResolutions({});
     setSavedResolved(0);
     setCreatedTasksResolved(0);
+    setSinFecha([]);
   }
 
   const allResolved = conflicts.length > 0 && conflicts.every((_, i) => resolutions[i]?.accion !== null);
@@ -489,6 +592,9 @@ export default function CargaMasivaPage() {
               })}
             </div>
 
+            {/* Aviso filas sin fecha — visible mientras se resuelven conflictos */}
+            {sinFecha.length > 0 && <SinFechaSection rows={sinFecha} onAsignar={openSinFechaModal} />}
+
             <div className="flex items-center justify-between pt-2">
               <span className="text-sm text-muted-foreground">
                 {pendingCount > 0 ? `${pendingCount} fila(s) sin resolver` : "Todas resueltas — listo para guardar"}
@@ -506,45 +612,50 @@ export default function CargaMasivaPage() {
 
         {/* ── STEP 3: Done ── */}
         {step === "done" && (
-          <div className="bg-card border border-green-500/20 rounded-2xl p-8 text-center space-y-4">
-            <div className="w-14 h-14 rounded-full bg-green-500/15 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-7 h-7 text-green-400" />
-            </div>
-            <h2 className="text-xl font-semibold">¡Carga completada!</h2>
-
-            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto text-center">
-              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-                <p className="text-2xl font-bold text-green-400">{savedDirect + savedResolved}</p>
-                <p className="text-xs text-muted-foreground mt-1">Novedades en bitácora</p>
+          <div className="space-y-4">
+            <div className="bg-card border border-green-500/20 rounded-2xl p-8 text-center space-y-4">
+              <div className="w-14 h-14 rounded-full bg-green-500/15 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-7 h-7 text-green-400" />
               </div>
-              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-3">
-                <p className="text-2xl font-bold text-cyan-400">{createdTasksDirect + createdTasksResolved}</p>
-                <p className="text-xs text-muted-foreground mt-1">Tareas de seguimiento</p>
-              </div>
-            </div>
+              <h2 className="text-xl font-semibold">¡Carga completada!</h2>
 
-            {(createdTasksDirect + createdTasksResolved) > 0 && (
-              <p className="text-xs text-cyan-400/80 bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 max-w-xs mx-auto">
-                Las tareas quedaron asignadas con la fecha y detalles especificados.
+              <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto text-center">
+                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-green-400">{savedDirect + savedResolved}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Novedades en bitácora</p>
+                </div>
+                <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-cyan-400">{createdTasksDirect + createdTasksResolved}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Tareas de seguimiento</p>
+                </div>
+              </div>
+
+              {(createdTasksDirect + createdTasksResolved) > 0 && (
+                <p className="text-xs text-cyan-400/80 bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 max-w-xs mx-auto">
+                  Las tareas quedaron asignadas con la fecha y detalles especificados.
+                </p>
+              )}
+
+              {errors.length > 0 && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-left space-y-1 max-w-sm mx-auto">
+                  <p className="text-xs font-semibold text-red-400">Filas no procesadas ({errors.length}):</p>
+                  {errors.map((e, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">Línea {e.line}: {e.error}</p>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-sm text-muted-foreground">
+                Todas las novedades fueron guardadas en la bitácora de cada cliente.
               </p>
-            )}
 
-            {errors.length > 0 && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-left space-y-1 max-w-sm mx-auto">
-                <p className="text-xs font-semibold text-red-400">Filas no procesadas ({errors.length}):</p>
-                {errors.map((e, i) => (
-                  <p key={i} className="text-xs text-muted-foreground">Línea {e.line}: {e.error}</p>
-                ))}
-              </div>
-            )}
+              <Button variant="outline" onClick={reset} className="gap-2">
+                <RotateCcw className="w-4 h-4" /> Nueva carga
+              </Button>
+            </div>
 
-            <p className="text-sm text-muted-foreground">
-              Todas las novedades fueron guardadas en la bitácora de cada cliente.
-            </p>
-
-            <Button variant="outline" onClick={reset} className="gap-2">
-              <RotateCcw className="w-4 h-4" /> Nueva carga
-            </Button>
+            {/* Aviso: filas sin fecha de seguimiento */}
+            {sinFecha.length > 0 && <SinFechaSection rows={sinFecha} onAsignar={openSinFechaModal} />}
           </div>
         )}
       </div>
@@ -667,6 +778,96 @@ export default function CargaMasivaPage() {
               >
                 <CalendarCheck2 className="w-4 h-4 mr-2" />
                 Completar y agendar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* ── Modal: asignar fecha a fila sin seguimiento ── */}
+      <Dialog open={!!sinFechaModal?.open} onOpenChange={(open) => { if (!open) setSinFechaModal(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogDescription className="sr-only">Asignar fecha de seguimiento</DialogDescription>
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center">
+                <CalendarCheck2 className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <DialogTitle>Asignar fecha de seguimiento</DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {sinFechaModal?.row.clientName} — la novedad ya está guardada en bitácora.
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="text-sm">Título de la tarea</Label>
+              <Input
+                className="mt-1"
+                value={sinFechaForm.title}
+                onChange={e => setSinFechaForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Ej: Seguimiento - Cliente OPS"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm">Fecha de seguimiento <span className="text-red-400">*</span></Label>
+              <Input
+                type="date"
+                className="mt-1"
+                value={sinFechaForm.dueDate}
+                onChange={e => setSinFechaForm(f => ({ ...f, dueDate: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">Prioridad</Label>
+                <Select value={sinFechaForm.priority} onValueChange={v => setSinFechaForm(f => ({ ...f, priority: v }))}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="medium">Media</SelectItem>
+                    <SelectItem value="low">Baja</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Asignar a</Label>
+                <Select value={sinFechaForm.assignedTo} onValueChange={v => setSinFechaForm(f => ({ ...f, assignedTo: v }))}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Usuario..." /></SelectTrigger>
+                  <SelectContent>
+                    {assignableUsers.map((u: any) => (
+                      <SelectItem key={u.id} value={String(u.id)}>{u.name || u.username}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm">Descripción <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Textarea
+                className="mt-1 text-sm"
+                rows={2}
+                value={sinFechaForm.description}
+                onChange={e => setSinFechaForm(f => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <Button variant="ghost" className="flex-1" onClick={() => setSinFechaModal(null)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-amber-600 hover:bg-amber-500 text-white"
+                disabled={!sinFechaForm.dueDate || savingFecha}
+                onClick={handleSinFechaConfirm}
+              >
+                {savingFecha ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CalendarCheck2 className="w-4 h-4 mr-2" />}
+                Agendar seguimiento
               </Button>
             </div>
           </div>

@@ -132,8 +132,8 @@ router.post("/bulk-activities/process", async (req, res) => {
         clientId,
         clientName: clientMap.get(clientId),
         fecha: row.fecha?.trim() || new Date().toISOString().slice(0, 10),
-        // fecha_seguimiento takes priority; fallback to fecha itself
-        fechaSeguimiento: row.fecha_seguimiento?.trim() || row.fecha?.trim() || null,
+        // Only use explicit fecha_seguimiento — no fallback to fecha
+        fechaSeguimiento: row.fecha_seguimiento?.trim() || null,
         urgencia: row.urgencia?.trim() || null,
         titulo: row.titulo?.trim() || null,
         novedad: row.novedad,
@@ -149,6 +149,7 @@ router.post("/bulk-activities/process", async (req, res) => {
 
     let savedDirect = 0;
     let createdTasks = 0;
+    const sinFechaRows: any[] = [];
 
     for (const row of directRows) {
       await db.insert(activitiesTable).values({
@@ -167,6 +168,15 @@ router.post("/bulk-activities/process", async (req, res) => {
           row.novedad, row.fechaSeguimiento, row.urgencia, userId
         );
         if (t) createdTasks++;
+      } else {
+        // Saved to log but no follow-up date — surface to frontend
+        sinFechaRows.push({
+          clientId: row.clientId,
+          clientName: row.clientName,
+          titulo: row.titulo,
+          novedad: row.novedad,
+          urgencia: row.urgencia,
+        });
       }
     }
 
@@ -175,6 +185,7 @@ router.post("/bulk-activities/process", async (req, res) => {
       createdTasks,
       conflicts: conflictRows,
       errors,
+      sinFecha: sinFechaRows,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
