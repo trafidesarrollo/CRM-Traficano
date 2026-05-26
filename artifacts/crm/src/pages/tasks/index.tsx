@@ -189,9 +189,7 @@ export default function Tasks() {
     setCreating(true);
     try {
       const clientName = clients.find((c: any) => String(c.id) === String(form.clientId))?.companyName;
-      const autoTitle = clientName
-        ? `Seguimiento – ${clientName}`
-        : form.description || "Nueva tarea";
+      const autoTitle = clientName || form.description || "Nueva tarea";
       const base: any = {
         ...form,
         title: autoTitle,
