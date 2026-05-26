@@ -437,14 +437,18 @@ function PriceCell({ item, priceList, onSaved }: {
   }
 
   return (
-    <div className="flex items-center gap-1 justify-end group">
+    <div className="flex items-center gap-1.5 justify-end">
       {currentPrice ? (
         <span className={`${colorClass} font-mono text-sm font-semibold`}>{fmt(currentPrice)}</span>
       ) : (
-        <span className="text-muted-foreground text-xs">—</span>
+        <span className="text-muted-foreground text-xs italic">Sin precio</span>
       )}
-      <button onClick={startEdit} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-0.5 ml-1">
-        <Pencil className="w-3 h-3" />
+      <button
+        onClick={startEdit}
+        title="Editar precio"
+        className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded p-0.5 transition-colors"
+      >
+        <Pencil className="w-3.5 h-3.5" />
       </button>
     </div>
   );
