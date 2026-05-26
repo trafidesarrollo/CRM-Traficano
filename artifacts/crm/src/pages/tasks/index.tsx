@@ -669,11 +669,21 @@ export default function Tasks() {
                     }
                     {isFollowupOverdue(q) && " · VENCIDO"}
                   </div>
-                  {q.total && Number(q.total) > 0 && (
-                    <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <DollarSign className="w-3 h-3" />{q.currency} {Number(q.total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                    </div>
-                  )}
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                    {q.total && Number(q.total) > 0 && (
+                      <span className="text-xs text-emerald-400 flex items-center gap-1 font-medium">
+                        <DollarSign className="w-3 h-3" />Total: {q.currency || "USD"} {Number(q.total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                    {q.totalKg && Number(q.totalKg) > 0 && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        {Number(q.totalKg).toLocaleString("es-AR", { minimumFractionDigits: 2 })} kg
+                      </span>
+                    )}
+                    {q.quoteType && (
+                      <span className="text-xs text-muted-foreground">{q.quoteType}</span>
+                    )}
+                  </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
               </CardContent>
@@ -859,8 +869,20 @@ export default function Tasks() {
                   )}
                   {selQuote.total && Number(selQuote.total) > 0 && (
                     <div className="flex items-center gap-2 text-muted-foreground">
-                      <DollarSign className="w-4 h-4 shrink-0" />
-                      <span>Total: <strong className="text-foreground">{selQuote.currency} {Number(selQuote.total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong></span>
+                      <DollarSign className="w-4 h-4 shrink-0 text-emerald-400" />
+                      <span>Total USD: <strong className="text-emerald-400">{selQuote.currency || "USD"} {Number(selQuote.total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</strong></span>
+                    </div>
+                  )}
+                  {selQuote.totalKg && Number(selQuote.totalKg) > 0 && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <span className="w-4 h-4 shrink-0 text-center text-xs font-bold text-amber-400">kg</span>
+                      <span>Kilos total: <strong className="text-foreground">{Number(selQuote.totalKg).toLocaleString("es-AR", { minimumFractionDigits: 2 })} kg</strong></span>
+                    </div>
+                  )}
+                  {selQuote.quoteType && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <FileText className="w-4 h-4 shrink-0" />
+                      <span>Tipo: <strong className="text-foreground">{selQuote.quoteType}</strong></span>
                     </div>
                   )}
                   {selQuote.followupDate && (
