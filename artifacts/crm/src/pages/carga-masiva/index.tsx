@@ -68,43 +68,6 @@ function defaultFollowup(c: ConflictRow, currentUserId?: string): FollowupTask {
   };
 }
 
-function SinFechaSection({ rows, onAsignar }: { rows: SinFechaRow[]; onAsignar: (r: SinFechaRow) => void }) {
-  return (
-    <div className="bg-amber-500/8 border border-amber-500/30 rounded-xl p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-        <p className="text-sm font-semibold text-amber-300">
-          {rows.length} {rows.length === 1 ? "fila guardada sin" : "filas guardadas sin"} fecha de seguimiento
-        </p>
-      </div>
-      <p className="text-xs text-muted-foreground -mt-1">
-        La novedad quedó en la bitácora, pero no se creó tarea. Podés asignar una fecha ahora.
-      </p>
-      <div className="space-y-2">
-        {rows.map((r, i) => (
-          <div key={i} className="flex items-center gap-3 bg-white/4 border border-amber-500/20 rounded-lg px-3 py-2.5">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{r.clientName}</p>
-              {r.titulo && <p className="text-xs text-muted-foreground truncate">{r.titulo}</p>}
-            </div>
-            {r.urgencia && (
-              <Badge variant="outline" className="text-xs shrink-0">{r.urgencia}</Badge>
-            )}
-            <Button
-              size="sm"
-              variant="outline"
-              className="shrink-0 h-7 text-xs border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
-              onClick={() => onAsignar(r)}
-            >
-              <CalendarCheck2 className="w-3 h-3 mr-1" />
-              Asignar fecha
-            </Button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function CargaMasivaPage() {
   const { toast } = useToast();
@@ -126,8 +89,10 @@ export default function CargaMasivaPage() {
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
-  // Rows guardadas sin fecha de seguimiento
+  // Rows pendientes sin fecha de seguimiento (requieren acción antes de guardar)
   const [sinFecha, setSinFecha] = useState<SinFechaRow[]>([]);
+  // null = guardar como nota (sin tarea), FollowupTask = crear tarea con esta fecha
+  const [sinFechaResolutions, setSinFechaResolutions] = useState<Record<number, FollowupTask | null>>({});
 
   // Schedule modal (for conflicts)
   const [scheduleModal, setScheduleModal] = useState<{ open: boolean; conflictIdx: number } | null>(null);
@@ -136,11 +101,10 @@ export default function CargaMasivaPage() {
   });
 
   // Sin-fecha modal
-  const [sinFechaModal, setSinFechaModal] = useState<{ open: boolean; row: SinFechaRow } | null>(null);
+  const [sinFechaModal, setSinFechaModal] = useState<{ open: boolean; row: SinFechaRow; idx: number } | null>(null);
   const [sinFechaForm, setSinFechaForm] = useState<FollowupTask>({
     title: "", tipo: "Seguimiento", dueDate: "", priority: "medium", status: "pending", assignedTo: "", description: "",
   });
-  const [savingFecha, setSavingFecha] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -232,9 +196,14 @@ export default function CargaMasivaPage() {
       setCreatedTasksDirect(data.createdTasks || 0);
       setConflicts(data.conflicts || []);
       setErrors(data.errors || []);
-      setSinFecha(data.sinFecha || []);
+      const sfRows = data.sinFecha || [];
+      setSinFecha(sfRows);
+      setSinFechaResolutions({});
 
-      if ((data.conflicts || []).length === 0) {
+      const hasConflicts = (data.conflicts || []).length > 0;
+      const hasSinFecha = sfRows.length > 0;
+
+      if (!hasConflicts && !hasSinFecha) {
         setStep("done");
       } else {
         const init: Record<number, Resolution> = {};
@@ -252,9 +221,11 @@ export default function CargaMasivaPage() {
   }
 
   async function resolveAll() {
-    const unresolved = conflicts.filter((_, i) => resolutions[i]?.accion === null);
-    if (unresolved.length > 0) {
-      toast({ title: `Hay ${unresolved.length} fila(s) sin resolución`, variant: "destructive" });
+    const unresolvedConflicts = conflicts.filter((_, i) => resolutions[i]?.accion === null);
+    const unresolvedSinFecha = sinFecha.filter((_, i) => !(i in sinFechaResolutions));
+    if (unresolvedConflicts.length > 0 || unresolvedSinFecha.length > 0) {
+      const total = unresolvedConflicts.length + unresolvedSinFecha.length;
+      toast({ title: `Hay ${total} fila(s) sin resolver`, variant: "destructive" });
       return;
     }
     setResolving(true);
@@ -276,11 +247,22 @@ export default function CargaMasivaPage() {
         };
       });
 
+      const sinFechaRows = sinFecha.map((sf, i) => ({
+        clientId: sf.clientId,
+        clientName: sf.clientName,
+        titulo: sf.titulo,
+        novedad: sf.novedad,
+        urgencia: sf.urgencia,
+        accion: (sf as any).accion ?? null,
+        fecha: (sf as any).fecha ?? new Date().toISOString().slice(0, 10),
+        followupTask: sinFechaResolutions[i] ?? null,
+      }));
+
       const r = await fetch(`${API}/api/bulk-activities/resolve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ rows }),
+        body: JSON.stringify({ rows, sinFechaRows }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Error al resolver");
@@ -294,7 +276,7 @@ export default function CargaMasivaPage() {
     }
   }
 
-  function openSinFechaModal(row: SinFechaRow) {
+  function openSinFechaModal(row: SinFechaRow, idx: number) {
     setSinFechaForm({
       title: row.titulo || row.clientName,
       tipo: "Seguimiento",
@@ -304,39 +286,22 @@ export default function CargaMasivaPage() {
       assignedTo: currentUserId,
       description: row.novedad,
     });
-    setSinFechaModal({ open: true, row });
+    setSinFechaModal({ open: true, row, idx });
   }
 
-  async function handleSinFechaConfirm() {
+  function handleSinFechaConfirm() {
     if (!sinFechaModal || !sinFechaForm.dueDate) return;
-    setSavingFecha(true);
-    try {
-      const { row } = sinFechaModal;
-      const due = new Date(sinFechaForm.dueDate);
-      due.setHours(12, 0, 0, 0);
-      await fetch(`${API}/api/tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          title: sinFechaForm.title || row.clientName,
-          description: sinFechaForm.description || row.novedad,
-          type: "task",
-          priority: sinFechaForm.priority,
-          status: sinFechaForm.status,
-          clientId: row.clientId,
-          assignedTo: sinFechaForm.assignedTo || currentUserId,
-          dueDate: due.toISOString(),
-        }),
-      });
-      setSinFecha(prev => prev.filter(r => r.clientId !== row.clientId));
-      toast({ title: "Seguimiento agendado", description: `Para ${row.clientName}` });
-      setSinFechaModal(null);
-    } catch {
-      toast({ title: "Error al agendar", variant: "destructive" });
-    } finally {
-      setSavingFecha(false);
-    }
+    const { idx } = sinFechaModal;
+    setSinFechaResolutions(prev => ({ ...prev, [idx]: { ...sinFechaForm } }));
+    setSinFechaModal(null);
+  }
+
+  function handleSinFechaSkip() {
+    if (!sinFechaModal) return;
+    const { idx } = sinFechaModal;
+    // null = save as activity note (no task)
+    setSinFechaResolutions(prev => ({ ...prev, [idx]: null }));
+    setSinFechaModal(null);
   }
 
   function reset() {
@@ -350,10 +315,15 @@ export default function CargaMasivaPage() {
     setSavedResolved(0);
     setCreatedTasksResolved(0);
     setSinFecha([]);
+    setSinFechaResolutions({});
   }
 
-  const allResolved = conflicts.length > 0 && conflicts.every((_, i) => resolutions[i]?.accion !== null);
-  const pendingCount = conflicts.filter((_, i) => !resolutions[i]?.accion).length;
+  const allConflictsResolved = conflicts.every((_, i) => resolutions[i]?.accion !== null);
+  const allSinFechaResolved = sinFecha.every((_, i) => i in sinFechaResolutions);
+  const allResolved = (conflicts.length > 0 || sinFecha.length > 0) && allConflictsResolved && allSinFechaResolved;
+  const pendingConflicts = conflicts.filter((_, i) => !resolutions[i]?.accion).length;
+  const pendingSinFecha = sinFecha.filter((_, i) => !(i in sinFechaResolutions)).length;
+  const pendingCount = pendingConflicts + pendingSinFecha;
 
   return (
     <AppLayout>
@@ -592,8 +562,57 @@ export default function CargaMasivaPage() {
               })}
             </div>
 
-            {/* Aviso filas sin fecha — visible mientras se resuelven conflictos */}
-            {sinFecha.length > 0 && <SinFechaSection rows={sinFecha} onAsignar={openSinFechaModal} />}
+            {/* Filas sin fecha — resolución obligatoria antes de guardar */}
+            {sinFecha.length > 0 && (
+              <div className="bg-amber-500/8 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <p className="text-sm font-semibold text-amber-300">
+                    {sinFecha.length} {sinFecha.length === 1 ? "novedad sin" : "novedades sin"} fecha de seguimiento — necesitan tu acción antes de guardar
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {sinFecha.map((sf, i) => {
+                    const res = sinFechaResolutions[i];
+                    const isResolved = i in sinFechaResolutions;
+                    return (
+                      <div key={i} className={`border rounded-lg px-3 py-2.5 transition-colors ${isResolved ? "bg-white/4 border-green-500/30" : "bg-white/4 border-amber-500/20"}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{sf.clientName}</p>
+                            {sf.titulo && <p className="text-xs text-muted-foreground truncate">{sf.titulo}</p>}
+                          </div>
+                          {sf.urgencia && <Badge variant="outline" className="text-xs shrink-0">{sf.urgencia}</Badge>}
+                          {!isResolved ? (
+                            <div className="flex gap-2 shrink-0">
+                              <Button size="sm" variant="outline" className="h-7 text-xs border-amber-500/40 text-amber-300 hover:bg-amber-500/10" onClick={() => openSinFechaModal(sf, i)}>
+                                <CalendarCheck2 className="w-3 h-3 mr-1" />Asignar fecha
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7 text-xs text-muted-foreground" onClick={() => setSinFechaResolutions(prev => ({ ...prev, [i]: null }))}>
+                                Solo nota
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 shrink-0">
+                              {res ? (
+                                <span className="text-xs text-green-400 flex items-center gap-1">
+                                  <CalendarCheck2 className="w-3 h-3" />Tarea: {res.dueDate}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-blue-400">Solo nota</span>
+                              )}
+                              <button className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => setSinFechaResolutions(prev => { const n = { ...prev }; delete n[i]; return n; })}>
+                                Cambiar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-2">
               <span className="text-sm text-muted-foreground">
@@ -653,9 +672,6 @@ export default function CargaMasivaPage() {
                 <RotateCcw className="w-4 h-4" /> Nueva carga
               </Button>
             </div>
-
-            {/* Aviso: filas sin fecha de seguimiento */}
-            {sinFecha.length > 0 && <SinFechaSection rows={sinFecha} onAsignar={openSinFechaModal} />}
           </div>
         )}
       </div>
@@ -795,7 +811,7 @@ export default function CargaMasivaPage() {
               <div>
                 <DialogTitle>Asignar fecha de seguimiento</DialogTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {sinFechaModal?.row.clientName} — la novedad ya está guardada en bitácora.
+                  {sinFechaModal?.row.clientName} — asigná una fecha para crear la tarea.
                 </p>
               </div>
             </div>
@@ -858,15 +874,15 @@ export default function CargaMasivaPage() {
             </div>
 
             <div className="flex gap-3 pt-1">
-              <Button variant="ghost" className="flex-1" onClick={() => setSinFechaModal(null)}>
-                Cancelar
+              <Button variant="ghost" className="flex-1" onClick={handleSinFechaSkip}>
+                Guardar como nota
               </Button>
               <Button
                 className="flex-1 bg-amber-600 hover:bg-amber-500 text-white"
-                disabled={!sinFechaForm.dueDate || savingFecha}
+                disabled={!sinFechaForm.dueDate}
                 onClick={handleSinFechaConfirm}
               >
-                {savingFecha ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CalendarCheck2 className="w-4 h-4 mr-2" />}
+                <CalendarCheck2 className="w-4 h-4 mr-2" />
                 Agendar seguimiento
               </Button>
             </div>

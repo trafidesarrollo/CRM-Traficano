@@ -153,30 +153,22 @@ router.post("/bulk-activities/process", async (req, res) => {
 
     for (const row of directRows) {
       if (row.fechaSeguimiento) {
-        // Task IS the bitácora entry — skip separate activity note to avoid duplicates
+        // Has date — task IS the bitácora entry, no separate activity note
         const t = await createFollowupTask(
           row.clientId, row.clientName, row.titulo,
           row.novedad, row.fechaSeguimiento, row.urgencia, userId
         );
         if (t) createdTasks++;
       } else {
-        // No task → create activity note as the bitácora record
-        await db.insert(activitiesTable).values({
-          type: "note",
-          title: row.titulo || row.clientName,
-          clientId: row.clientId,
-          description: row.novedad + (row.accion ? `\nAcción: ${row.accion}` : ""),
-          outcome: row.accion || undefined,
-          completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
-        }).returning();
-        savedDirect++;
-        // Surface to frontend for manual date assignment
+        // No date — don't save yet, surface to frontend for date assignment before saving
         sinFechaRows.push({
           clientId: row.clientId,
           clientName: row.clientName,
           titulo: row.titulo,
           novedad: row.novedad,
           urgencia: row.urgencia,
+          accion: row.accion,
+          fecha: row.fecha,
         });
       }
     }
@@ -195,7 +187,7 @@ router.post("/bulk-activities/process", async (req, res) => {
 
 router.post("/bulk-activities/resolve", async (req, res) => {
   try {
-    const { rows } = req.body as {
+    const { rows, sinFechaRows: sinFechaResolved = [] } = req.body as {
       rows: Array<{
         clientId: number;
         clientName: string;
@@ -217,11 +209,27 @@ router.post("/bulk-activities/resolve", async (req, res) => {
           description: string;
         } | null;
       }>;
+      sinFechaRows?: Array<{
+        clientId: number;
+        clientName: string;
+        titulo: string | null;
+        novedad: string;
+        urgencia: string | null;
+        accion: string | null;
+        fecha: string;
+        followupTask: {
+          title: string;
+          dueDate: string;
+          priority: string;
+          assignedTo: string;
+          description: string;
+        } | null; // null = save as activity note
+      }>;
     };
 
     const userId: number = (req as any).userId;
 
-    if (!Array.isArray(rows) || rows.length === 0) {
+    if (!Array.isArray(rows)) {
       res.status(400).json({ error: "Se requiere un array 'rows'" });
       return;
     }
@@ -294,6 +302,38 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         }).returning();
       }
       saved++;
+    }
+
+    // Process sinFecha rows (saved without date, now assigned or skipped)
+    for (const sfRow of sinFechaResolved) {
+      const description = sfRow.novedad + (sfRow.accion ? `\nAcción: ${sfRow.accion}` : "");
+      if (sfRow.followupTask && sfRow.followupTask.dueDate) {
+        const due = parseDate(sfRow.followupTask.dueDate);
+        if (due) {
+          const assignedTo = sfRow.followupTask.assignedTo ? parseInt(sfRow.followupTask.assignedTo) : userId;
+          await db.insert(tasksTable).values({
+            title: sfRow.followupTask.title || sfRow.clientName,
+            description: sfRow.followupTask.description || description,
+            clientId: sfRow.clientId,
+            assignedTo: isNaN(assignedTo) ? userId : assignedTo,
+            status: "pending" as any,
+            priority: (sfRow.followupTask.priority || "medium") as any,
+            dueDate: due,
+          } as any);
+          createdTasks++;
+        }
+      } else {
+        // User chose to save without a task — create activity note
+        await db.insert(activitiesTable).values({
+          type: "note",
+          title: sfRow.titulo || sfRow.clientName,
+          clientId: sfRow.clientId,
+          description,
+          outcome: sfRow.accion || undefined,
+          completedAt: (sfRow.fecha ? parseDate(sfRow.fecha) : null) || new Date(),
+        });
+        saved++;
+      }
     }
 
     res.json({ saved, createdTasks });
