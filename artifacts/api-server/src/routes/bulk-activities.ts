@@ -195,6 +195,15 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         accion?: string;
         tareasACerrar: number[];
         accion_vendedor: "asociar_y_cerrar" | "solo_bitacora";
+        followupTask?: {
+          title: string;
+          tipo: string;
+          dueDate: string;
+          priority: string;
+          status: string;
+          assignedTo: string;
+          description: string;
+        } | null;
       }>;
     };
 
@@ -249,7 +258,25 @@ router.post("/bulk-activities/resolve", async (req, res) => {
       }
       saved++;
 
-      if (row.fechaSeguimiento) {
+      // Use explicit followupTask if provided, otherwise fall back to fechaSeguimiento
+      if (row.followupTask && row.followupTask.dueDate) {
+        const ft = row.followupTask;
+        const due = parseDate(ft.dueDate);
+        if (due) {
+          const assignedTo = ft.assignedTo ? parseInt(ft.assignedTo) : userId;
+          await db.insert(tasksTable).values({
+            title: ft.title || `Seguimiento - ${row.clientName}`,
+            description: ft.description || row.novedad,
+            clientId: row.clientId,
+            assignedTo: isNaN(assignedTo) ? userId : assignedTo,
+            status: (ft.status || "pending") as any,
+            priority: (ft.priority || "medium") as any,
+            dueDate: due,
+          } as any);
+          createdTasks++;
+        }
+      } else if (!row.followupTask && row.fechaSeguimiento) {
+        // Legacy: create from CSV fechaSeguimiento only when no explicit followupTask was set
         const t = await createFollowupTask(
           row.clientId, row.clientName, row.titulo || null,
           row.novedad, row.fechaSeguimiento, row.urgencia || null, userId

@@ -1,14 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Upload, FileUp, CheckCircle2, AlertCircle, AlertTriangle,
-  ChevronRight, RotateCcw, X, Loader2, ListTodo
+  ChevronRight, RotateCcw, X, Loader2, ListTodo, CalendarCheck2,
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -25,13 +32,33 @@ type ConflictRow = {
   tareasPendientes: Array<{ id: number; title: string; status: string; dueDate: string | null }>;
 };
 
-// Per-conflict resolution: which task IDs to close, plus the main action
-type Resolution = {
-  // IDs of tasks the user checked to close
-  tareasACerrar: number[];
-  // "asociar_y_cerrar" = close selected tasks + log; "solo_bitacora" = just log; null = undecided
-  accion: "asociar_y_cerrar" | "solo_bitacora" | null;
+type FollowupTask = {
+  title: string;
+  tipo: string;
+  dueDate: string;
+  priority: string;
+  status: string;
+  assignedTo: string;
+  description: string;
 };
+
+type Resolution = {
+  tareasACerrar: number[];
+  accion: "asociar_y_cerrar" | "solo_bitacora" | null;
+  followup: FollowupTask | null; // null = sin agendar, defined = agendar
+};
+
+function defaultFollowup(c: ConflictRow, currentUserId?: string): FollowupTask {
+  return {
+    title: c.titulo ? `Seguimiento: ${c.titulo}` : `Seguimiento - ${c.clientName}`,
+    tipo: "Seguimiento",
+    dueDate: c.fechaSeguimiento || "",
+    priority: c.urgencia?.toLowerCase() === "alta" ? "high" : c.urgencia?.toLowerCase() === "baja" ? "low" : "medium",
+    status: "pending",
+    assignedTo: currentUserId || "",
+    description: "",
+  };
+}
 
 export default function CargaMasivaPage() {
   const { toast } = useToast();
@@ -49,25 +76,69 @@ export default function CargaMasivaPage() {
   const [savedResolved, setSavedResolved] = useState(0);
   const [createdTasksResolved, setCreatedTasksResolved] = useState(0);
 
+  // Assignable users for the schedule modal
+  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+
+  // Schedule modal
+  const [scheduleModal, setScheduleModal] = useState<{ open: boolean; conflictIdx: number } | null>(null);
+  const [scheduleForm, setScheduleForm] = useState<FollowupTask>({
+    title: "", tipo: "Seguimiento", dueDate: "", priority: "medium", status: "pending", assignedTo: "", description: "",
+  });
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API}/api/users/assignable`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+      fetch(`${API}/api/auth/me`, { credentials: "include" }).then(r => r.json()).catch(() => null),
+    ]).then(([users, me]) => {
+      const userList = Array.isArray(users) ? users : [];
+      setAssignableUsers(userList);
+      if (me?.id) setCurrentUserId(String(me.id));
+    });
+  }, []);
+
   function toggleTask(conflictIdx: number, taskId: number) {
     setResolutions(prev => {
-      const cur = prev[conflictIdx] ?? { tareasACerrar: [], accion: null };
+      const cur = prev[conflictIdx] ?? { tareasACerrar: [], accion: null, followup: null };
       const already = cur.tareasACerrar.includes(taskId);
       const tareasACerrar = already
         ? cur.tareasACerrar.filter(id => id !== taskId)
         : [...cur.tareasACerrar, taskId];
-      // If at least one task selected → force "asociar_y_cerrar"; otherwise reset action
-      const accion = tareasACerrar.length > 0 ? "asociar_y_cerrar" : cur.accion === "asociar_y_cerrar" ? null : cur.accion;
-      return { ...prev, [conflictIdx]: { tareasACerrar, accion } };
+      const accion = tareasACerrar.length > 0 ? cur.accion : (cur.accion === "asociar_y_cerrar" ? null : cur.accion);
+      return { ...prev, [conflictIdx]: { ...cur, tareasACerrar, accion } };
     });
   }
 
-  function setAccion(conflictIdx: number, accion: "asociar_y_cerrar" | "solo_bitacora") {
+  function openScheduleModal(conflictIdx: number) {
+    const c = conflicts[conflictIdx];
+    setScheduleForm(defaultFollowup(c, currentUserId));
+    setScheduleModal({ open: true, conflictIdx });
+  }
+
+  function handleScheduleConfirm() {
+    if (!scheduleModal) return;
+    const idx = scheduleModal.conflictIdx;
     setResolutions(prev => {
-      const cur = prev[conflictIdx] ?? { tareasACerrar: [], accion: null };
-      // If choosing "solo_bitacora", clear selected tasks
-      const tareasACerrar = accion === "solo_bitacora" ? [] : cur.tareasACerrar;
-      return { ...prev, [conflictIdx]: { tareasACerrar, accion } };
+      const cur = prev[idx] ?? { tareasACerrar: [], accion: null, followup: null };
+      return { ...prev, [idx]: { ...cur, accion: "asociar_y_cerrar", followup: { ...scheduleForm } } };
+    });
+    setScheduleModal(null);
+  }
+
+  function handleScheduleSkip() {
+    if (!scheduleModal) return;
+    const idx = scheduleModal.conflictIdx;
+    setResolutions(prev => {
+      const cur = prev[idx] ?? { tareasACerrar: [], accion: null, followup: null };
+      return { ...prev, [idx]: { ...cur, accion: "asociar_y_cerrar", followup: null } };
+    });
+    setScheduleModal(null);
+  }
+
+  function setAccionSoloBitacora(conflictIdx: number) {
+    setResolutions(prev => {
+      const cur = prev[conflictIdx] ?? { tareasACerrar: [], accion: null, followup: null };
+      return { ...prev, [conflictIdx]: { tareasACerrar: [], accion: "solo_bitacora", followup: null } };
     });
   }
 
@@ -104,7 +175,7 @@ export default function CargaMasivaPage() {
       } else {
         const init: Record<number, Resolution> = {};
         (data.conflicts as ConflictRow[]).forEach((_, i) => {
-          init[i] = { tareasACerrar: [], accion: null };
+          init[i] = { tareasACerrar: [], accion: null, followup: null };
         });
         setResolutions(init);
         setStep("conflicts");
@@ -124,23 +195,8 @@ export default function CargaMasivaPage() {
     }
     setResolving(true);
     try {
-      // One row per conflict, with all task IDs to close in an array
       const rows = conflicts.map((c, i) => {
         const res = resolutions[i];
-        if (res.accion === "asociar_y_cerrar" && res.tareasACerrar.length > 0) {
-          return {
-            clientId: c.clientId,
-            clientName: c.clientName,
-            fecha: c.fecha,
-            fechaSeguimiento: c.fechaSeguimiento,
-            urgencia: c.urgencia,
-            titulo: c.titulo,
-            novedad: c.novedad,
-            accion: c.accion,
-            tareasACerrar: res.tareasACerrar,
-            accion_vendedor: "asociar_y_cerrar" as const,
-          };
-        }
         return {
           clientId: c.clientId,
           clientName: c.clientName,
@@ -150,8 +206,9 @@ export default function CargaMasivaPage() {
           titulo: c.titulo,
           novedad: c.novedad,
           accion: c.accion,
-          tareasACerrar: [] as number[],
-          accion_vendedor: "solo_bitacora" as const,
+          tareasACerrar: res.accion === "asociar_y_cerrar" ? res.tareasACerrar : [] as number[],
+          accion_vendedor: res.accion as "asociar_y_cerrar" | "solo_bitacora",
+          followupTask: res.followup ?? null,
         };
       });
 
@@ -305,14 +362,14 @@ export default function CargaMasivaPage() {
                 Estos clientes tienen tareas pendientes — decidí qué hacer con cada uno
               </p>
               <p className="text-xs text-muted-foreground">
-                Para cada fila, elegí si querés cerrar la tarea vinculada o solo guardar la novedad sin tocar la tarea.
+                Para cada fila, marcá las tareas a cerrar y luego especificá el próximo seguimiento, o elegí solo guardar en bitácora.
               </p>
             </div>
 
             {/* Conflict cards */}
             <div className="space-y-3">
               {conflicts.map((c, i) => {
-                const res = resolutions[i] ?? { tareasACerrar: [], accion: null };
+                const res = resolutions[i] ?? { tareasACerrar: [], accion: null, followup: null };
                 const isSoloBitacora = res.accion === "solo_bitacora";
                 const hasSelection = res.tareasACerrar.length > 0;
                 const isResolved = res.accion !== null;
@@ -360,28 +417,55 @@ export default function CargaMasivaPage() {
                       })}
                     </div>
 
-                    {/* Action selector */}
-                    <div className="flex gap-2 flex-wrap">
-                      <button
-                        onClick={() => setAccion(i, "asociar_y_cerrar")}
-                        disabled={!hasSelection}
-                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed ${res.accion === "asociar_y_cerrar" ? "bg-green-500/20 border-green-500/50 text-green-300" : "border-border/50 text-muted-foreground hover:border-green-500/40 hover:bg-green-500/5"}`}
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
-                        Cerrar tarea{res.tareasACerrar.length > 1 ? "s" : ""} seleccionada{res.tareasACerrar.length > 1 ? "s" : ""} y registrar
-                        {res.tareasACerrar.length > 0 && <span className="ml-1 text-green-400">({res.tareasACerrar.length})</span>}
-                      </button>
-                      <button
-                        onClick={() => setAccion(i, "solo_bitacora")}
-                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left ${res.accion === "solo_bitacora" ? "bg-blue-500/20 border-blue-500/50 text-blue-300" : "border-border/50 text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5"}`}
-                      >
-                        <X className="w-3.5 h-3.5 inline mr-1.5" />
-                        Solo guardar en bitácora (sin cerrar tareas)
-                      </button>
-                    </div>
+                    {/* Resolution status banner */}
+                    {isResolved && (
+                      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-xs ${res.accion === "asociar_y_cerrar" ? "bg-green-500/10 border border-green-500/30 text-green-300" : "bg-blue-500/10 border border-blue-500/30 text-blue-300"}`}>
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        {res.accion === "asociar_y_cerrar" ? (
+                          <>
+                            Cerrando {res.tareasACerrar.length} tarea{res.tareasACerrar.length !== 1 ? "s" : ""} y registrando.
+                            {res.followup ? (
+                              <span className="ml-1">Seguimiento agendado: <strong>{res.followup.dueDate || "sin fecha"}</strong></span>
+                            ) : (
+                              <span className="ml-1 opacity-70">Sin próximo seguimiento.</span>
+                            )}
+                          </>
+                        ) : "Solo bitácora, sin cerrar tareas."}
+                        <button
+                          className="ml-auto underline underline-offset-2 opacity-70 hover:opacity-100"
+                          onClick={() => {
+                            setResolutions(prev => ({ ...prev, [i]: { tareasACerrar: res.tareasACerrar, accion: null, followup: null } }));
+                          }}
+                        >
+                          Cambiar
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Action buttons — only shown when not yet resolved */}
                     {!isResolved && (
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => openScheduleModal(i)}
+                          disabled={!hasSelection}
+                          className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed border-border/50 text-muted-foreground hover:border-green-500/40 hover:bg-green-500/5`}
+                        >
+                          <CalendarCheck2 className="w-3.5 h-3.5 inline mr-1.5" />
+                          Cerrar tarea{res.tareasACerrar.length > 1 ? "s" : ""} seleccionada{res.tareasACerrar.length > 1 ? "s" : ""} y agendar seguimiento
+                          {res.tareasACerrar.length > 0 && <span className="ml-1 text-green-400">({res.tareasACerrar.length})</span>}
+                        </button>
+                        <button
+                          onClick={() => setAccionSoloBitacora(i)}
+                          className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-border/50 text-muted-foreground hover:border-blue-500/40 hover:bg-blue-500/5 transition-all text-left"
+                        >
+                          <X className="w-3.5 h-3.5 inline mr-1.5" />
+                          Solo guardar en bitácora (sin cerrar tareas)
+                        </button>
+                      </div>
+                    )}
+                    {!isResolved && !hasSelection && (
                       <p className="text-xs text-yellow-500/70 mt-2">
-                        Seleccioná las tareas a cerrar y confirmá, o elegí "Solo bitácora".
+                        Marcá al menos una tarea para cerrarla, o elegí "Solo bitácora".
                       </p>
                     )}
                   </div>
@@ -425,7 +509,7 @@ export default function CargaMasivaPage() {
 
             {(createdTasksDirect + createdTasksResolved) > 0 && (
               <p className="text-xs text-cyan-400/80 bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 max-w-xs mx-auto">
-                Las tareas quedaron asignadas a tu usuario con la fecha de seguimiento del CSV.
+                Las tareas quedaron asignadas con la fecha y detalles especificados.
               </p>
             )}
 
@@ -448,6 +532,130 @@ export default function CargaMasivaPage() {
           </div>
         )}
       </div>
+
+      {/* ── Agendar seguimiento modal ── */}
+      <Dialog open={!!scheduleModal?.open} onOpenChange={(open) => { if (!open) setScheduleModal(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogDescription className="sr-only">Agendar próximo seguimiento</DialogDescription>
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center">
+                <CalendarCheck2 className="w-5 h-5 text-green-400" />
+              </div>
+              <div>
+                <DialogTitle>Agendar seguimiento</DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Completá los datos del próximo seguimiento antes de cerrar la tarea.
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="text-sm">Título</Label>
+              <Input
+                className="mt-1"
+                value={scheduleForm.title}
+                onChange={e => setScheduleForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Ej: Seguimiento - Cliente OPS"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm">Tipo</Label>
+              <Select value={scheduleForm.tipo} onValueChange={v => setScheduleForm(f => ({ ...f, tipo: v }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["Seguimiento", "Llamada", "Reunión", "Email", "Visita", "Cotización", "Otro"].map(t => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm">Fecha de seguimiento</Label>
+              <Input
+                type="date"
+                className="mt-1"
+                value={scheduleForm.dueDate}
+                onChange={e => setScheduleForm(f => ({ ...f, dueDate: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">Prioridad</Label>
+                <Select value={scheduleForm.priority} onValueChange={v => setScheduleForm(f => ({ ...f, priority: v }))}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="medium">Media</SelectItem>
+                    <SelectItem value="low">Baja</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Estado</Label>
+                <Select value={scheduleForm.status} onValueChange={v => setScheduleForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Abierta</SelectItem>
+                    <SelectItem value="in_progress">En progreso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm">Asignar a</Label>
+              <Select value={scheduleForm.assignedTo} onValueChange={v => setScheduleForm(f => ({ ...f, assignedTo: v }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Seleccionar usuario..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignableUsers.map((u: any) => (
+                    <SelectItem key={u.id} value={String(u.id)}>
+                      {u.name || u.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm">Descripción <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Textarea
+                className="mt-1 text-sm"
+                rows={3}
+                value={scheduleForm.description}
+                onChange={e => setScheduleForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Ej: Confirmar disponibilidad para reunión..."
+              />
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <Button variant="ghost" className="flex-1" onClick={handleScheduleSkip}>
+                Cerrar sin agendar
+              </Button>
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleScheduleConfirm}
+              >
+                <CalendarCheck2 className="w-4 h-4 mr-2" />
+                Completar y agendar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
