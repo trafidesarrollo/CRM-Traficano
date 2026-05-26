@@ -47,6 +47,8 @@ import {
   X,
   MapPin,
   ChevronsUpDown,
+  ScrollText,
+  Send,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -250,8 +252,37 @@ export default function QuoteEdit() {
   const [savingFollowup, setSavingFollowup] = useState(false);
 
   const [showConvertModal, setShowConvertModal] = useState(false);
-  const [convertForm, setConvertForm] = useState({ purchaseOrder: "", ocFile: null as File | null });
+  const [convertForm, setConvertForm] = useState({ purchaseOrder: "", ocFile: null as File | null, deliveryDate: "" });
   const [converting, setConverting] = useState(false);
+
+  const [quoteLogs, setQuoteLogs] = useState<any[]>([]);
+  const [logInput, setLogInput] = useState("");
+  const [submittingLog, setSubmittingLog] = useState(false);
+  const loadQuoteLogs = () => {
+    if (!id) return;
+    fetch(`${API}/api/quotes/${id}/logs`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setQuoteLogs(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  };
+  const submitLog = async () => {
+    if (!logInput.trim() || !id) return;
+    setSubmittingLog(true);
+    try {
+      await fetch(`${API}/api/quotes/${id}/logs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ message: logInput.trim() }),
+      });
+      setLogInput("");
+      loadQuoteLogs();
+    } catch {
+      toast({ title: "Error al guardar la nota", variant: "destructive" });
+    } finally {
+      setSubmittingLog(false);
+    }
+  };
   const [usdRate, setUsdRate] = useState<{ sell: number | null; date: string | null; stale: boolean } | null>(null);
 
   const [linkedTasks, setLinkedTasks] = useState<any[]>([]);
@@ -667,7 +698,7 @@ export default function QuoteEdit() {
     }
   };
 
-  useEffect(() => { if (!isNew && id) loadLinkedTasks(); }, [id, isNew]);
+  useEffect(() => { if (!isNew && id) { loadLinkedTasks(); loadQuoteLogs(); } }, [id, isNew]);
 
   // Auto-assign salesperson when creating new quote (vendor pre-fills themselves)
   useEffect(() => {
@@ -1021,7 +1052,7 @@ export default function QuoteEdit() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ purchaseOrder: convertForm.purchaseOrder.trim() }),
+        body: JSON.stringify({ purchaseOrder: convertForm.purchaseOrder.trim(), deliveryDate: convertForm.deliveryDate || null }),
       });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
@@ -1464,7 +1495,7 @@ export default function QuoteEdit() {
             </div>
 
             <div>
-              <Label>Prioridad</Label>
+              <Label>Prioridad <span className="text-destructive">*</span></Label>
               <Select
                 value={form.priority}
                 onValueChange={(v) => setForm({ ...form, priority: v })}
@@ -1481,7 +1512,7 @@ export default function QuoteEdit() {
               </Select>
             </div>
             <div>
-              <Label>Tipo de cotización</Label>
+              <Label>Tipo de cotización <span className="text-destructive">*</span></Label>
               <Select
                 value={form.quoteType}
                 onValueChange={(v) => setForm({ ...form, quoteType: v })}
@@ -1543,7 +1574,7 @@ export default function QuoteEdit() {
               <p className="text-xs text-muted-foreground mt-1">Se le asignará una tarea de seguimiento automáticamente</p>
             </div>
             <div>
-              <Label>Tipo de orden</Label>
+              <Label>Tipo de orden <span className="text-destructive">*</span></Label>
               <Select
                 value={form.orderType}
                 onValueChange={(v) => setForm({ ...form, orderType: v })}
@@ -2118,6 +2149,65 @@ export default function QuoteEdit() {
         </Card>
       )}
 
+      {/* ── Bitácora ── */}
+      {!isNew && id && (
+        <Card className="mt-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <ScrollText className="w-4 h-4 text-primary" />
+                Bitácora
+                {quoteLogs.length > 0 && (
+                  <Badge variant="outline" className="text-xs ml-1">{quoteLogs.length}</Badge>
+                )}
+              </h3>
+            </div>
+
+            <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
+              {quoteLogs.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">Sin notas registradas</p>
+              ) : (
+                quoteLogs.map((log: any) => (
+                  <div key={log.id} className="rounded-lg border border-border/40 bg-white/5 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {log.userName || "Sistema"}
+                      </span>
+                      <span className="text-xs text-muted-foreground/60">
+                        {new Date(log.createdAt).toLocaleString("es-AR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{log.message}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <textarea
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                rows={2}
+                placeholder="Agregar nota a la bitácora…"
+                value={logInput}
+                onChange={e => setLogInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitLog(); }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-auto px-3 self-end"
+                onClick={submitLog}
+                disabled={submittingLog || !logInput.trim()}
+                title="Guardar nota (Ctrl+Enter)"
+              >
+                {submittingLog ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground/60 mt-1.5">Ctrl+Enter para guardar</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Modal: Completar tarea con nota ── */}
       <Dialog open={!!taskToComplete} onOpenChange={(open) => { if (!open) { setTaskToComplete(null); setCompleteNote(""); } }}>
         <DialogContent className="sm:max-w-md">
@@ -2275,6 +2365,16 @@ export default function QuoteEdit() {
                   placeholder="Ej: OC-2024-00123"
                   value={convertForm.purchaseOrder}
                   onChange={(e) => setConvertForm((p) => ({ ...p, purchaseOrder: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-1.5">
+                  Fecha de entrega comprometida
+                </Label>
+                <Input
+                  type="date"
+                  value={convertForm.deliveryDate}
+                  onChange={(e) => setConvertForm((p) => ({ ...p, deliveryDate: e.target.value }))}
                 />
               </div>
               <div>

@@ -28,3 +28,4 @@ export * from "./custom_fields";
 export * from "./pipelines";
 export * from "./production";
 export * from "./user_permissions";
+export * from "./quote_logs";

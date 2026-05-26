@@ -297,7 +297,7 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const userId = (req as any).session?.userId;
-    const { purchaseOrder: bodyPurchaseOrder } = req.body || {};
+    const { purchaseOrder: bodyPurchaseOrder, deliveryDate: bodyDeliveryDate } = req.body || {};
     const result = await db.transaction(async (tx) => {
       const [quote] = await tx.select().from(quotesTable).where(eq(quotesTable.id, id));
       if (!quote) throw new Error("NOT_FOUND");
@@ -331,6 +331,7 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
         status: "approved",
         approvedAt: new Date(),
         purchaseOrder: bodyPurchaseOrder || quote.purchaseOrder || null,
+        deliveryDate: bodyDeliveryDate ? new Date(bodyDeliveryDate) : quote.deliveryDate,
         quoteStatus: "APROBADA",
       }).where(eq(quotesTable.id, id));
 
