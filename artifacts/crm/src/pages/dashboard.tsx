@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useGetDashboardMetrics } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout";
 import { StatCard } from "@/components/stat-card";
-import { Users, Briefcase, Inbox, AlertCircle, LayoutDashboard, ListTodo } from "lucide-react";
+import { Users, Briefcase, Inbox, AlertCircle, LayoutDashboard, ListTodo, UserSearch, FileText, CheckCircle2, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Progress } from "@/components/ui/progress";
@@ -144,6 +144,81 @@ export default function Dashboard() {
       {cpData && (
         <div className="space-y-6">
           <h2 className="text-2xl font-display font-bold">Plan Comercial</h2>
+
+          {/* ── Contadores de Clientes ── */}
+          {cpData.clientStats && (
+            <div>
+              <h3 className="text-base font-semibold mb-3 text-muted-foreground uppercase tracking-wide text-xs">Resumen de Clientes</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <Card className="bg-card/50 backdrop-blur-sm border-white/5">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-8 h-8 rounded-full bg-slate-500/15 flex items-center justify-center">
+                        <UserSearch className="w-4 h-4 text-slate-400" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold">{cpData.clientStats.prospect}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Prospectos</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/50 backdrop-blur-sm border-white/5">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-blue-400" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-blue-400">{cpData.clientStats.potential}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Potenciales</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/50 backdrop-blur-sm border-white/5">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-8 h-8 rounded-full bg-violet-500/15 flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-violet-400" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-violet-400">{cpData.clientStats.cotizados}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Cotizados</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/50 backdrop-blur-sm border-white/5">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-8 h-8 rounded-full bg-green-500/15 flex items-center justify-center">
+                        <CheckCircle2 className="w-4 h-4 text-green-400" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-green-400">{cpData.clientStats.final}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Cerrados</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/50 backdrop-blur-sm border-white/5">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-8 h-8 rounded-full bg-gray-500/15 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-muted-foreground">{cpData.clientStats.inactive}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Inactivos</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-primary/10 backdrop-blur-sm border-primary/20">
+                  <CardContent className="p-4 text-center">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-primary" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-primary">{cpData.clientStats.total}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Total</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
 
           {cpData.hunterMetrics?.length > 0 && (
             <div>

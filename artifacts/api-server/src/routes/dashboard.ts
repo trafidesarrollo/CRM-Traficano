@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, clientsTable, opportunitiesTable, emailsTable, activitiesTable, salespeopleTable, goalsTable } from "@workspace/db";
+import { db, clientsTable, opportunitiesTable, emailsTable, activitiesTable, salespeopleTable, goalsTable, quotesTable } from "@workspace/db";
 import { eq, sql, and, gte, inArray, notInArray, isNotNull, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -209,11 +209,36 @@ router.get("/dashboard/commercial-plan", async (req, res) => {
       lost: allOpportunities.filter(o => o.status === "lost").length,
     };
 
+    // ── Client counters ──────────────────────────────────────────────────────
+    const [clientStatusCounts, quotedClientRows] = await Promise.all([
+      db.select({ status: clientsTable.status, count: sql<number>`count(*)` })
+        .from(clientsTable)
+        .groupBy(clientsTable.status),
+      db.selectDistinct({ clientId: quotesTable.clientId })
+        .from(quotesTable)
+        .where(isNotNull(quotesTable.clientId)),
+    ]);
+
+    const statusMap: Record<string, number> = {};
+    for (const row of clientStatusCounts) {
+      statusMap[row.status] = Number(row.count);
+    }
+
+    const clientStats = {
+      prospect: statusMap["prospect"] ?? 0,
+      potential: statusMap["potential"] ?? 0,
+      final: statusMap["final"] ?? 0,
+      inactive: statusMap["inactive"] ?? 0,
+      total: Object.values(statusMap).reduce((a, b) => a + b, 0),
+      cotizados: quotedClientRows.length,
+    };
+
     res.json({
       hunterMetrics,
       farmerMetrics,
       adminMetrics,
       pipelineFunnel,
+      clientStats,
     });
   } catch (err) {
     req.log.error(err);
