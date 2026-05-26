@@ -152,24 +152,25 @@ router.post("/bulk-activities/process", async (req, res) => {
     const sinFechaRows: any[] = [];
 
     for (const row of directRows) {
-      await db.insert(activitiesTable).values({
-        type: "note",
-        title: row.titulo || row.clientName,
-        clientId: row.clientId,
-        description: row.novedad + (row.accion ? `\nAcción: ${row.accion}` : ""),
-        outcome: row.accion || undefined,
-        completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
-      }).returning();
-      savedDirect++;
-
       if (row.fechaSeguimiento) {
+        // Task IS the bitácora entry — skip separate activity note to avoid duplicates
         const t = await createFollowupTask(
           row.clientId, row.clientName, row.titulo,
           row.novedad, row.fechaSeguimiento, row.urgencia, userId
         );
         if (t) createdTasks++;
       } else {
-        // Saved to log but no follow-up date — surface to frontend
+        // No task → create activity note as the bitácora record
+        await db.insert(activitiesTable).values({
+          type: "note",
+          title: row.titulo || row.clientName,
+          clientId: row.clientId,
+          description: row.novedad + (row.accion ? `\nAcción: ${row.accion}` : ""),
+          outcome: row.accion || undefined,
+          completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
+        }).returning();
+        savedDirect++;
+        // Surface to frontend for manual date assignment
         sinFechaRows.push({
           clientId: row.clientId,
           clientName: row.clientName,
@@ -231,7 +232,8 @@ router.post("/bulk-activities/resolve", async (req, res) => {
     for (const row of rows) {
       const shouldClose = row.accion_vendedor === "asociar_y_cerrar" && row.tareasACerrar.length > 0;
 
-      // Close all selected tasks
+      // Determine closing context label (used in task description if task is created)
+      let closedLabel = "";
       if (shouldClose) {
         const taskTitles: string[] = [];
         for (const tareaId of row.tareasACerrar) {
@@ -242,61 +244,56 @@ router.post("/bulk-activities/resolve", async (req, res) => {
             .set({ status: "completed", completedAt: new Date() })
             .where(eq(tasksTable.id, tareaId));
         }
-        const closedLabel = taskTitles.length === 1
+        closedLabel = taskTitles.length === 1
           ? `[Tarea cerrada: ${taskTitles[0]}] `
           : `[${taskTitles.length} tareas cerradas: ${taskTitles.join(", ")}] `;
-        const description = closedLabel + row.novedad + (row.accion ? `\nAcción: ${row.accion}` : "");
+      }
 
-        // ONE activity note per conflict row (no duplicates)
-        await db.insert(activitiesTable).values({
-          type: "note",
-          title: row.titulo || row.clientName,
-          clientId: row.clientId,
-          description,
-          outcome: row.accion || undefined,
-          completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
-        }).returning();
+      const baseDescription = closedLabel + row.novedad + (row.accion ? `\nAcción: ${row.accion}` : "");
+
+      // Determine if a follow-up task will be created
+      const willCreateTask =
+        (row.followupTask && row.followupTask.dueDate) ||
+        (row.followupTask === undefined && row.fechaSeguimiento);
+
+      if (willCreateTask) {
+        // Task IS the bitácora entry — skip separate activity note to avoid duplicates
+        if (row.followupTask && row.followupTask.dueDate) {
+          const ft = row.followupTask;
+          const due = parseDate(ft.dueDate);
+          if (due) {
+            const assignedTo = ft.assignedTo ? parseInt(ft.assignedTo) : userId;
+            await db.insert(tasksTable).values({
+              title: ft.title || row.clientName,
+              description: ft.description || baseDescription,
+              clientId: row.clientId,
+              assignedTo: isNaN(assignedTo) ? userId : assignedTo,
+              status: (ft.status || "pending") as any,
+              priority: (ft.priority || "medium") as any,
+              dueDate: due,
+            } as any);
+            createdTasks++;
+          }
+        } else if (row.followupTask === undefined && row.fechaSeguimiento) {
+          // Legacy path
+          const t = await createFollowupTask(
+            row.clientId, row.clientName, row.titulo || null,
+            baseDescription, row.fechaSeguimiento, row.urgencia || null, userId
+          );
+          if (t) createdTasks++;
+        }
       } else {
-        const description = row.novedad + (row.accion ? `\nAcción: ${row.accion}` : "");
+        // No task being created → activity note is the sole bitácora record
         await db.insert(activitiesTable).values({
           type: "note",
           title: row.titulo || row.clientName,
           clientId: row.clientId,
-          description,
+          description: baseDescription,
           outcome: row.accion || undefined,
           completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
         }).returning();
       }
       saved++;
-
-      // followupTask === object with dueDate → create with explicit details
-      // followupTask === null → user explicitly chose NOT to schedule (skip)
-      // followupTask === undefined → legacy request, fall back to fechaSeguimiento from CSV
-      if (row.followupTask && row.followupTask.dueDate) {
-        const ft = row.followupTask;
-        const due = parseDate(ft.dueDate);
-        if (due) {
-          const assignedTo = ft.assignedTo ? parseInt(ft.assignedTo) : userId;
-          await db.insert(tasksTable).values({
-            title: ft.title || row.clientName,
-            description: ft.description || row.novedad,
-            clientId: row.clientId,
-            assignedTo: isNaN(assignedTo) ? userId : assignedTo,
-            status: (ft.status || "pending") as any,
-            priority: (ft.priority || "medium") as any,
-            dueDate: due,
-          } as any);
-          createdTasks++;
-        }
-      } else if (row.followupTask === undefined && row.fechaSeguimiento) {
-        // Legacy path: only when followupTask was never sent (old-format requests)
-        const t = await createFollowupTask(
-          row.clientId, row.clientName, row.titulo || null,
-          row.novedad, row.fechaSeguimiento, row.urgencia || null, userId
-        );
-        if (t) createdTasks++;
-      }
-      // if followupTask === null: user explicitly chose no follow-up — do nothing
     }
 
     res.json({ saved, createdTasks });
