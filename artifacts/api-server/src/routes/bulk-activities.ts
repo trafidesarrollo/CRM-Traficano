@@ -258,7 +258,9 @@ router.post("/bulk-activities/resolve", async (req, res) => {
       }
       saved++;
 
-      // Use explicit followupTask if provided, otherwise fall back to fechaSeguimiento
+      // followupTask === object with dueDate → create with explicit details
+      // followupTask === null → user explicitly chose NOT to schedule (skip)
+      // followupTask === undefined → legacy request, fall back to fechaSeguimiento from CSV
       if (row.followupTask && row.followupTask.dueDate) {
         const ft = row.followupTask;
         const due = parseDate(ft.dueDate);
@@ -275,14 +277,15 @@ router.post("/bulk-activities/resolve", async (req, res) => {
           } as any);
           createdTasks++;
         }
-      } else if (!row.followupTask && row.fechaSeguimiento) {
-        // Legacy: create from CSV fechaSeguimiento only when no explicit followupTask was set
+      } else if (row.followupTask === undefined && row.fechaSeguimiento) {
+        // Legacy path: only when followupTask was never sent (old-format requests)
         const t = await createFollowupTask(
           row.clientId, row.clientName, row.titulo || null,
           row.novedad, row.fechaSeguimiento, row.urgencia || null, userId
         );
         if (t) createdTasks++;
       }
+      // if followupTask === null: user explicitly chose no follow-up — do nothing
     }
 
     res.json({ saved, createdTasks });
