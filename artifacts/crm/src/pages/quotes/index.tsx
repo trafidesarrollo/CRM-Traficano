@@ -22,8 +22,9 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const getQuoteStatusBadge = (q: any): { label: string; color: string } => {
-  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada", color: "bg-green-500/20 text-green-300" };
-  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",    color: "bg-red-500/20 text-red-300" };
+  if (q.quoteStatus === "APROBADA" || q.quoteStatus === "FINALIZADA") return { label: "APROBADA", color: "bg-green-500/20 text-green-300" };
+  if (q.quoteStatus === "PERDIDA")    return { label: "PERDIDA",    color: "bg-red-500/20 text-red-300" };
+  if (q.quoteStatus === "DESISTIDA")  return { label: "DESISTIDA",  color: "bg-amber-500/20 text-amber-300" };
   return STATUS_LABELS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300" };
 };
 

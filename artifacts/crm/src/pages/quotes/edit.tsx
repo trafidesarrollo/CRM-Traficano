@@ -189,10 +189,10 @@ export default function QuoteEdit() {
   const isPrivilegedUser = user?.role === "admin" || user?.role === "gerente_comercial";
 
   const computeQuoteStatus = (status: string, purchaseOrder: string, closeReason: string) => {
-    if (status === "approved" && purchaseOrder) return { label: "Ganada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
-    if (status === "approved" && closeReason?.startsWith("DESISTIDA")) return { label: "Desistida", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" };
-    if (status === "approved" && closeReason) return { label: "Perdida", color: "bg-red-500/20 text-red-300 border-red-500/30" };
-    if (status === "approved") return { label: "Ganada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
+    if (status === "approved" && purchaseOrder) return { label: "APROBADA", color: "bg-green-500/20 text-green-300 border-green-500/30" };
+    if (status === "approved" && closeReason?.startsWith("DESISTIDA")) return { label: "DESISTIDA", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" };
+    if (status === "approved" && closeReason) return { label: "PERDIDA", color: "bg-red-500/20 text-red-300 border-red-500/30" };
+    if (status === "approved") return { label: "APROBADA", color: "bg-green-500/20 text-green-300 border-green-500/30" };
     if (status === "sent") return { label: "Enviada", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" };
     return { label: "En proceso", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" };
   };

@@ -247,7 +247,7 @@ router.patch("/quotes/:id", async (req, res) => {
     // Auto-derive quoteStatus from status
     if (data.status === "draft") data.quoteStatus = "EN PROCESO";
     else if (data.status === "sent") data.quoteStatus = "ENVIADA";
-    else if (data.status === "approved" && !data.closeReason) data.quoteStatus = "FINALIZADA";
+    else if (data.status === "approved" && !data.closeReason) data.quoteStatus = "APROBADA";
     else if (data.status === "approved" && typeof data.closeReason === "string" && data.closeReason.startsWith("DESISTIDA")) data.quoteStatus = "DESISTIDA";
     else if (data.status === "approved" && data.closeReason) data.quoteStatus = "PERDIDA";
     // Remove manual override of quoteStatus if it came from body
@@ -331,7 +331,7 @@ router.post("/quotes/:id/convert-to-order", async (req, res) => {
         status: "approved",
         approvedAt: new Date(),
         purchaseOrder: bodyPurchaseOrder || quote.purchaseOrder || null,
-        quoteStatus: "FINALIZADA",
+        quoteStatus: "APROBADA",
       }).where(eq(quotesTable.id, id));
 
       // Promote client to "final" upon first OC
