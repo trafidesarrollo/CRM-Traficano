@@ -31,30 +31,102 @@ function computeStatus(data: any, existingStatus?: string): string {
 
 router.get("/clients", async (req, res) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 200;
-    const search = req.query.search as string;
-    const statusFilter = req.query.status as string; // comma-separated
-    const offset = (page - 1) * limit;
+    const page    = parseInt(req.query.page as string) || 1;
+    const limit   = parseInt(req.query.limit as string) || 200;
+    const search  = (req.query.search as string) || "";
+    const statusFilter     = (req.query.status as string) || "";
+    const importanceFilter = (req.query.importance as string) || "";
+    const teamFilter       = (req.query.teamId as string) || "";
+    const offset  = (page - 1) * limit;
 
-    let base = db.select().from(clientsTable).$dynamic();
+    // Build dynamic WHERE fragments (Drizzle sql-tagged for safe parameterisation)
+    const searchCond = search
+      ? sql`AND c.company_name ILIKE ${"%" + search + "%"}`
+      : sql``;
+    const statusCond = statusFilter
+      ? sql`AND c.status = ANY(${statusFilter.split(",").map(s => s.trim()).filter(Boolean)})`
+      : sql``;
+    const importanceCond = importanceFilter
+      ? sql`AND COALESCE(c.importance,'ninguna') = ANY(${importanceFilter.split(",").map(s => s.trim()).filter(Boolean)})`
+      : sql``;
+    const teamCond = teamFilter === "none"
+      ? sql`AND c.assigned_team_id IS NULL`
+      : teamFilter && teamFilter !== "all"
+        ? sql`AND c.assigned_team_id = ${parseInt(teamFilter)}`
+        : sql``;
 
-    const conditions: any[] = [];
-    if (search) conditions.push(ilike(clientsTable.companyName, `%${search}%`));
-    if (statusFilter) {
-      const statuses = statusFilter.split(",").map(s => s.trim()).filter(Boolean);
-      if (statuses.length) conditions.push(inArray(clientsTable.status, statuses as any));
-    }
-
-    if (conditions.length === 1) base = base.where(conditions[0]);
-    else if (conditions.length > 1) base = base.where(and(...conditions));
-
-    const [data, countResult] = await Promise.all([
-      base.orderBy(desc(clientsTable.id)).limit(limit).offset(offset),
-      db.select({ count: sql<number>`count(*)` }).from(clientsTable),
+    const [dataRes, countRes] = await Promise.all([
+      db.execute(sql`
+        SELECT
+          c.*,
+          COALESCE(
+            (SELECT u.full_name
+               FROM commercial_team_members ctm
+               JOIN users u ON u.id = ctm.user_id
+              WHERE ctm.team_id = c.assigned_team_id AND ctm.role = 'vendedor'
+              LIMIT 1),
+            (SELECT s.name FROM salespeople s WHERE s.id = c.assigned_salesperson_id LIMIT 1)
+          ) AS vendedor_principal,
+          COALESCE(
+            (SELECT SUM(COALESCE(q.net_amount::numeric, q.total::numeric, 0))
+               FROM quotes q
+              WHERE q.client_id = c.id
+                AND q.status NOT IN ('approved','rejected','FINALIZADA','PERDIDA','expired')),
+            0
+          ) AS total_cotizado_abierto,
+          (SELECT t.title
+             FROM tasks t
+            WHERE t.client_id = c.id
+            ORDER BY t.created_at DESC LIMIT 1) AS ultima_tarea,
+          (SELECT t.due_date
+             FROM tasks t
+            WHERE t.client_id = c.id
+            ORDER BY t.created_at DESC LIMIT 1) AS ultima_tarea_fecha,
+          (SELECT a.created_at
+             FROM activities a
+            WHERE a.client_id = c.id
+            ORDER BY a.created_at DESC LIMIT 1) AS ultimo_contacto
+        FROM clients c
+        WHERE 1=1
+          ${searchCond}
+          ${statusCond}
+          ${importanceCond}
+          ${teamCond}
+        ORDER BY c.id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `),
+      db.execute(sql`
+        SELECT COUNT(*) AS cnt
+        FROM clients c
+        WHERE 1=1
+          ${searchCond}
+          ${statusCond}
+          ${importanceCond}
+          ${teamCond}
+      `),
     ]);
 
-    res.json({ data, total: Number(countResult[0].count), page, limit });
+    const data = dataRes.rows.map((r: any) => ({
+      ...r,
+      // camelCase aliases for frontend consistency
+      companyName: r.company_name,
+      taxId: r.tax_id,
+      assignedSalespersonId: r.assigned_salesperson_id,
+      assignedUserId: r.assigned_user_id,
+      assignedTeamId: r.assigned_team_id,
+      clientEmails: r.client_emails ?? [],
+      consumptionScale: r.consumption_scale,
+      externalId: r.external_id,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      vendedorPrincipal: r.vendedor_principal ?? null,
+      totalCotizadoAbierto: Number(r.total_cotizado_abierto ?? 0),
+      ultimaTarea: r.ultima_tarea ?? null,
+      ultimaTareaFecha: r.ultima_tarea_fecha ?? null,
+      ultimoContacto: r.ultimo_contacto ?? null,
+    }));
+
+    res.json({ data, total: Number((countRes.rows[0] as any).cnt), page, limit });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error al listar clientes" });

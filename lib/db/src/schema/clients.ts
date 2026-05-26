@@ -21,6 +21,7 @@ export const clientsTable = pgTable("clients", {
   notes: text("notes"),
   // Proyección de consumo anual en USD (solo visible cuando status >= potential)
   consumptionScale: numeric("consumption_scale"),
+  importance: text("importance").default("ninguna"),
   externalId: text("external_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

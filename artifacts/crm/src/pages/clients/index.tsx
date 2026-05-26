@@ -20,15 +20,19 @@ const API = import.meta.env.VITE_API_URL || "";
 
 // ─── Column config ───────────────────────────────────────────────────────────
 const TOGGLEABLE_COLUMNS = [
-  { key: "emails",      label: "Emails",      default: true  },
-  { key: "phone",       label: "Teléfono",    default: false },
-  { key: "cuit",        label: "CUIT",        default: false },
-  { key: "industry",    label: "Industria",   default: true  },
-  { key: "city",        label: "Ciudad",      default: true  },
-  { key: "country",     label: "País",        default: false },
-  { key: "scale",       label: "Escala USD",  default: true  },
-  { key: "salesperson", label: "Vendedor",    default: false },
-  { key: "status",      label: "Estado",      default: true  },
+  { key: "emails",           label: "Emails",              default: true  },
+  { key: "phone",            label: "Teléfono",            default: false },
+  { key: "cuit",             label: "CUIT",                default: false },
+  { key: "industry",         label: "Industria",           default: true  },
+  { key: "city",             label: "Ciudad",              default: true  },
+  { key: "country",          label: "País",                default: false },
+  { key: "scale",            label: "Escala USD",          default: true  },
+  { key: "salesperson",      label: "Vendedor",            default: true  },
+  { key: "importance",       label: "Importancia",         default: true  },
+  { key: "totalCotizado",    label: "Total Cotizado Abto", default: true  },
+  { key: "ultimaTarea",      label: "Última Tarea",        default: true  },
+  { key: "ultimoContacto",   label: "Último Contacto",     default: true  },
+  { key: "status",           label: "Estado",              default: true  },
 ] as const;
 type ColKey = (typeof TOGGLEABLE_COLUMNS)[number]["key"];
 const LS_KEY = "crm:clients:columns";
@@ -39,6 +43,14 @@ function loadCols(): Set<ColKey> {
   } catch {}
   return new Set(TOGGLEABLE_COLUMNS.filter(c => c.default).map(c => c.key));
 }
+
+// ─── Importance config ───────────────────────────────────────────────────────
+const IMPORTANCE_CONFIG: Record<string, { label: string; badge: string }> = {
+  alta:    { label: "ALTA",    badge: "bg-red-500/15 text-red-400 border-red-500/30" },
+  media:   { label: "MEDIA",   badge: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  baja:    { label: "BAJA",    badge: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  ninguna: { label: "NINGUNA", badge: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },
+};
 
 // ─── Status config ───────────────────────────────────────────────────────────
 const CLIENT_STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
@@ -345,6 +357,7 @@ function ProspectsImportDialog({ onDone }: { onDone: () => void }) {
 const BLANK_FORM = {
   companyName: "", taxId: "", industry: "", city: "",
   notes: "", consumptionScale: "",
+  importance: "ninguna",
   assignedSalespersonId: undefined as number | undefined,
   assignedUserId: undefined as number | undefined,
 };
@@ -399,6 +412,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
           city: editClient.city || "",
           notes: editClient.notes || "",
           consumptionScale: editClient.consumptionScale != null ? String(editClient.consumptionScale) : "",
+          importance: editClient.importance || "ninguna",
           assignedSalespersonId: editClient.assignedSalespersonId || undefined,
           assignedUserId: editClient.assignedUserId || undefined,
         });
@@ -436,6 +450,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         industry: form.industry.trim() || undefined,
         city: form.city.trim() || undefined,
         notes: form.notes.trim() || undefined,
+        importance: form.importance || "ninguna",
         assignedSalespersonId: form.assignedSalespersonId || undefined,
         assignedUserId: form.assignedUserId || undefined,
       };
@@ -599,6 +614,26 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             </div>
           )}
 
+          {/* ── Importancia ── */}
+          <div>
+            <Label>Importancia del cliente</Label>
+            <Select value={form.importance} onValueChange={v => setForm(prev => ({ ...prev, importance: v }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccioná importancia" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(IMPORTANCE_CONFIG).map(([v, cfg]) => (
+                  <SelectItem key={v} value={v}>
+                    <span className={`inline-flex items-center gap-1.5 text-sm font-medium`}>
+                      <span className={`w-2 h-2 rounded-full ${cfg.badge.includes("red") ? "bg-red-400" : cfg.badge.includes("amber") ? "bg-amber-400" : cfg.badge.includes("blue") ? "bg-blue-400" : "bg-zinc-400"}`} />
+                      {cfg.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label>Notas</Label>
             <Textarea value={form.notes} onChange={f("notes")} placeholder="Observaciones..." rows={2} />
@@ -751,6 +786,7 @@ export default function Clients() {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [importanceFilter, setImportanceFilter] = useState<string>("all");
   const [spFilter, setSpFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [editClient, setEditClient] = useState<any>(null);
@@ -822,10 +858,18 @@ export default function Clients() {
   const allClients: any[] = (response as any)?.data || [];
 
   const filteredClients = useMemo(() => {
-    if (spFilter === "all") return allClients;
-    if (spFilter === "none") return allClients.filter((c: any) => !c.assignedTeamId);
-    return allClients.filter((c: any) => String(c.assignedTeamId) === spFilter);
-  }, [allClients, spFilter]);
+    let result = allClients;
+    // Team filter (client-side fallback — API already filters if teamId param is passed via refetch)
+    if (spFilter !== "all") {
+      if (spFilter === "none") result = result.filter((c: any) => !c.assignedTeamId);
+      else result = result.filter((c: any) => String(c.assignedTeamId) === spFilter);
+    }
+    // Importance filter (client-side on current page data)
+    if (importanceFilter !== "all") {
+      result = result.filter((c: any) => (c.importance || "ninguna") === importanceFilter);
+    }
+    return result;
+  }, [allClients, spFilter, importanceFilter]);
 
   const sortedClients = useMemo(() => {
     if (!sortKey) return filteredClients;
@@ -912,6 +956,19 @@ export default function Clients() {
           )}
         </div>
 
+        {/* ── Filtro por importancia ── */}
+        <Select value={importanceFilter} onValueChange={setImportanceFilter}>
+          <SelectTrigger className="h-8 text-xs w-40">
+            <SelectValue placeholder="Importancia" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Toda importancia</SelectItem>
+            {Object.entries(IMPORTANCE_CONFIG).map(([v, cfg]) => (
+              <SelectItem key={v} value={v}>{cfg.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         {/* ── Filtro por equipo comercial ── */}
         <Select value={spFilter} onValueChange={setSpFilter}>
           <SelectTrigger className="h-8 text-xs w-48">
@@ -962,9 +1019,13 @@ export default function Clients() {
               {col("industry")    && <TableHead><SortHead label="Industria" sk="industry" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               {col("city")        && <TableHead><SortHead label="Ciudad" sk="city" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               {col("country")     && <TableHead>País</TableHead>}
-              {col("scale")       && <TableHead><SortHead label="Escala USD" sk="scale" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
-              {col("salesperson") && <TableHead>Vendedor</TableHead>}
-              {col("status")      && <TableHead><SortHead label="Estado" sk="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
+              {col("scale")          && <TableHead><SortHead label="Escala USD" sk="scale" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
+              {col("salesperson")    && <TableHead>Vendedor</TableHead>}
+              {col("importance")     && <TableHead>Importancia</TableHead>}
+              {col("totalCotizado")  && <TableHead>Tot. Cotizado Abierto</TableHead>}
+              {col("ultimaTarea")    && <TableHead>Última Tarea</TableHead>}
+              {col("ultimoContacto") && <TableHead>Último Contacto</TableHead>}
+              {col("status")         && <TableHead><SortHead label="Estado" sk="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
@@ -1019,7 +1080,39 @@ export default function Clients() {
                     </TableCell>
                   )}
                   {col("salesperson") && (
-                    <TableCell className="text-sm text-muted-foreground">{sp?.name || "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {client.vendedorPrincipal || sp?.name || "—"}
+                    </TableCell>
+                  )}
+                  {col("importance") && (() => {
+                    const imp = client.importance || "ninguna";
+                    const icfg = IMPORTANCE_CONFIG[imp] || IMPORTANCE_CONFIG.ninguna;
+                    return (
+                      <TableCell>
+                        <Badge variant="outline" className={icfg.badge}>{icfg.label}</Badge>
+                      </TableCell>
+                    );
+                  })()}
+                  {col("totalCotizado") && (
+                    <TableCell className="text-sm font-mono">
+                      {client.totalCotizadoAbierto > 0 ? (
+                        <span className="text-emerald-400">u$s {Number(client.totalCotizadoAbierto).toLocaleString("es-AR")}</span>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  )}
+                  {col("ultimaTarea") && (
+                    <TableCell className="text-xs text-muted-foreground max-w-[140px]">
+                      {client.ultimaTarea ? (
+                        <span className="truncate block" title={client.ultimaTarea}>{client.ultimaTarea}</span>
+                      ) : "—"}
+                    </TableCell>
+                  )}
+                  {col("ultimoContacto") && (
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {client.ultimoContacto
+                        ? new Date(client.ultimoContacto).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" })
+                        : "—"}
+                    </TableCell>
                   )}
                   {col("status") && (
                     <TableCell>
