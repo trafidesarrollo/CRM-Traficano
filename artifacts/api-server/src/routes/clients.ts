@@ -148,8 +148,28 @@ router.get("/clients/:id/overview", async (req, res) => {
     const totalApproved = approvedQuotes.reduce((s: number, q: any) => s + Number(q.net_amount || q.total || 0), 0);
     const conversionRate = quotesData.length ? (wonQuotes / quotesData.length) * 100 : 0;
 
+    // Enrich with team info
+    let teamInfo: any = null;
+    if (client.assignedTeamId) {
+      const teamRes = await db.execute(sql`
+        SELECT ct.id, ct.name, ct.description,
+          COALESCE(
+            json_agg(json_build_object('id', ctm.id, 'userId', ctm.user_id, 'role', ctm.role, 'fullName', u.full_name))
+            FILTER (WHERE ctm.id IS NOT NULL),
+            '[]'
+          ) AS members
+        FROM commercial_teams ct
+        LEFT JOIN commercial_team_members ctm ON ctm.team_id = ct.id
+        LEFT JOIN users u ON u.id = ctm.user_id
+        WHERE ct.id = ${client.assignedTeamId}
+        GROUP BY ct.id
+      `);
+      teamInfo = teamRes.rows[0] || null;
+    }
+
     res.json({
       client,
+      teamInfo,
       quotes: quotesData,
       orders: ordersData,
       contacts: contacts,

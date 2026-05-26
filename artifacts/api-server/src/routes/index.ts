@@ -45,6 +45,7 @@ import duplicatesRouter from "./duplicates.js";
 import exchangeRateRouter from "./exchange-rate.js";
 import productionRouter from "./production.js";
 import quoteLogsRouter from "./quote-logs.js";
+import commercialTeamsRouter from "./commercial-teams.js";
 import {
   requireAuth,
   requireRole,
@@ -237,6 +238,7 @@ router.use(requireMinRole("vendedor"), quotesRouter);
 router.use(requireMinRole("vendedor"), ordersRouter);
 router.use(tasksRouter);
 router.use(quoteLogsRouter);
+router.use(commercialTeamsRouter);
 router.use(notificationsRouter);
 router.use(requireMinRole("vendedor"), emailTemplatesRouter);
 router.use(documentsRouter);

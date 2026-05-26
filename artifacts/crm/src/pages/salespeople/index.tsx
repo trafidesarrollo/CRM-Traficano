@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useGetSalespeople, useCreateSalesperson, useDeleteSalesperson, useUpdateSalesperson } from "@workspace/api-client-react";
-import { Plus, Search, Trash2, Mail, Phone, Eye, Activity, PhoneIncoming, PhoneOutgoing, Clock, CheckCircle, PhoneMissed, Pencil, Save, X } from "lucide-react";
+import { Plus, Search, Trash2, Mail, Phone, Eye, Activity, PhoneIncoming, PhoneOutgoing, Clock, CheckCircle, PhoneMissed, Pencil, Save, X, Users, UserPlus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,98 @@ export default function Salespeople() {
       onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
     },
   });
+
+  // ── Equipos comerciales ──
+  const [mainTab, setMainTab] = useState("vendedores");
+  const [teams, setTeams] = useState<any[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [teamForm, setTeamForm] = useState({ name: "", description: "" });
+  const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
+  const [editTeamName, setEditTeamName] = useState("");
+  const [addingMemberToTeam, setAddingMemberToTeam] = useState<number | null>(null);
+  const [newMemberUserId, setNewMemberUserId] = useState("");
+  const [newMemberRole, setNewMemberRole] = useState("vendedor");
+  const [teamUsers, setTeamUsers] = useState<any[]>([]);
+
+  const loadTeams = async () => {
+    setLoadingTeams(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/commercial-teams`, { credentials: "include" });
+      const d = await r.json();
+      setTeams(Array.isArray(d) ? d : []);
+    } catch {} finally { setLoadingTeams(false); }
+  };
+
+  useEffect(() => {
+    loadTeams();
+    fetch(`${API_BASE}/api/users/assignable`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setTeamUsers(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+
+  const createTeam = async () => {
+    if (!teamForm.name.trim()) return;
+    try {
+      const r = await fetch(`${API_BASE}/api/commercial-teams`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(teamForm),
+      });
+      if (!r.ok) throw new Error();
+      toast({ title: "Equipo creado" });
+      setTeamOpen(false);
+      setTeamForm({ name: "", description: "" });
+      loadTeams();
+    } catch { toast({ title: "Error al crear equipo", variant: "destructive" }); }
+  };
+
+  const saveTeamEdit = async (id: number) => {
+    try {
+      await fetch(`${API_BASE}/api/commercial-teams/${id}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editTeamName }),
+      });
+      toast({ title: "Equipo actualizado" });
+      setEditingTeamId(null);
+      loadTeams();
+    } catch { toast({ title: "Error al actualizar", variant: "destructive" }); }
+  };
+
+  const deleteTeam = async (id: number) => {
+    if (!window.confirm("¿Eliminar este equipo?")) return;
+    try {
+      await fetch(`${API_BASE}/api/commercial-teams/${id}`, { method: "DELETE", credentials: "include" });
+      toast({ title: "Equipo eliminado" });
+      loadTeams();
+    } catch { toast({ title: "Error al eliminar", variant: "destructive" }); }
+  };
+
+  const addMember = async (teamId: number) => {
+    if (!newMemberUserId) return;
+    try {
+      const r = await fetch(`${API_BASE}/api/commercial-teams/${teamId}/members`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: parseInt(newMemberUserId), role: newMemberRole }),
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || "Error"); }
+      toast({ title: "Miembro agregado" });
+      setAddingMemberToTeam(null);
+      setNewMemberUserId("");
+      loadTeams();
+    } catch (e: any) { toast({ title: e.message || "Error al agregar miembro", variant: "destructive" }); }
+  };
+
+  const removeMember = async (teamId: number, memberId: number) => {
+    try {
+      await fetch(`${API_BASE}/api/commercial-teams/${teamId}/members/${memberId}`, { method: "DELETE", credentials: "include" });
+      toast({ title: "Miembro quitado" });
+      loadTeams();
+    } catch { toast({ title: "Error al quitar miembro", variant: "destructive" }); }
+  };
 
   const startEditSp = (sp: any) => {
     setEditingId(sp.id);
@@ -138,11 +230,16 @@ export default function Salespeople() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">Vendedores</h1>
-          <p className="text-muted-foreground mt-1">{salespeople?.length || 0} vendedores registrados</p>
+          <p className="text-muted-foreground mt-1">
+            {mainTab === "vendedores"
+              ? `${salespeople?.length || 0} vendedores registrados`
+              : `${teams.length} equipos comerciales`}
+          </p>
         </div>
+        {mainTab === "vendedores" ? (
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="w-4 h-4 mr-2" />Nuevo Vendedor</Button>
@@ -172,20 +269,43 @@ export default function Salespeople() {
             </div>
           </DialogContent>
         </Dialog>
+        ) : (
+          <>
+            <Dialog open={teamOpen} onOpenChange={setTeamOpen}>
+              <DialogTrigger asChild>
+                <Button><Plus className="w-4 h-4 mr-2" />Nuevo Equipo</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Nuevo Equipo Comercial</DialogTitle></DialogHeader>
+                <div className="space-y-4">
+                  <div><Label>Nombre del equipo</Label><Input value={teamForm.name} onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })} /></div>
+                  <div><Label>Descripción (opcional)</Label><Input value={teamForm.description} onChange={(e) => setTeamForm({ ...teamForm, description: e.target.value })} /></div>
+                  <Button className="w-full" disabled={!teamForm.name.trim()} onClick={createTeam}>Crear Equipo</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
       </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar vendedores..." className="pl-10 bg-card border-border/50" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
+      <Tabs value={mainTab} onValueChange={setMainTab} className="mt-0">
+        <TabsList className="mb-6">
+          <TabsTrigger value="vendedores">Vendedores</TabsTrigger>
+          <TabsTrigger value="equipos">Equipos Comerciales</TabsTrigger>
+        </TabsList>
 
-      {isLoading ? (
-        <div className="flex h-[30vh] items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">No se encontraron vendedores</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((sp: any) => {
+        <TabsContent value="vendedores">
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input placeholder="Buscar vendedores..." className="pl-10 bg-card border-border/50" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          {isLoading ? (
+            <div className="flex h-[30vh] items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">No se encontraron vendedores</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((sp: any) => {
             const isEditing = editingId === sp.id;
 
             return (
@@ -258,9 +378,108 @@ export default function Salespeople() {
                 </CardContent>
               </Card>
             );
-          })}
-        </div>
-      )}
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="equipos">
+          {loadingTeams ? (
+            <div className="flex h-[30vh] items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
+          ) : teams.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p>No hay equipos comerciales aún.</p>
+              <p className="text-sm mt-1">Usá "Nuevo Equipo" para crear uno.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teams.map((team: any) => (
+                <Card key={team.id} className="bg-card/50 backdrop-blur-sm border-white/5">
+                  <CardContent className="p-5 space-y-4">
+                    {/* Team header */}
+                    {editingTeamId === team.id ? (
+                      <div className="flex gap-2">
+                        <Input value={editTeamName} onChange={(e) => setEditTeamName(e.target.value)} className="h-8 text-sm" autoFocus />
+                        <Button size="sm" variant="ghost" onClick={() => setEditingTeamId(null)}><X className="w-4 h-4" /></Button>
+                        <Button size="sm" onClick={() => saveTeamEdit(team.id)} disabled={!editTeamName.trim()}><Save className="w-4 h-4" /></Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold">{team.name}</h3>
+                          {team.description && <p className="text-xs text-muted-foreground mt-0.5">{team.description}</p>}
+                          <p className="text-xs text-muted-foreground mt-1">{team.members?.length || 0} miembros</p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => { setEditingTeamId(team.id); setEditTeamName(team.name); }}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteTeam(team.id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Members */}
+                    {(team.members || []).length > 0 && (
+                      <div className="space-y-2">
+                        {(team.members || []).map((m: any) => (
+                          <div key={m.id} className="flex items-center justify-between gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs shrink-0">
+                                {(m.fullName || "?")[0].toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-medium leading-tight text-sm">{m.fullName}</p>
+                                <p className="text-[11px] text-muted-foreground">{m.role === "vendedor" ? "Vendedor" : "Apoyo"}</p>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => removeMember(team.id, m.id)}>
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add member */}
+                    {addingMemberToTeam === team.id ? (
+                      <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
+                        <p className="text-xs font-medium text-muted-foreground">Agregar miembro</p>
+                        <Select value={newMemberUserId} onValueChange={setNewMemberUserId}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccionar usuario..." /></SelectTrigger>
+                          <SelectContent>
+                            {teamUsers.map((u: any) => (
+                              <SelectItem key={u.id} value={String(u.id)}>{u.fullName || u.username}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={newMemberRole} onValueChange={setNewMemberRole}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="vendedor">Vendedor</SelectItem>
+                            <SelectItem value="apoyo">Apoyo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="h-7 text-xs flex-1" disabled={!newMemberUserId} onClick={() => addMember(team.id)}>Agregar</Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddingMemberToTeam(null)}>Cancelar</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full h-8 text-xs gap-1.5" onClick={() => { setAddingMemberToTeam(team.id); setNewMemberUserId(""); setNewMemberRole("vendedor"); }}>
+                        <UserPlus className="w-3.5 h-3.5" />Agregar miembro
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <Sheet open={!!panelSp} onOpenChange={(v) => { if (!v) setPanelSp(null); }}>
         <SheetContent className="w-[480px] sm:w-[600px] p-0 overflow-hidden flex flex-col">

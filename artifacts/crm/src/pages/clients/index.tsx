@@ -785,11 +785,11 @@ export default function Clients() {
   const { data: salespeopleRes } = useGetSalespeople();
   const salespeople = (salespeopleRes as any) || [];
 
-  const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const [commercialTeams, setCommercialTeams] = useState<any[]>([]);
   useEffect(() => {
-    fetch(`${API}/api/users/assignable`, { credentials: "include" })
+    fetch(`${API}/api/commercial-teams`, { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
-      .then(d => setAssignableUsers(Array.isArray(d) ? d : []))
+      .then(d => setCommercialTeams(Array.isArray(d) ? d : []))
       .catch(() => {});
   }, []);
 
@@ -821,24 +821,11 @@ export default function Clients() {
 
   const allClients: any[] = (response as any)?.data || [];
 
-  // Build userId → [salespersonId] map for filtering
-  const userToSpIds = useMemo(() => {
-    const map: Record<string, number[]> = {};
-    for (const sp of salespeople) {
-      if (sp.userId) {
-        const key = String(sp.userId);
-        map[key] = [...(map[key] || []), sp.id];
-      }
-    }
-    return map;
-  }, [salespeople]);
-
   const filteredClients = useMemo(() => {
     if (spFilter === "all") return allClients;
-    if (spFilter === "none") return allClients.filter((c: any) => !c.assignedSalespersonId);
-    const spIds = userToSpIds[spFilter] || [];
-    return allClients.filter((c: any) => spIds.includes(c.assignedSalespersonId));
-  }, [allClients, spFilter, userToSpIds]);
+    if (spFilter === "none") return allClients.filter((c: any) => !c.assignedTeamId);
+    return allClients.filter((c: any) => String(c.assignedTeamId) === spFilter);
+  }, [allClients, spFilter]);
 
   const sortedClients = useMemo(() => {
     if (!sortKey) return filteredClients;
@@ -925,16 +912,16 @@ export default function Clients() {
           )}
         </div>
 
-        {/* ── Filtro por vendedor ── */}
+        {/* ── Filtro por equipo comercial ── */}
         <Select value={spFilter} onValueChange={setSpFilter}>
-          <SelectTrigger className="h-8 text-xs w-44">
-            <SelectValue placeholder="Todos los vendedores" />
+          <SelectTrigger className="h-8 text-xs w-48">
+            <SelectValue placeholder="Todos los equipos" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los vendedores</SelectItem>
-            <SelectItem value="none">Sin vendedor</SelectItem>
-            {assignableUsers.map((u: any) => (
-              <SelectItem key={u.id} value={String(u.id)}>{u.fullName || u.username}</SelectItem>
+            <SelectItem value="all">Todos los equipos</SelectItem>
+            <SelectItem value="none">Sin equipo</SelectItem>
+            {commercialTeams.map((t: any) => (
+              <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>

@@ -164,6 +164,39 @@ export default function ClientDetail() {
       .catch(() => {});
   }, []);
 
+  // ── Equipos comerciales ──
+  const [teams, setTeams] = useState<any[]>([]);
+  useEffect(() => {
+    fetch(`${API}/api/commercial-teams`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setTeams(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+  const [assigningTeam, setAssigningTeam] = useState(false);
+  const [savingTeam, setSavingTeam] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+
+  const assignTeam = async (teamId: number | null) => {
+    setSavingTeam(true);
+    try {
+      const r = await fetch(`${API}/api/clients/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ assignedTeamId: teamId }),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e.error || "Error al asignar equipo");
+      }
+      toast({ title: teamId ? "Equipo asignado" : "Equipo desasignado" });
+      setAssigningTeam(false);
+      load();
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally { setSavingTeam(false); }
+  };
+
   // ── Asignación de vendedor ──
   const isAdminOrManager = role === "admin" || role === "gerente" || role === "gerente_comercial";
   const [assigningVendedor, setAssigningVendedor] = useState(false);
@@ -464,65 +497,61 @@ export default function ClientDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              {/* Vendedor asignado */}
-              {client.salespersonInfo ? (
-                <div className="space-y-2">
+              {data.teamInfo ? (
+                <div className="space-y-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
-                        {(client.salespersonInfo.name || "?")[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium leading-tight">{client.salespersonInfo.name}</p>
-                        <p className="text-xs text-muted-foreground">Vendedor asignado</p>
-                      </div>
+                    <div>
+                      <p className="font-medium">{data.teamInfo.name}</p>
+                      <p className="text-xs text-muted-foreground">{data.teamInfo.members?.length || 0} miembros</p>
                     </div>
-                    {(isAdminOrManager) && (
+                    {isAdminOrManager && (
                       <button
                         className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-                        onClick={() => { setSelectedSpId(String(client.salespersonInfo.id)); setAssigningVendedor(true); }}
+                        onClick={() => { setSelectedTeamId(String(data.teamInfo.id)); setAssigningTeam(true); }}
                       >
                         Cambiar
                       </button>
                     )}
                   </div>
-                  {/* Apoyo heredado del vendedor */}
-                  {client.salespersonInfo.support_user_name && (
-                    <div className="flex items-center gap-2.5 pl-0.5 border-l-2 border-border/50 ml-4">
-                      <UserCheck className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <div>
-                        <p className="font-medium leading-tight">{client.salespersonInfo.support_user_name}</p>
-                        <p className="text-xs text-muted-foreground">Apoyo comercial</p>
+                  <div className="space-y-2">
+                    {(data.teamInfo.members || []).map((m: any) => (
+                      <div key={m.id} className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs shrink-0">
+                          {(m.fullName || "?")[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium leading-tight">{m.fullName}</p>
+                          <p className="text-xs text-muted-foreground">{m.role === "vendedor" ? "Vendedor" : "Apoyo"}</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs">Sin vendedor asignado</p>
-                  {!assigningVendedor ? (
+                  <p className="text-muted-foreground text-xs">Sin equipo asignado</p>
+                  {isAdminOrManager && !assigningTeam && (
                     <button
                       className="text-xs text-primary hover:underline"
-                      onClick={() => { setSelectedSpId(""); setAssigningVendedor(true); }}
+                      onClick={() => { setSelectedTeamId(""); setAssigningTeam(true); }}
                     >
-                      + Asignar vendedor
+                      + Asignar equipo
                     </button>
-                  ) : null}
+                  )}
                 </div>
               )}
 
-              {/* Panel de asignación */}
-              {assigningVendedor && (
+              {assigningTeam && (
                 <div className="rounded-lg border border-border/60 bg-muted/10 p-3 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Seleccionar vendedor</p>
-                  <Select value={selectedSpId} onValueChange={setSelectedSpId}>
+                  <p className="text-xs font-medium text-muted-foreground">Seleccionar equipo</p>
+                  <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                     <SelectTrigger className="h-8 text-sm">
-                      <SelectValue placeholder="— Sin vendedor —" />
+                      <SelectValue placeholder="— Sin equipo —" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">— Sin vendedor —</SelectItem>
-                      {salespeople.filter((s: any) => s.isActive !== false).map((s: any) => (
-                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                      <SelectItem value="none">— Sin equipo —</SelectItem>
+                      {teams.map((t: any) => (
+                        <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -530,12 +559,12 @@ export default function ClientDetail() {
                     <Button
                       size="sm"
                       className="h-7 text-xs"
-                      disabled={savingVendedor}
-                      onClick={() => assignVendedor(selectedSpId && selectedSpId !== "none" ? Number(selectedSpId) : null)}
+                      disabled={savingTeam}
+                      onClick={() => assignTeam(selectedTeamId && selectedTeamId !== "none" ? Number(selectedTeamId) : null)}
                     >
-                      {savingVendedor ? <Loader2 className="w-3 h-3 animate-spin" /> : "Guardar"}
+                      {savingTeam ? <Loader2 className="w-3 h-3 animate-spin" /> : "Guardar"}
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAssigningVendedor(false)}>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAssigningTeam(false)}>
                       Cancelar
                     </Button>
                   </div>

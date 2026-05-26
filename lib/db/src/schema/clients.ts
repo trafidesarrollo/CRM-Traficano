@@ -16,6 +16,7 @@ export const clientsTable = pgTable("clients", {
   status: text("status", { enum: ["prospect", "potential", "inactive", "final"] }).notNull().default("prospect"),
   assignedSalespersonId: integer("assigned_salesperson_id"),
   assignedUserId: integer("assigned_user_id"),
+  assignedTeamId: integer("assigned_team_id"),
   clientEmails: json("client_emails").$type<string[]>().default([]),
   notes: text("notes"),
   // Proyección de consumo anual en USD (solo visible cuando status >= potential)
