@@ -1101,16 +1101,11 @@ export default function Clients() {
                     </TableCell>
                   )}
                   {col("ultimaTarea") && (
-                    <TableCell className="text-xs max-w-[160px]">
-                      {client.ultimaTarea ? (
-                        <>
-                          <span className="truncate block text-foreground/80" title={client.ultimaTarea}>{client.ultimaTarea}</span>
-                          {client.ultimaTareaFecha && (
-                            <span className={`font-medium ${new Date(client.ultimaTareaFecha) < new Date() ? "text-red-400" : "text-amber-400"}`}>
-                              {new Date(client.ultimaTareaFecha).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
-                            </span>
-                          )}
-                        </>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {client.ultimaTareaFecha ? (
+                        <span className={`font-medium ${new Date(client.ultimaTareaFecha) < new Date() ? "text-red-400" : "text-amber-400"}`}>
+                          {new Date(client.ultimaTareaFecha).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                        </span>
                       ) : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   )}
