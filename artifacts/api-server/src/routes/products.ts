@@ -131,6 +131,7 @@ router.get("/products/catalog", async (req, res) => {
     const seamType = req.query.seamType as string | undefined;
     const shape = req.query.shape as string | undefined;
     const hasPrice = req.query.hasPrice === "true";
+    const noPrice = req.query.noPrice === "true";
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
     const offset = (page - 1) * limit;
@@ -141,6 +142,7 @@ router.get("/products/catalog", async (req, res) => {
     if (accessoryType) accConds.push(`pa.accessory_type = '${esc(accessoryType)}'`);
     if (standard) accConds.push(`pa.standard = '${esc(standard)}'`);
     if (hasPrice) accConds.push(`pa.sale_price IS NOT NULL AND pa.sale_price > 0`);
+    if (noPrice) accConds.push(`(pa.sale_price IS NULL OR pa.sale_price = 0)`);
     const accWhere = accConds.length ? `WHERE ${accConds.join(" AND ")}` : "";
 
     // Build medidas query conditions
@@ -150,6 +152,7 @@ router.get("/products/catalog", async (req, res) => {
     if (seamType) medConds.push(`pm.seam_type = '${esc(seamType)}'`);
     if (shape) medConds.push(`pm.shape = '${esc(shape)}'`);
     if (hasPrice) medConds.push(`pm.sale_price IS NOT NULL AND pm.sale_price > 0`);
+    if (noPrice) medConds.push(`(pm.sale_price IS NULL OR pm.sale_price = 0)`);
     const medWhere = medConds.length ? `WHERE ${medConds.join(" AND ")}` : "";
 
     const accSelect = `
@@ -223,6 +226,38 @@ router.get("/products/catalog/filters", async (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/products/medidas/:id — update medidas fields (price etc.)
+router.patch("/products/medidas/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const allowed: any = {};
+    if (req.body.salePrice !== undefined) allowed.salePrice = req.body.salePrice ? String(req.body.salePrice) : null;
+    if (req.body.isActive !== undefined) allowed.isActive = req.body.isActive;
+    const [updated] = await db.update(productsMedidasTable).set({ ...allowed, updatedAt: new Date() }).where(eq(productsMedidasTable.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+    res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al actualizar producto" });
+  }
+});
+
+// PATCH /api/products/accesorios/:id — update accesorios fields (price etc.)
+router.patch("/products/accesorios/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const allowed: any = {};
+    if (req.body.salePrice !== undefined) allowed.salePrice = req.body.salePrice ? String(req.body.salePrice) : null;
+    if (req.body.isActive !== undefined) allowed.isActive = req.body.isActive;
+    const [updated] = await db.update(productsAccesoriosTable).set({ ...allowed, updatedAt: new Date() }).where(eq(productsAccesoriosTable.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+    res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al actualizar producto" });
   }
 });
 

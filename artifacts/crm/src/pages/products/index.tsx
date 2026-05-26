@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   Search, Package, Ruler, Upload, FileSpreadsheet, CheckCircle2,
-  AlertCircle, X, ChevronLeft, ChevronRight, DollarSign, Wrench
+  AlertCircle, X, ChevronLeft, ChevronRight, DollarSign, Wrench, Pencil, Check
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -172,6 +172,69 @@ const SOURCE_COLORS: Record<string, string> = {
 
 const fmt = (n: any) => n != null ? `u$s ${Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null;
 
+// ─── Inline price editor cell ──────────────────────────────────────────────────
+function PriceCell({ item, onSaved }: { item: any; onSaved: (id: number, source: string, newPrice: string | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(item.sale_price ? String(Number(item.sale_price).toFixed(2)) : "");
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  const startEdit = () => { setEditing(true); setValue(item.sale_price ? String(Number(item.sale_price).toFixed(2)) : ""); setTimeout(() => inputRef.current?.select(), 50); };
+  const cancel = () => setEditing(false);
+
+  const save = async () => {
+    const parsed = value.trim() === "" ? null : parseFloat(value.replace(",", "."));
+    if (value.trim() !== "" && (isNaN(parsed as number) || (parsed as number) < 0)) {
+      toast({ title: "Precio inválido", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      const url = `${API}/api/products/${item.source}/${item.id}`;
+      const r = await fetch(url, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ salePrice: parsed }) });
+      if (!r.ok) throw new Error((await r.json()).error || "Error");
+      onSaved(item.id, item.source, parsed !== null ? String(parsed) : null);
+      toast({ title: "Precio actualizado" });
+      setEditing(false);
+    } catch (e: any) {
+      toast({ title: "Error al guardar", description: e.message, variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 justify-end">
+        <span className="text-muted-foreground text-xs">u$s</span>
+        <input
+          ref={inputRef}
+          type="number"
+          step="0.01"
+          min="0"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") cancel(); }}
+          className="w-24 text-right bg-background border border-primary/50 rounded px-1.5 py-0.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        <button onClick={save} disabled={saving} className="text-green-400 hover:text-green-300 p-0.5"><Check className="w-3.5 h-3.5" /></button>
+        <button onClick={cancel} className="text-muted-foreground hover:text-foreground p-0.5"><X className="w-3.5 h-3.5" /></button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 justify-end group">
+      {item.sale_price ? (
+        <span className="text-green-400 font-mono text-sm font-semibold">{fmt(item.sale_price)}</span>
+      ) : (
+        <span className="text-muted-foreground text-xs">—</span>
+      )}
+      <button onClick={startEdit} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-0.5 ml-1">
+        <Pencil className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function Products() {
   const { toast } = useToast();
@@ -181,7 +244,7 @@ export default function Products() {
   const [search, setSearch] = useState("");
   const [accessoryType, setAccessoryType] = useState("all");
   const [category, setCategory] = useState("all");
-  const [hasPrice, setHasPrice] = useState(false);
+  const [priceFilter, setPriceFilter] = useState<"all" | "with" | "without">("all");
   const [page, setPage] = useState(1);
   const [catalog, setCatalog] = useState<any>({ data: [], total: 0, pages: 1 });
   const [loading, setLoading] = useState(false);
@@ -201,21 +264,31 @@ export default function Products() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (accessoryType && accessoryType !== "all") params.set("accessoryType", accessoryType);
     if (category && category !== "all") params.set("category", category);
-    if (hasPrice) params.set("hasPrice", "true");
+    if (priceFilter === "with") params.set("hasPrice", "true");
+    if (priceFilter === "without") params.set("noPrice", "true");
     params.set("page", String(page));
     params.set("limit", "50");
     try {
       const r = await fetch(`${API}/api/products/catalog?${params}`, { credentials: "include" });
       if (r.ok) setCatalog(await r.json());
     } finally { setLoading(false); }
-  }, [type, debouncedSearch, accessoryType, category, hasPrice, page]);
+  }, [type, debouncedSearch, accessoryType, category, priceFilter, page]);
 
   useEffect(() => { loadFilters(); }, [loadFilters]);
-  useEffect(() => { setPage(1); }, [type, debouncedSearch, accessoryType, category, hasPrice]);
+  useEffect(() => { setPage(1); }, [type, debouncedSearch, accessoryType, category, priceFilter]);
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
 
-  const resetFilters = () => { setSearch(""); setAccessoryType("all"); setCategory("all"); setHasPrice(false); setPage(1); };
-  const hasActiveFilters = search || (accessoryType && accessoryType !== "all") || (category && category !== "all") || hasPrice;
+  const resetFilters = () => { setSearch(""); setAccessoryType("all"); setCategory("all"); setPriceFilter("all"); setPage(1); };
+  const hasActiveFilters = search || (accessoryType && accessoryType !== "all") || (category && category !== "all") || priceFilter !== "all";
+
+  const handlePriceSaved = (id: number, source: string, newPrice: string | null) => {
+    setCatalog((prev: any) => ({
+      ...prev,
+      data: prev.data.map((item: any) =>
+        item.id === id && item.source === source ? { ...item, sale_price: newPrice } : item
+      ),
+    }));
+  };
 
   // Import handlers
   const importMedidas = async (rows: any[], setProgress: (p: number) => void) => {
@@ -313,12 +386,17 @@ export default function Products() {
             </Select>
           )}
 
-          <button
-            onClick={() => setHasPrice(!hasPrice)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border transition-colors ${hasPrice ? "bg-green-500/20 text-green-400 border-green-500/40" : "border-border/50 text-muted-foreground hover:text-foreground"}`}
-          >
-            <DollarSign className="w-3.5 h-3.5" />Con precio
-          </button>
+          <Select value={priceFilter} onValueChange={(v) => setPriceFilter(v as "all" | "with" | "without")}>
+            <SelectTrigger className="w-44">
+              <DollarSign className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="Lista de precios" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los precios</SelectItem>
+              <SelectItem value="with">Con precio cargado</SelectItem>
+              <SelectItem value="without">Sin precio</SelectItem>
+            </SelectContent>
+          </Select>
 
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={resetFilters} className="text-muted-foreground">
@@ -348,7 +426,7 @@ export default function Products() {
                       <th className="p-3">Nombre</th>
                       <th className="p-3">Tipo / Categoría</th>
                       <th className="p-3">Norma</th>
-                      <th className="p-3 text-right">Precio VENTA</th>
+                      <th className="p-3 text-right">Lista de Precios</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -384,11 +462,7 @@ export default function Products() {
                         </td>
                         <td className="p-3 text-xs text-muted-foreground max-w-[140px] truncate" title={item.standard || ""}>{item.standard || "—"}</td>
                         <td className="p-3 text-right">
-                          {item.sale_price ? (
-                            <span className="text-green-400 font-mono text-sm font-semibold">{fmt(item.sale_price)}</span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
+                          <PriceCell item={item} onSaved={handlePriceSaved} />
                         </td>
                       </tr>
                     ))}
