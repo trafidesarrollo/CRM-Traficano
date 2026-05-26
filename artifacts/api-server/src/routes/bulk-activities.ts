@@ -56,7 +56,7 @@ async function createFollowupTask(
   const due = parseDate(fechaSeguimiento);
   if (!due) return null;
   const [task] = await db.insert(tasksTable).values({
-    title: titulo ? `Seguimiento: ${titulo}` : `Seguimiento - ${clientName}`,
+    title: titulo || clientName,
     description: novedad,
     clientId,
     assignedTo,
@@ -154,7 +154,7 @@ router.post("/bulk-activities/process", async (req, res) => {
     for (const row of directRows) {
       await db.insert(activitiesTable).values({
         type: "note",
-        title: row.titulo || `Novedad - ${row.clientName}`,
+        title: row.titulo || row.clientName,
         clientId: row.clientId,
         description: row.novedad + (row.accion ? `\nAcción: ${row.accion}` : ""),
         outcome: row.accion || undefined,
@@ -250,7 +250,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         // ONE activity note per conflict row (no duplicates)
         await db.insert(activitiesTable).values({
           type: "note",
-          title: row.titulo || `Novedad - ${row.clientName}`,
+          title: row.titulo || row.clientName,
           clientId: row.clientId,
           description,
           outcome: row.accion || undefined,
@@ -260,7 +260,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         const description = row.novedad + (row.accion ? `\nAcción: ${row.accion}` : "");
         await db.insert(activitiesTable).values({
           type: "note",
-          title: row.titulo || `Novedad - ${row.clientName}`,
+          title: row.titulo || row.clientName,
           clientId: row.clientId,
           description,
           outcome: row.accion || undefined,
@@ -278,7 +278,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         if (due) {
           const assignedTo = ft.assignedTo ? parseInt(ft.assignedTo) : userId;
           await db.insert(tasksTable).values({
-            title: ft.title || `Seguimiento - ${row.clientName}`,
+            title: ft.title || row.clientName,
             description: ft.description || row.novedad,
             clientId: row.clientId,
             assignedTo: isNaN(assignedTo) ? userId : assignedTo,
