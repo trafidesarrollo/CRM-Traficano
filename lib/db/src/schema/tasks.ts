@@ -1,6 +1,13 @@
-import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+
+export const taskAssigneesTable = pgTable("task_assignees", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull(),
+  userId: integer("user_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.taskId, t.userId)]);
 
 export const tasksTable = pgTable("tasks", {
   id: serial("id").primaryKey(),

@@ -1,8 +1,48 @@
 import { Router, type IRouter } from "express";
-import { db, tasksTable, notificationsTable, salespeopleTable, clientsTable, usersTable, quotesTable } from "@workspace/db";
-import { eq, desc, sql, and, or, lt, gt, gte, lte, isNull, inArray } from "drizzle-orm";
+import { db, tasksTable, taskAssigneesTable, notificationsTable, salespeopleTable, clientsTable, usersTable, quotesTable } from "@workspace/db";
+import { eq, desc, sql, and, or, lt, gt, gte, lte, isNull, inArray, ne } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+// Helper: sync task_assignees for a task (replace all)
+async function syncAssignees(taskId: number, assigneeIds: number[]) {
+  if (!assigneeIds.length) return;
+  // Delete existing
+  await db.delete(taskAssigneesTable).where(eq(taskAssigneesTable.taskId, taskId));
+  // Insert new
+  const rows = [...new Set(assigneeIds)].map(uid => ({ taskId, userId: uid }));
+  if (rows.length) await db.insert(taskAssigneesTable).values(rows).onConflictDoNothing();
+}
+
+// Helper: get all assignee names for a task
+async function getAssigneeNames(taskId: number): Promise<{ id: number; name: string }[]> {
+  const rows = await db
+    .select({ id: usersTable.id, name: usersTable.fullName })
+    .from(taskAssigneesTable)
+    .innerJoin(usersTable, eq(taskAssigneesTable.userId, usersTable.id))
+    .where(eq(taskAssigneesTable.taskId, taskId));
+  return rows.map(r => ({ id: r.id, name: r.name ?? "" }));
+}
+
+// Helper: notify all co-assignees except the actor
+async function notifyAssignees(taskId: number, actorId: number, type: string, title: string, body: string) {
+  const assignees = await db
+    .select({ userId: taskAssigneesTable.userId })
+    .from(taskAssigneesTable)
+    .where(and(eq(taskAssigneesTable.taskId, taskId), ne(taskAssigneesTable.userId, actorId)));
+
+  for (const { userId } of assignees) {
+    await db.insert(notificationsTable).values({
+      userId,
+      type,
+      title,
+      body,
+      link: `/tasks?id=${taskId}`,
+      entityType: "task",
+      entityId: taskId,
+    });
+  }
+}
 
 router.get("/tasks", async (req, res) => {
   try {
@@ -14,7 +54,6 @@ router.get("/tasks", async (req, res) => {
     const quoteId = req.query.quoteId ? parseInt(req.query.quoteId as string) : undefined;
     const conds: any[] = [];
     if (status) conds.push(eq(tasksTable.status, status as any));
-    if (assignedTo) conds.push(eq(tasksTable.assignedTo, assignedTo));
     if (priority && priority !== "all") conds.push(eq(tasksTable.priority, priority as any));
     if (quoteId) conds.push(eq(tasksTable.quoteId, quoteId));
     if (view === "today") {
@@ -33,6 +72,17 @@ router.get("/tasks", async (req, res) => {
       const t = new Date(req.query.to as string);
       if (!Number.isNaN(t.getTime())) conds.push(lte(tasksTable.dueDate, t));
     }
+
+    // For assignee filtering: tasks where assigned_to = X OR they appear in task_assignees
+    if (assignedTo) {
+      conds.push(
+        or(
+          eq(tasksTable.assignedTo, assignedTo),
+          sql`EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = ${tasksTable.id} AND ta.user_id = ${assignedTo})`
+        )
+      );
+    }
+
     const where = conds.length ? and(...conds) : undefined;
 
     const childCounts = db.$with("child_counts").as(
@@ -47,6 +97,18 @@ router.get("/tasks", async (req, res) => {
       assigneeName: usersTable.fullName,
       clientName: clientsTable.companyName,
       childrenCount: sql<number>`coalesce(${childCounts.cnt}, 0)`,
+      // Aggregate all assignee names from junction table
+      assigneeNames: sql<string>`(
+        SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
+        FROM task_assignees ta2
+        JOIN users u2 ON u2.id = ta2.user_id
+        WHERE ta2.task_id = ${tasksTable.id}
+      )`,
+      assigneeIds: sql<string>`(
+        SELECT string_agg(ta2.user_id::text, ',' ORDER BY ta2.user_id)
+        FROM task_assignees ta2
+        WHERE ta2.task_id = ${tasksTable.id}
+      )`,
     }).from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
       .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
@@ -55,7 +117,14 @@ router.get("/tasks", async (req, res) => {
       .orderBy(sql`case when ${tasksTable.status}='completed' then 1 else 0 end, ${tasksTable.dueDate} asc nulls last`)
       .limit(500);
 
-    res.json(data.map(r => ({ ...r.t, assigneeName: r.assigneeName, clientName: r.clientName, childrenCount: Number(r.childrenCount) })));
+    res.json(data.map(r => ({
+      ...r.t,
+      assigneeName: r.assigneeNames ?? r.assigneeName,
+      assigneeNames: r.assigneeNames ?? r.assigneeName ?? null,
+      assigneeIds: r.assigneeIds ? r.assigneeIds.split(",").map(Number) : (r.t.assignedTo ? [r.t.assignedTo] : []),
+      clientName: r.clientName,
+      childrenCount: Number(r.childrenCount),
+    })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -71,6 +140,17 @@ router.get("/tasks/:id", async (req, res) => {
         clientName: sql<string>`coalesce(${clientsTable.companyName}, '')`,
         childrenCount: sql<number>`(select count(*) from tasks c where c.parent_task_id = ${tasksTable.id})`,
         parentTitle: sql<string | null>`(select p.title from tasks p where p.id = ${tasksTable.parentTaskId})`,
+        assigneeNames: sql<string>`(
+          SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
+          FROM task_assignees ta2
+          JOIN users u2 ON u2.id = ta2.user_id
+          WHERE ta2.task_id = ${tasksTable.id}
+        )`,
+        assigneeIds: sql<string>`(
+          SELECT string_agg(ta2.user_id::text, ',' ORDER BY ta2.user_id)
+          FROM task_assignees ta2
+          WHERE ta2.task_id = ${tasksTable.id}
+        )`,
       })
       .from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
@@ -79,7 +159,9 @@ router.get("/tasks/:id", async (req, res) => {
     if (!row) { res.status(404).json({ error: "Tarea no encontrada" }); return; }
     res.json({
       ...row.t,
-      assigneeName: row.assigneeName,
+      assigneeName: row.assigneeNames ?? row.assigneeName,
+      assigneeNames: row.assigneeNames ?? row.assigneeName ?? null,
+      assigneeIds: row.assigneeIds ? row.assigneeIds.split(",").map(Number) : (row.t.assignedTo ? [row.t.assignedTo] : []),
       clientName: row.clientName,
       childrenCount: Number(row.childrenCount),
       parentTitle: row.parentTitle ?? null,
@@ -92,37 +174,61 @@ router.get("/tasks/:id", async (req, res) => {
 router.post("/tasks", async (req, res) => {
   try {
     const userId = (req as any).session?.userId;
-    const data: any = { ...req.body, createdBy: userId };
+    const { assigneeIds: rawAssigneeIds, ...rest } = req.body;
+    const assigneeIds: number[] = Array.isArray(rawAssigneeIds) && rawAssigneeIds.length > 0
+      ? rawAssigneeIds.map(Number).filter(Boolean)
+      : rest.assignedTo ? [parseInt(rest.assignedTo)] : [];
+
+    const data: any = { ...rest, createdBy: userId };
+    // Primary assignee = first in list
+    if (assigneeIds.length > 0) data.assignedTo = assigneeIds[0];
+
     for (const k of ["dueDate", "reminderAt", "completedAt"]) {
       if (data[k] && typeof data[k] === "string") data[k] = new Date(data[k]);
     }
     const [row] = await db.insert(tasksTable).values(data).returning();
 
-    if (row.assignedTo && row.assignedTo !== userId) {
-      await db.insert(notificationsTable).values({
-        userId: row.assignedTo,
-        type: "task_assigned",
-        title: "Nueva tarea asignada",
-        body: row.title,
-        link: `/tasks?id=${row.id}`,
-        entityType: "task",
-        entityId: row.id,
-      });
+    // Sync assignees junction table
+    if (assigneeIds.length > 0) {
+      await syncAssignees(row.id, assigneeIds);
+    } else if (row.assignedTo) {
+      await syncAssignees(row.id, [row.assignedTo]);
     }
-    // Push to Google Calendar if enabled (best-effort, async)
+
+    // Notify all assignees except creator
+    for (const uid of assigneeIds) {
+      if (uid !== userId) {
+        await db.insert(notificationsTable).values({
+          userId: uid,
+          type: "task_assigned",
+          title: "Nueva tarea asignada",
+          body: row.title,
+          link: `/tasks?id=${row.id}`,
+          entityType: "task",
+          entityId: row.id,
+        });
+      }
+    }
+
+    // Push to Google Calendar for all assignees (best-effort)
     (async () => {
       try {
-        if (!row.dueDate || !row.assignedTo) return;
+        if (!row.dueDate) return;
         const { getUserConnection, getValidAccessToken, pushTaskToGCal } = await import("./gcal.js");
-        const conn = await getUserConnection(row.assignedTo);
-        if (!conn?.calendarSyncEnabled) return;
-        const token = await getValidAccessToken(conn);
-        const r = await pushTaskToGCal(token, row);
-        if (r) await db.update(tasksTable).set({ googleEventId: r.id, googleSyncedAt: new Date() }).where(eq(tasksTable.id, row.id));
+        const targets = assigneeIds.length ? assigneeIds : (row.assignedTo ? [row.assignedTo] : []);
+        for (const uid of targets) {
+          const conn = await getUserConnection(uid);
+          if (!conn?.calendarSyncEnabled) continue;
+          const token = await getValidAccessToken(conn);
+          const r = await pushTaskToGCal(token, row);
+          if (r && uid === targets[0]) {
+            await db.update(tasksTable).set({ googleEventId: r.id, googleSyncedAt: new Date() }).where(eq(tasksTable.id, row.id));
+          }
+        }
       } catch {}
     })();
 
-    res.status(201).json(row);
+    res.status(201).json({ ...row, assigneeIds });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -132,27 +238,50 @@ router.patch("/tasks/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const userId = (req as any).session?.userId;
-    const data: any = { ...req.body };
+    const { assigneeIds: rawAssigneeIds, ...rest } = req.body;
+    const data: any = { ...rest };
+
     for (const k of ["dueDate", "reminderAt", "completedAt"]) {
       if (data[k] && typeof data[k] === "string") data[k] = new Date(data[k]);
     }
     if (data.status === "completed" && !data.completedAt) {
       data.completedAt = new Date();
     }
+
     const [prev] = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
     if (!prev) { res.status(404).json({ error: "No encontrada" }); return; }
-    const [row] = await db.update(tasksTable).set(data).where(eq(tasksTable.id, id)).returning();
-    if (data.assignedTo && data.assignedTo !== prev.assignedTo && data.assignedTo !== userId) {
-      await db.insert(notificationsTable).values({
-        userId: data.assignedTo,
-        type: "task_assigned",
-        title: "Tarea reasignada a vos",
-        body: row.title,
-        link: `/tasks?id=${row.id}`,
-        entityType: "task",
-        entityId: row.id,
-      });
+
+    // Update assignees if provided
+    if (Array.isArray(rawAssigneeIds) && rawAssigneeIds.length > 0) {
+      const ids = rawAssigneeIds.map(Number).filter(Boolean);
+      data.assignedTo = ids[0];
+      await syncAssignees(id, ids);
+
+      // Notify new assignees
+      for (const uid of ids) {
+        if (uid !== userId && uid !== prev.assignedTo) {
+          await db.insert(notificationsTable).values({
+            userId: uid,
+            type: "task_assigned",
+            title: "Tarea asignada a vos",
+            body: prev.title,
+            link: `/tasks?id=${id}`,
+            entityType: "task",
+            entityId: id,
+          });
+        }
+      }
     }
+
+    const [row] = await db.update(tasksTable).set(data).where(eq(tasksTable.id, id)).returning();
+
+    // If completing or deferring, notify co-assignees
+    if (data.status === "completed") {
+      await notifyAssignees(id, userId, "task_assigned", "Tarea completada por un compañero", `"${row.title}" fue marcada como completada.`);
+    } else if (data.dueDate && data.dueDate !== prev.dueDate) {
+      await notifyAssignees(id, userId, "task_assigned", "Tarea reagendada", `"${row.title}" fue reagendada por un compañero.`);
+    }
+
     res.json(row);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -169,26 +298,39 @@ router.delete("/tasks/:id", async (req, res) => {
   }
 });
 
-// Weekly view for manager: tasks grouped by day for a given week, filterable by assignee
+// Weekly view for manager
 router.get("/tasks/weekly", async (req, res) => {
   try {
     const weekStart = req.query.weekStart ? new Date(req.query.weekStart as string) : (() => {
       const d = new Date(); d.setHours(0,0,0,0);
-      d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Monday
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
       return d;
     })();
     const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 5); // Saturday 00:00
+    weekEnd.setDate(weekStart.getDate() + 5);
     weekEnd.setHours(0,0,0,0);
 
     const assignedTo = req.query.assignedTo ? parseInt(req.query.assignedTo as string) : undefined;
     const conds: any[] = [gte(tasksTable.dueDate, weekStart), lt(tasksTable.dueDate, weekEnd)];
-    if (assignedTo) conds.push(eq(tasksTable.assignedTo, assignedTo));
+    if (assignedTo) {
+      conds.push(
+        or(
+          eq(tasksTable.assignedTo, assignedTo),
+          sql`EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = ${tasksTable.id} AND ta.user_id = ${assignedTo})`
+        )
+      );
+    }
 
     const data = await db.select({
       t: tasksTable,
       assigneeName: usersTable.fullName,
       clientName: clientsTable.companyName,
+      assigneeNames: sql<string>`(
+        SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
+        FROM task_assignees ta2
+        JOIN users u2 ON u2.id = ta2.user_id
+        WHERE ta2.task_id = ${tasksTable.id}
+      )`,
     }).from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
       .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
@@ -199,20 +341,22 @@ router.get("/tasks/weekly", async (req, res) => {
       )
       .limit(500);
 
-    res.json(data.map(r => ({ ...r.t, assigneeName: r.assigneeName, clientName: r.clientName })));
+    res.json(data.map(r => ({
+      ...r.t,
+      assigneeName: r.assigneeNames ?? r.assigneeName,
+      clientName: r.clientName,
+    })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Defer all overdue pending tasks to next business day (run at end of day or manually)
 router.post("/tasks/defer-overdue", async (req, res) => {
   try {
     const userId = (req as any).session?.userId;
     const now = new Date();
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
 
-    // Find all pending/in_progress tasks with dueDate before today
     const overdue = await db.select().from(tasksTable).where(
       and(
         lt(tasksTable.dueDate, todayStart),
@@ -222,14 +366,13 @@ router.post("/tasks/defer-overdue", async (req, res) => {
 
     if (overdue.length === 0) { res.json({ deferred: 0 }); return; }
 
-    // Next business day
     const nextDay = new Date(todayStart);
     nextDay.setDate(nextDay.getDate() + 1);
-    if (nextDay.getDay() === 6) nextDay.setDate(nextDay.getDate() + 2); // skip Saturday
-    if (nextDay.getDay() === 0) nextDay.setDate(nextDay.getDate() + 1); // skip Sunday
+    if (nextDay.getDay() === 6) nextDay.setDate(nextDay.getDate() + 2);
+    if (nextDay.getDay() === 0) nextDay.setDate(nextDay.getDate() + 1);
     nextDay.setHours(8, 0, 0, 0);
 
-    const DEFER_ALERT_THRESHOLD = 2; // alert after 2 deferments
+    const DEFER_ALERT_THRESHOLD = 2;
     const alertTargets = new Set<number>();
 
     for (const task of overdue) {
@@ -247,7 +390,6 @@ router.post("/tasks/defer-overdue", async (req, res) => {
       }
     }
 
-    // Notify managers about employees with repeatedly deferred tasks
     if (alertTargets.size > 0) {
       const managers = await db.select().from(usersTable).where(
         sql`${usersTable.role} IN ('admin', 'gerente')`
@@ -278,7 +420,6 @@ router.post("/tasks/defer-overdue", async (req, res) => {
   }
 });
 
-// Bulk create tasks from CSV data (array of task objects)
 router.post("/tasks/bulk", async (req, res) => {
   try {
     const userId = (req as any).session?.userId;
@@ -300,18 +441,20 @@ router.post("/tasks/bulk", async (req, res) => {
 
     const inserted = await db.insert(tasksTable).values(parsed).returning();
 
-    // Send notifications for assignments
     for (const row of inserted) {
-      if (row.assignedTo && row.assignedTo !== userId) {
-        await db.insert(notificationsTable).values({
-          userId: row.assignedTo,
-          type: "task_assigned",
-          title: "Nueva tarea asignada",
-          body: row.title,
-          link: `/tasks?id=${row.id}`,
-          entityType: "task",
-          entityId: row.id,
-        });
+      if (row.assignedTo) {
+        await db.insert(taskAssigneesTable).values({ taskId: row.id, userId: row.assignedTo }).onConflictDoNothing();
+        if (row.assignedTo !== userId) {
+          await db.insert(notificationsTable).values({
+            userId: row.assignedTo,
+            type: "task_assigned",
+            title: "Nueva tarea asignada",
+            body: row.title,
+            link: `/tasks?id=${row.id}`,
+            entityType: "task",
+            entityId: row.id,
+          });
+        }
       }
     }
 
@@ -330,13 +473,18 @@ router.get("/tasks/stats/summary", async (req, res) => {
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
 
-    // Managers can filter by a specific assignee via ?assignedTo=userId
     const assignedToParam = req.query.assignedTo ? Number(req.query.assignedTo) : null;
+
     let userFilter: any;
+    const makeAssigneeFilter = (uid: number) => or(
+      eq(tasksTable.assignedTo, uid),
+      sql`EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = ${tasksTable.id} AND ta.user_id = ${uid})`
+    );
+
     if (!isManager) {
-      userFilter = eq(tasksTable.assignedTo, userId);
+      userFilter = makeAssigneeFilter(userId);
     } else if (assignedToParam) {
-      userFilter = eq(tasksTable.assignedTo, assignedToParam);
+      userFilter = makeAssigneeFilter(assignedToParam);
     } else {
       userFilter = undefined;
     }

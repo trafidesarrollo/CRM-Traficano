@@ -208,27 +208,23 @@ export default function Tasks() {
         dueDate: form.dueDate || null,
       };
 
-      // If the client has a team and members are checked → create one task per assignee
-      const assigneeIds = teamAssignees.size > 0
-        ? Array.from(teamAssignees)
+      // Build assigneeIds — if team checked: one shared task; otherwise single
+      const assigneeIds: number[] = teamAssignees.size > 0
+        ? Array.from(teamAssignees).filter(Boolean) as number[]
         : form.assignedTo
           ? [parseInt(form.assignedTo)]
-          : [user?.id];
+          : user?.id ? [user.id] : [];
 
-      const results = await Promise.all(
-        assigneeIds.filter(Boolean).map(uid =>
-          fetch(`${API}/api/tasks`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ ...base, assignedTo: uid }),
-          })
-        )
-      );
+      const r = await fetch(`${API}/api/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...base, assigneeIds }),
+      });
 
-      if (results.every(r => r.ok)) {
-        const count = assigneeIds.filter(Boolean).length;
-        toast({ title: count > 1 ? `${count} tareas creadas` : "Tarea creada" });
+      if (r.ok) {
+        const count = assigneeIds.length;
+        toast({ title: count > 1 ? `Tarea grupal creada para ${count} vendedores` : "Tarea creada" });
         setNewOpen(false);
         setForm({ title: "", description: "", type: "task", priority: "medium", assignedTo: "", clientId: "", dueDate: "" });
         setClientTeamMembers([]);
@@ -500,7 +496,7 @@ export default function Tasks() {
                   {creating
                     ? "Creando..."
                     : teamAssignees.size > 1
-                      ? `Crear ${teamAssignees.size} tareas`
+                      ? `Crear tarea grupal (${teamAssignees.size} vendedores)`
                       : "Crear tarea"}
                 </Button>
               </div>
@@ -692,7 +688,15 @@ export default function Tasks() {
                         <Badge className={`text-xs ${PRIORITY_COLORS[t.priority]}`}>{PRIORITY_LABELS[t.priority]}</Badge>
                         <Badge variant="outline" className="text-xs">{TYPE_LABELS[t.type] || t.type}</Badge>
                         {t.clientName && <span className="text-xs text-muted-foreground">· {t.clientName}</span>}
-                        {!isVendedor && t.assigneeName && <span className="text-xs text-muted-foreground">· {t.assigneeName}</span>}
+                        {!isVendedor && t.assigneeName && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            ·
+                            {(t.assigneeIds?.length ?? 0) > 1
+                              ? <><User className="w-3 h-3 text-blue-400" /><span className="text-blue-300">{t.assigneeName}</span></>
+                              : t.assigneeName
+                            }
+                          </span>
+                        )}
                         {(t.deferCount ?? 0) > 0 && <span className="text-xs text-orange-400 flex items-center gap-0.5"><RefreshCw className="w-3 h-3" />Diferida {t.deferCount}x</span>}
                         {(t.childrenCount ?? 0) > 0 && (
                           <span className="text-xs text-violet-400 flex items-center gap-0.5">
@@ -845,7 +849,10 @@ export default function Tasks() {
                   {selected.assigneeName && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <User className="w-4 h-4 shrink-0" />
-                      <span>Asignado a: <strong className="text-foreground">{selected.assigneeName}</strong></span>
+                      {(selected.assigneeIds?.length ?? 0) > 1
+                        ? <span>Equipo: <strong className="text-blue-300">{selected.assigneeName}</strong></span>
+                        : <span>Asignado a: <strong className="text-foreground">{selected.assigneeName}</strong></span>
+                      }
                     </div>
                   )}
                   {selected.clientName && (
