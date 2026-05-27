@@ -30,3 +30,4 @@ export * from "./production";
 export * from "./user_permissions";
 export * from "./quote_logs";
 export * from "./commercial_teams";
+export * from "./industries";

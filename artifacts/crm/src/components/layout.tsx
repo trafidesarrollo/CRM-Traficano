@@ -54,6 +54,7 @@ const navItems = [
   { href: "/prompts",          label: "Prompts IA",            icon: Bot,             module: "prompts",           hiddenFromRoles: ["vendedor"] },
   { href: "/audit",            label: "Auditoría",             icon: ShieldCheck,     module: "auditoria",         roles: ["admin", "gerente", "gerente_comercial"] },
   { href: "/production",       label: "Producción (MES)",      icon: Factory,         module: "produccion",        hiddenFromRoles: ["vendedor"] },
+  { href: "/industries",       label: "Rubros / Industrias",   icon: Factory,         module: "industrias",        roles: ["admin", "gerente_comercial", "gerente"] },
   { href: "/users",            label: "Usuarios",              icon: Settings,        module: "usuarios",          roles: ["admin", "gerente_comercial"] },
 ];
 

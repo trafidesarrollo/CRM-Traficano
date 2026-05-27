@@ -381,6 +381,13 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
   const isAdmin = (user as any)?.role === "admin" || (user as any)?.role === "gerente" || (user as any)?.role === "gerente_comercial";
   const [form, setForm] = useState<ClientForm>({ ...BLANK_FORM });
   const [saving, setSaving] = useState(false);
+  const [industries, setIndustries] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    fetch(`${API}/api/industries`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(setIndustries)
+      .catch(() => {});
+  }, []);
   // Contact inline creation (shown as step after save)
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactForm, setContactForm] = useState({ firstName: "", lastName: "", email: "", phone: "", position: "" });
@@ -521,7 +528,20 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             </div>
             <div>
               <Label>Industria <span className="text-destructive">*</span></Label>
-              <Input value={form.industry} onChange={f("industry")} placeholder="Ej: Metalúrgica" />
+              <Select
+                value={form.industry}
+                onValueChange={v => setForm(prev => ({ ...prev, industry: v === "__none__" ? "" : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccioná un rubro…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Sin especificar —</SelectItem>
+                  {industries.map(ind => (
+                    <SelectItem key={ind.id} value={ind.name}>{ind.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

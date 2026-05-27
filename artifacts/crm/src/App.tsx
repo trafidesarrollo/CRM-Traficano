@@ -49,6 +49,7 @@ import AuditLogPage from "@/pages/audit/index";
 import ProductionList from "@/pages/production/index";
 import ProductionDetail from "@/pages/production/detail";
 import ProductionDashboard from "@/pages/production/dashboard";
+import IndustriesPage from "@/pages/industries/index";
 
 const queryClient = new QueryClient();
 
@@ -137,6 +138,7 @@ function Router() {
       <Route path="/automation" component={() => <ProtectedRoute component={Automation} />} />
       <Route path="/custom-fields" component={() => <ProtectedRoute component={CustomFields} />} />
       <Route path="/carga-masiva" component={() => <ProtectedRoute component={CargaMasiva} />} />
+      <Route path="/industries" component={() => <ProtectedRoute component={IndustriesPage} />} />
 
       <Route component={NotFound} />
     </Switch>
