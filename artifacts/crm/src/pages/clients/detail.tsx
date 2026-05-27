@@ -88,11 +88,12 @@ export default function ClientDetail() {
   const [completingTask, setCompletingTask] = useState(false);
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
 
-  // ── Task detail modal (read-only + chain + close/followup) ──
+  // ── Task detail modal (read-only + full thread + close/followup) ──
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [taskModalData, setTaskModalData] = useState<any>(null);
-  const [taskChain, setTaskChain] = useState<any[]>([]);
-  const [taskChainLoading, setTaskChainLoading] = useState(false);
+  // fullThread = [...ancestors, currentTask, ...children] all sorted oldest→newest
+  const [taskThread, setTaskThread] = useState<{ items: any[]; currentId: number } | null>(null);
+  const [taskThreadLoading, setTaskThreadLoading] = useState(false);
   const [taskSaving, setTaskSaving] = useState(false);
   const [taskShowFollowup, setTaskShowFollowup] = useState(false);
   const [taskFollowupDate, setTaskFollowupDate] = useState("");
@@ -106,18 +107,25 @@ export default function ClientDetail() {
     setTaskFollowupDate((() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })());
     setTaskFollowupTitle(task.title || "");
     setTaskFollowupDesc("");
-    // Load chain
-    setTaskChain([]);
+    setTaskThread(null);
     if (task.id) {
-      setTaskChainLoading(true);
+      setTaskThreadLoading(true);
       try {
-        const r = await fetch(`${API}/api/tasks/${task.id}/chain`, { credentials: "include" });
-        if (r.ok) {
-          const chain = await r.json();
-          // chain includes the task itself; show only ancestors (all except last)
-          setTaskChain(Array.isArray(chain) ? chain.slice(0, -1) : []);
-        }
-      } catch {} finally { setTaskChainLoading(false); }
+        // Fetch ancestors (chain) and direct children in parallel
+        const [chainRes, childrenRes] = await Promise.all([
+          fetch(`${API}/api/tasks/${task.id}/chain`, { credentials: "include" }),
+          fetch(`${API}/api/tasks?parentTaskId=${task.id}&limit=50`, { credentials: "include" }),
+        ]);
+        const chain: any[] = chainRes.ok ? await chainRes.json() : [];
+        const childrenData = childrenRes.ok ? await childrenRes.json() : [];
+        const children: any[] = Array.isArray(childrenData) ? childrenData : (childrenData.tasks || []);
+        // chain = [...ancestors, currentTask]; combine with children (exclude current from children if duplicated)
+        const allItems = [
+          ...chain,
+          ...children.filter(c => c.id !== task.id),
+        ];
+        setTaskThread({ items: allItems, currentId: task.id });
+      } catch {} finally { setTaskThreadLoading(false); }
     }
   };
 
@@ -1166,48 +1174,78 @@ export default function ClientDetail() {
                   </div>
                 )}
 
-                {/* Hilo de seguimiento */}
-                {(taskChainLoading || taskChain.length > 0) && (
+                {/* Hilo completo */}
+                {(taskThreadLoading || (taskThread && taskThread.items.length > 1)) && (
                   <div className="border-t border-border/40 pt-3">
-                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-2">
-                      <History className="w-3.5 h-3.5" />Historial de seguimientos anteriores
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-3">
+                      <History className="w-3.5 h-3.5" />Hilo completo de seguimientos
+                      {taskThread && <span className="ml-1 text-muted-foreground/50">({taskThread.items.length} tareas)</span>}
                     </p>
-                    {taskChainLoading ? (
+                    {taskThreadLoading ? (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />Cargando hilo…
                       </div>
-                    ) : (
-                      <div className="relative pl-4">
-                        <div className="absolute left-[7px] top-0 bottom-0 w-px bg-border/40" />
-                        {taskChain.map((ancestor, i) => (
-                          <div key={ancestor.id} className="relative mb-3 last:mb-0">
-                            <div className="absolute -left-4 top-1 w-2 h-2 rounded-full border border-border bg-background" />
-                            <div className="rounded-lg bg-white/3 border border-border/30 p-2.5 text-xs">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="font-medium text-foreground/80 leading-snug">{ancestor.title}</p>
-                                <Badge className="text-[10px] shrink-0 bg-green-500/15 text-green-400 border-0">
-                                  Cerrada
-                                </Badge>
-                              </div>
-                              {ancestor.description && (
-                                <p className="text-muted-foreground mt-1 line-clamp-2">{ancestor.description}</p>
-                              )}
-                              <div className="flex items-center gap-3 mt-1.5 text-muted-foreground/70">
-                                {ancestor.completedAt && (
-                                  <span className="flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3 text-green-500/60" />
-                                    {new Date(ancestor.completedAt).toLocaleDateString("es-AR")}
-                                  </span>
+                    ) : taskThread && (
+                      <div className="relative pl-5">
+                        <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border/40" />
+                        {taskThread.items.map((item) => {
+                          const isCurrent = item.id === taskThread.currentId;
+                          const isDone = item.status === "completed";
+                          const itemDate = item.completedAt || item.dueDate || item.due_date;
+                          return (
+                            <div key={item.id} className="relative mb-3 last:mb-0">
+                              {/* dot */}
+                              <div className={`absolute -left-5 top-2 w-3 h-3 rounded-full border-2 flex items-center justify-center
+                                ${isCurrent
+                                  ? "border-primary bg-primary"
+                                  : isDone
+                                    ? "border-green-500 bg-green-500/20"
+                                    : "border-orange-400 bg-orange-400/15"
+                                }`}
+                              />
+                              <div className={`rounded-lg border p-2.5 text-xs transition-colors
+                                ${isCurrent
+                                  ? "border-primary/50 bg-primary/5 shadow-sm"
+                                  : isDone
+                                    ? "border-green-500/20 bg-green-500/5"
+                                    : "border-orange-400/20 bg-orange-400/5"
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    {isCurrent && <span className="text-[10px] font-bold text-primary shrink-0">ESTA</span>}
+                                    <p className={`font-medium leading-snug ${isCurrent ? "text-foreground" : "text-foreground/75"}`}>
+                                      {item.title}
+                                    </p>
+                                  </div>
+                                  <Badge className={`text-[10px] shrink-0 border-0
+                                    ${isDone ? "bg-green-500/15 text-green-400" : "bg-orange-500/15 text-orange-400"}`}>
+                                    {isDone ? "Cerrada" : "Abierta"}
+                                  </Badge>
+                                </div>
+                                {item.description && (
+                                  <p className="text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
                                 )}
-                                {ancestor.assigneeNames?.length > 0 && (
-                                  <span className="flex items-center gap-1">
-                                    <Users className="w-3 h-3" />{ancestor.assigneeNames.join(", ")}
-                                  </span>
-                                )}
+                                <div className="flex items-center gap-3 mt-1.5 text-muted-foreground/60 flex-wrap">
+                                  {itemDate && (
+                                    <span className="flex items-center gap-1">
+                                      {isDone
+                                        ? <CheckCircle2 className="w-3 h-3 text-green-500/60" />
+                                        : <CalendarClock className="w-3 h-3" />}
+                                      {new Date(itemDate).toLocaleDateString("es-AR")}
+                                    </span>
+                                  )}
+                                  {(item.assigneeNames?.length > 0 || item.assignee_name) && (
+                                    <span className="flex items-center gap-1">
+                                      <Users className="w-3 h-3" />
+                                      {item.assigneeNames?.join(", ") || item.assignee_name}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

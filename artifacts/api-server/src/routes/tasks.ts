@@ -365,52 +365,61 @@ router.get("/tasks/weekly", async (req, res) => {
 router.get("/tasks/:id/chain", async (req, res) => {
   try {
     const startId = parseInt(req.params.id);
+    if (isNaN(startId)) { res.status(400).json({ error: "Invalid task id" }); return; }
 
-    // Walk up the parent chain (max 50 hops to prevent infinite loops)
-    const chain: any[] = [];
-    let currentId: number | null = startId;
-    const visited = new Set<number>();
+    // Recursive CTE to walk up the ancestor chain (max 50 hops)
+    const rows = await db.execute(sql`
+      WITH RECURSIVE chain AS (
+        SELECT t.*, 0 AS depth
+        FROM tasks t
+        WHERE t.id = ${startId}
+        UNION ALL
+        SELECT p.*, c.depth + 1
+        FROM tasks p
+        JOIN chain c ON p.id = c.parent_task_id
+        WHERE c.depth < 50
+      )
+      SELECT
+        chain.*,
+        (SELECT co.company_name FROM clients co WHERE co.id = chain.client_id) AS client_name,
+        (SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
+         FROM task_assignees ta2
+         JOIN users u2 ON u2.id = ta2.user_id
+         WHERE ta2.task_id = chain.id) AS assignee_names,
+        (SELECT string_agg(ta2.user_id::text, ',' ORDER BY ta2.user_id)
+         FROM task_assignees ta2
+         WHERE ta2.task_id = chain.id) AS assignee_ids,
+        (SELECT u3.full_name FROM users u3 WHERE u3.id = chain.closed_by) AS closed_by_name,
+        (SELECT u4.full_name FROM users u4 WHERE u4.id = chain.created_by) AS created_by_name
+      FROM chain
+      ORDER BY chain.depth DESC
+    `);
 
-    while (currentId !== null && !visited.has(currentId) && chain.length < 50) {
-      visited.add(currentId);
-      const [row] = await db.select({
-        t: tasksTable,
-        clientName: sql<string | null>`(select c.company_name from clients c where c.id = ${tasksTable.clientId})`,
-        assigneeNames: sql<string | null>`(
-          SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
-          FROM task_assignees ta2
-          JOIN users u2 ON u2.id = ta2.user_id
-          WHERE ta2.task_id = ${tasksTable.id}
-        )`,
-        assigneeIds: sql<string | null>`(
-          SELECT string_agg(ta2.user_id::text, ',' ORDER BY ta2.user_id)
-          FROM task_assignees ta2
-          WHERE ta2.task_id = ${tasksTable.id}
-        )`,
-        closedByName: sql<string | null>`(
-          SELECT u3.full_name FROM users u3 WHERE u3.id = ${tasksTable.closedBy}
-        )`,
-        createdByName: sql<string | null>`(
-          SELECT u4.full_name FROM users u4 WHERE u4.id = ${tasksTable.createdBy}
-        )`,
-      }).from(tasksTable).where(eq(tasksTable.id, currentId));
-
-      if (!row) break;
-
-      chain.unshift({
-        ...row.t,
-        clientName: row.clientName ?? null,
-        assigneeNames: row.assigneeNames ?? null,
-        assigneeIds: row.assigneeIds ? row.assigneeIds.split(",").map(Number) : [],
-        closedByName: row.closedByName ?? null,
-        createdByName: row.createdByName ?? null,
-      });
-
-      currentId = row.t.parentTaskId ?? null;
-    }
+    const chain = (rows.rows ?? rows as any[]).map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      type: r.type,
+      priority: r.priority,
+      status: r.status,
+      dueDate: r.due_date,
+      completedAt: r.completed_at,
+      parentTaskId: r.parent_task_id,
+      clientId: r.client_id,
+      createdAt: r.created_at,
+      assignedTo: r.assigned_to,
+      closedBy: r.closed_by,
+      createdBy: r.created_by,
+      clientName: r.client_name ?? null,
+      assigneeNames: r.assignee_names ? r.assignee_names.split(", ") : [],
+      assigneeIds: r.assignee_ids ? r.assignee_ids.split(",").map(Number) : [],
+      closedByName: r.closed_by_name ?? null,
+      createdByName: r.created_by_name ?? null,
+    }));
 
     res.json(chain);
   } catch (err: any) {
+    console.error("[chain endpoint error]", err);
     res.status(500).json({ error: err.message });
   }
 });
