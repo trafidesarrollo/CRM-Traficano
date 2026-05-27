@@ -428,10 +428,6 @@ export default function Tasks() {
   };
 
   const openDetail = (task: any) => {
-    if (task.clientId) {
-      window.open(`/clients/${task.clientId}?taskId=${task.id}`, "_blank");
-      return;
-    }
     setSelected(task); setDetailOpen(true);
     setShowFollowupForm(false); setFollowupDate(""); setFollowupNote("");
     setShowCloseForm(false); setCloseNote("");
@@ -443,10 +439,6 @@ export default function Tasks() {
       const r = await fetch(`${API}/api/tasks/${id}`, { credentials: "include" });
       if (r.ok) {
         const task = await r.json();
-        if (task.clientId) {
-          window.open(`/clients/${task.clientId}?taskId=${task.id}`, "_blank");
-          return;
-        }
         setSelected(task);
         setDetailOpen(true);
         setShowFollowupForm(false); setFollowupDate(""); setFollowupNote("");
@@ -996,7 +988,10 @@ export default function Tasks() {
                   {selected.clientName && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Building2 className="w-4 h-4 shrink-0" />
-                      <span>Cliente: <strong className="text-foreground">{selected.clientName}</strong></span>
+                      <span>Cliente: {selected.clientId
+                        ? <a href={`/clients/${selected.clientId}`} target="_blank" rel="noreferrer" className="font-semibold text-foreground hover:text-primary underline-offset-2 hover:underline inline-flex items-center gap-1">{selected.clientName}<ExternalLink className="w-3 h-3 opacity-60" /></a>
+                        : <strong className="text-foreground">{selected.clientName}</strong>
+                      }</span>
                     </div>
                   )}
                   {selected.completedAt && (
