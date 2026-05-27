@@ -104,8 +104,7 @@ export default function ClientDetail() {
     setTaskFollowupDesc("");
   };
 
-  const patchTask = async (taskId: number, fields: any) => {
-    setTaskSaving(true);
+  const patchTask = async (taskId: number, fields: any, reloadPage = false) => {
     try {
       const r = await fetch(`${API}/api/tasks/${taskId}`, {
         method: "PATCH",
@@ -116,9 +115,9 @@ export default function ClientDetail() {
       if (r.ok) {
         const updated = await r.json();
         setTaskModalData((prev: any) => ({ ...prev, ...updated }));
-        load();
+        if (reloadPage) load();
       }
-    } finally { setTaskSaving(false); }
+    } catch {}
   };
 
   const closeTaskWithFollowup = async (createFollowup: boolean) => {
@@ -1171,7 +1170,7 @@ export default function ClientDetail() {
                     value={taskModalData.status}
                     onValueChange={v => {
                       setTaskModalData((p: any) => ({ ...p, status: v }));
-                      patchTask(taskModalData.id, { status: v, ...(v === "completed" ? { completedAt: new Date().toISOString() } : {}) });
+                      patchTask(taskModalData.id, { status: v, ...(v === "completed" ? { completedAt: new Date().toISOString() } : {}) }, true);
                     }}
                   >
                     <SelectTrigger className="h-7 text-xs border-0 bg-transparent px-0 w-auto gap-1 focus:ring-0">
