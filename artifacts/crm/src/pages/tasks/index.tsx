@@ -734,7 +734,6 @@ export default function Tasks() {
                         {/* Bandera de estado */}
                         <Badge variant="outline" className={`text-xs font-semibold ${flag.cls}`}>{flag.label}</Badge>
                         <Badge className={`text-xs ${PRIORITY_COLORS[t.priority]}`}>{PRIORITY_LABELS[t.priority]}</Badge>
-                        <Badge variant="outline" className="text-xs">{TYPE_LABELS[t.type] || t.type}</Badge>
                         {t.clientName && <span className="text-xs text-muted-foreground">· {t.clientName}</span>}
                         {!isVendedor && t.assigneeName && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -880,7 +879,6 @@ export default function Tasks() {
                     <DialogTitle className="text-left text-lg leading-snug">{selected.title}</DialogTitle>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       <Badge className={`text-xs ${PRIORITY_COLORS[selected.priority]}`}>{PRIORITY_LABELS[selected.priority]}</Badge>
-                      <Badge variant="outline" className="text-xs">{TYPE_LABELS[selected.type]}</Badge>
                       <Badge variant="outline" className={`text-xs ${STATUS_CONFIG[selected.status]?.color}`}>{STATUS_CONFIG[selected.status]?.label}</Badge>
                     </div>
                   </div>
