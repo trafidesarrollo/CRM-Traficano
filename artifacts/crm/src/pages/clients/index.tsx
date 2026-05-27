@@ -360,6 +360,7 @@ const BLANK_FORM = {
   importance: "ninguna",
   assignedSalespersonId: undefined as number | undefined,
   assignedUserId: undefined as number | undefined,
+  assignedTeamId: undefined as number | undefined,
 };
 
 type ClientForm = typeof BLANK_FORM;
@@ -394,11 +395,16 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [taskForm, setTaskForm] = useState(BLANK_TASK);
   const [users, setUsers] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
 
   useEffect(() => {
     fetch(`${API}/api/users/assignable`, { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
       .then(setUsers)
+      .catch(() => {});
+    fetch(`${API}/api/commercial-teams`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(setTeams)
       .catch(() => {});
   }, []);
 
@@ -415,6 +421,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
           importance: editClient.importance || "ninguna",
           assignedSalespersonId: editClient.assignedSalespersonId || undefined,
           assignedUserId: editClient.assignedUserId || undefined,
+          assignedTeamId: editClient.assignedTeamId || undefined,
         });
       } else {
         setForm({ ...BLANK_FORM });
@@ -453,6 +460,7 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         importance: form.importance || "ninguna",
         assignedSalespersonId: form.assignedSalespersonId || undefined,
         assignedUserId: form.assignedUserId || undefined,
+        assignedTeamId: form.assignedTeamId || undefined,
       };
       if (form.consumptionScale.trim() !== "") payload.consumptionScale = form.consumptionScale.trim();
       // Preserve existing status on edit; only override if explicitly "final"
@@ -633,6 +641,47 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
               </SelectContent>
             </Select>
           </div>
+
+          {/* ── Equipo comercial ── */}
+          {isAdmin && teams.length > 0 && (
+            <div className="space-y-2">
+              <Label>Equipo comercial asignado</Label>
+              <Select
+                value={form.assignedTeamId ? String(form.assignedTeamId) : "none"}
+                onValueChange={v => setForm(prev => ({ ...prev, assignedTeamId: v === "none" ? undefined : parseInt(v) }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin equipo asignado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin equipo asignado</SelectItem>
+                  {teams.map((t: any) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.name}
+                      {t.members?.length > 0 && (
+                        <span className="text-muted-foreground ml-1.5 text-xs">
+                          ({t.members.map((m: any) => m.fullName || m.username).filter(Boolean).join(", ")})
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.assignedTeamId && (() => {
+                const team = teams.find((t: any) => t.id === form.assignedTeamId);
+                if (!team?.members?.length) return null;
+                return (
+                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 flex flex-wrap gap-1.5">
+                    {team.members.map((m: any) => (
+                      <span key={m.id} className="text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2 py-0.5">
+                        {m.fullName || m.username}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           <div>
             <Label>Notas</Label>
