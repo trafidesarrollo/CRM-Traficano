@@ -47,7 +47,7 @@ router.get("/clients", async (req, res) => {
       ? sql`AND c.status = ANY(${statusFilter.split(",").map(s => s.trim()).filter(Boolean)})`
       : sql``;
     const importanceCond = importanceFilter
-      ? sql`AND COALESCE(c.importance,'ninguna') = ANY(${importanceFilter.split(",").map(s => s.trim()).filter(Boolean)})`
+      ? sql`AND COALESCE(c.importance,'ninguna') = ${importanceFilter}`
       : sql``;
     const teamCond = teamFilter === "none"
       ? sql`AND c.assigned_team_id IS NULL`
