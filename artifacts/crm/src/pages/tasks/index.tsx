@@ -104,6 +104,10 @@ export default function Tasks() {
   const [followupNote, setFollowupNote] = useState("");
   const [showFollowupForm, setShowFollowupForm] = useState(false);
 
+  // Thread state (parent + children of selected task)
+  const [threadParent, setThreadParent] = useState<any>(null);
+  const [threadChildren, setThreadChildren] = useState<any[]>([]);
+
   // Bitácora / close form
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closeNote, setCloseNote] = useState("");
@@ -313,9 +317,14 @@ export default function Tasks() {
         }),
       });
       if (r.ok) {
-        toast({ title: "Tarea hija creada", description: `Vinculada a Tarea #${childModal.parentTask.id}` });
+        const created = await r.json();
+        toast({ title: "Tarea de seguimiento creada", description: `Vinculada al hilo de Tarea #${childModal.parentTask.id}` });
         setChildModal(null);
         load();
+        // If the parent task is currently open, refresh its thread
+        if (selected && selected.id === childModal.parentTask.id) {
+          loadThread(selected);
+        }
       } else toast({ title: "Error al crear tarea", variant: "destructive" });
     } finally { setCreatingChild(false); }
   };
@@ -376,6 +385,26 @@ export default function Tasks() {
     } finally { setSavingQuote(false); }
   };
 
+  const loadThread = async (task: any) => {
+    setThreadParent(null);
+    setThreadChildren([]);
+    // Load parent
+    if (task.parentTaskId) {
+      try {
+        const r = await fetch(`${API}/api/tasks/${task.parentTaskId}`, { credentials: "include" });
+        if (r.ok) setThreadParent(await r.json());
+      } catch {}
+    }
+    // Load children
+    try {
+      const r = await fetch(`${API}/api/tasks?parentTaskId=${task.id}`, { credentials: "include" });
+      if (r.ok) {
+        const j = await r.json();
+        setThreadChildren(Array.isArray(j) ? j : []);
+      }
+    } catch {}
+  };
+
   const openDetail = (task: any) => {
     if (task.clientId) {
       window.open(`/clients/${task.clientId}?taskId=${task.id}`, "_blank");
@@ -384,6 +413,25 @@ export default function Tasks() {
     setSelected(task); setDetailOpen(true);
     setShowFollowupForm(false); setFollowupDate(""); setFollowupNote("");
     setShowCloseForm(false); setCloseNote("");
+    loadThread(task);
+  };
+
+  const openDetailById = async (id: number) => {
+    try {
+      const r = await fetch(`${API}/api/tasks/${id}`, { credentials: "include" });
+      if (r.ok) {
+        const task = await r.json();
+        if (task.clientId) {
+          window.open(`/clients/${task.clientId}?taskId=${task.id}`, "_blank");
+          return;
+        }
+        setSelected(task);
+        setDetailOpen(true);
+        setShowFollowupForm(false); setFollowupDate(""); setFollowupNote("");
+        setShowCloseForm(false); setCloseNote("");
+        loadThread(task);
+      }
+    } catch {}
   };
 
   const openQuoteDetail = (q: any) => {
@@ -873,24 +921,138 @@ export default function Tasks() {
                       <span>Diferida {selected.deferCount} vez{selected.deferCount > 1 ? "ces" : ""}</span>
                     </div>
                   )}
-                  {selected.parentTaskId && (
-                    <div className="flex items-center gap-2 text-cyan-400">
-                      <Link2 className="w-4 h-4 shrink-0" />
-                      <span>
-                        Viene de: <strong className="text-foreground">Tarea #{selected.parentTaskId}{selected.parentTitle ? ` — ${selected.parentTitle}` : ""}</strong>
-                      </span>
-                    </div>
-                  )}
-                  {(selected.childrenCount ?? 0) > 0 && (
-                    <div className="flex items-center gap-2 text-violet-400">
-                      <GitBranch className="w-4 h-4 shrink-0" />
-                      <span>Tareas relacionadas: <strong className="text-foreground">{selected.childrenCount}</strong></span>
-                    </div>
-                  )}
                 </div>
                 {selected.description && (
                   <div className="p-3 bg-white/5 rounded-lg text-sm text-muted-foreground leading-relaxed">{selected.description}</div>
                 )}
+
+                {/* ── Thread view ── */}
+                {(threadParent || threadChildren.length > 0 || selected.parentTaskId) && (
+                  <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-violet-400 mb-1">
+                      <GitBranch className="w-3.5 h-3.5" />Hilo de tareas
+                    </div>
+
+                    {/* Parent task */}
+                    {threadParent && (
+                      <button
+                        onClick={() => openDetailById(threadParent.id)}
+                        className="w-full text-left flex items-center gap-2 p-2 rounded-md hover:bg-white/5 transition-colors border border-white/5"
+                      >
+                        <div className="shrink-0">
+                          {threadParent.status === "completed"
+                            ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                            : <Circle className="w-4 h-4 text-muted-foreground" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">↑ Origen:</span>
+                            <span className={`text-xs font-medium truncate ${threadParent.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                              {threadParent.title}
+                            </span>
+                          </div>
+                          {threadParent.dueDate && (
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {format(parseISO(threadParent.dueDate), "d MMM yyyy", { locale: es })}
+                            </div>
+                          )}
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      </button>
+                    )}
+
+                    {/* Current task position */}
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-white/5 border border-violet-500/30">
+                      <div className="shrink-0">
+                        {selected.status === "completed"
+                          ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                          : <Circle className="w-4 h-4 text-violet-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-semibold text-violet-300 truncate block">
+                          → {selected.title} <span className="text-violet-500">(esta)</span>
+                        </span>
+                        {selected.dueDate && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {format(parseISO(selected.dueDate), "d MMM yyyy", { locale: es })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Child tasks */}
+                    {threadChildren.map(child => (
+                      <button
+                        key={child.id}
+                        onClick={() => openDetailById(child.id)}
+                        className="w-full text-left flex items-center gap-2 p-2 rounded-md hover:bg-white/5 transition-colors border border-white/5"
+                      >
+                        <div className="shrink-0">
+                          {child.status === "completed"
+                            ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                            : <Circle className="w-4 h-4 text-muted-foreground" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">↓ Seguimiento:</span>
+                            <span className={`text-xs font-medium truncate ${child.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                              {child.title}
+                            </span>
+                          </div>
+                          {child.dueDate && (
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {format(parseISO(child.dueDate), "d MMM yyyy", { locale: es })}
+                              {child.status === "completed" && <span className="ml-2 text-green-400">✓ Cerrada</span>}
+                              {child.status !== "completed" && child.dueDate && new Date(child.dueDate) < new Date() && (
+                                <span className="ml-2 text-red-400">Vencida</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      </button>
+                    ))}
+
+                    {/* Quick link to create follow-up */}
+                    <button
+                      onClick={() => {
+                        setChildForm({
+                          title: selected.title,
+                          description: "",
+                          priority: selected.priority || "medium",
+                          dueDate: "",
+                          assignedTo: String(selected.assignedTo || ""),
+                        });
+                        setChildModal({ open: true, parentTask: selected });
+                      }}
+                      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-violet-500/10 text-xs text-violet-400 hover:text-violet-300 transition-colors border border-dashed border-violet-500/20"
+                    >
+                      <Plus className="w-3 h-3" />Agregar seguimiento al hilo
+                    </button>
+                  </div>
+                )}
+
+                {/* If no thread yet, show a create-followup shortcut */}
+                {!selected.parentTaskId && threadChildren.length === 0 && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => {
+                        setChildForm({
+                          title: selected.title,
+                          description: "",
+                          priority: selected.priority || "medium",
+                          dueDate: "",
+                          assignedTo: String(selected.assignedTo || ""),
+                        });
+                        setChildModal({ open: true, parentTask: selected });
+                      }}
+                      className="text-xs text-muted-foreground hover:text-violet-400 flex items-center gap-1 transition-colors"
+                    >
+                      <GitBranch className="w-3 h-3" />Crear tarea de seguimiento vinculada
+                    </button>
+                  </div>
+                )}
+
                 <hr className="border-border/40" />
                 {showCloseForm ? (
                   <div className="space-y-3 p-3 bg-green-500/5 rounded-lg border border-green-500/20">

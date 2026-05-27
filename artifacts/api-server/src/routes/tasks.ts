@@ -52,10 +52,12 @@ router.get("/tasks", async (req, res) => {
 
     const priority = req.query.priority as string | undefined;
     const quoteId = req.query.quoteId ? parseInt(req.query.quoteId as string) : undefined;
+    const parentTaskId = req.query.parentTaskId ? parseInt(req.query.parentTaskId as string) : undefined;
     const conds: any[] = [];
     if (status) conds.push(eq(tasksTable.status, status as any));
     if (priority && priority !== "all") conds.push(eq(tasksTable.priority, priority as any));
     if (quoteId) conds.push(eq(tasksTable.quoteId, quoteId));
+    if (parentTaskId) conds.push(eq(tasksTable.parentTaskId, parentTaskId));
     if (view === "today") {
       const start = new Date(); start.setHours(0,0,0,0);
       const end = new Date(); end.setHours(23,59,59,999);
