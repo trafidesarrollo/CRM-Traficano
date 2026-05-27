@@ -361,6 +361,60 @@ router.get("/tasks/weekly", async (req, res) => {
   }
 });
 
+// GET /api/tasks/:id/chain — full ancestor chain for a task (oldest first)
+router.get("/tasks/:id/chain", async (req, res) => {
+  try {
+    const startId = parseInt(req.params.id);
+
+    // Walk up the parent chain (max 50 hops to prevent infinite loops)
+    const chain: any[] = [];
+    let currentId: number | null = startId;
+    const visited = new Set<number>();
+
+    while (currentId !== null && !visited.has(currentId) && chain.length < 50) {
+      visited.add(currentId);
+      const [row] = await db.select({
+        t: tasksTable,
+        clientName: sql<string | null>`(select c.company_name from clients c where c.id = ${tasksTable.clientId})`,
+        assigneeNames: sql<string | null>`(
+          SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
+          FROM task_assignees ta2
+          JOIN users u2 ON u2.id = ta2.user_id
+          WHERE ta2.task_id = ${tasksTable.id}
+        )`,
+        assigneeIds: sql<string | null>`(
+          SELECT string_agg(ta2.user_id::text, ',' ORDER BY ta2.user_id)
+          FROM task_assignees ta2
+          WHERE ta2.task_id = ${tasksTable.id}
+        )`,
+        closedByName: sql<string | null>`(
+          SELECT u3.full_name FROM users u3 WHERE u3.id = ${tasksTable.closedBy}
+        )`,
+        createdByName: sql<string | null>`(
+          SELECT u4.full_name FROM users u4 WHERE u4.id = ${tasksTable.createdBy}
+        )`,
+      }).from(tasksTable).where(eq(tasksTable.id, currentId));
+
+      if (!row) break;
+
+      chain.unshift({
+        ...row.t,
+        clientName: row.clientName ?? null,
+        assigneeNames: row.assigneeNames ?? null,
+        assigneeIds: row.assigneeIds ? row.assigneeIds.split(",").map(Number) : [],
+        closedByName: row.closedByName ?? null,
+        createdByName: row.createdByName ?? null,
+      });
+
+      currentId = row.t.parentTaskId ?? null;
+    }
+
+    res.json(chain);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/tasks/defer-overdue", async (req, res) => {
   try {
     const userId = (req as any).session?.userId;

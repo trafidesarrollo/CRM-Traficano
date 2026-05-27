@@ -300,6 +300,8 @@ router.post("/bulk-activities/resolve", async (req, res) => {
             const assignedTo = ft.assignedTo ? parseInt(ft.assignedTo) : userId;
             const effectiveAssignedTo = isNaN(assignedTo) ? userId : assignedTo;
             const taskTitle = ft.title || row.clientName;
+            // Identify the most recent pending/in_progress task for this client to use as parent
+            const parentTaskId = row.tareasACerrar?.length > 0 ? row.tareasACerrar[row.tareasACerrar.length - 1] : undefined;
             const [inserted] = await db.insert(tasksTable).values({
               title: taskTitle,
               description: ft.description || baseDescription,
@@ -308,6 +310,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
               status: (ft.status || "pending") as any,
               priority: (ft.priority || "medium") as any,
               dueDate: due,
+              parentTaskId: parentTaskId ?? null,
             } as any).returning({ id: tasksTable.id });
             if (inserted && row.clientId) {
               const assignment = await assignTaskToClientTeam(inserted.id, row.clientId, effectiveAssignedTo);

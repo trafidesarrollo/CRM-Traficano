@@ -13,7 +13,7 @@ import {
   Plus, Trash2, Clock, AlertCircle, Calendar, ListTodo, RefreshCw,
   CheckCircle2, Circle, CalendarClock, User, Users, Building2,
   ChevronRight, Bell, X, FileText, DollarSign, ExternalLink, Filter,
-  GitBranch, Link2
+  GitBranch, Link2, History, ChevronDown, ChevronUp, ArrowRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -107,6 +107,12 @@ export default function Tasks() {
   // Thread state (parent + children of selected task)
   const [threadParent, setThreadParent] = useState<any>(null);
   const [threadChildren, setThreadChildren] = useState<any[]>([]);
+
+  // Full chain sidebar
+  const [chainOpen, setChainOpen] = useState(false);
+  const [chain, setChain] = useState<any[]>([]);
+  const [chainLoading, setChainLoading] = useState(false);
+  const [expandedChainNode, setExpandedChainNode] = useState<number | null>(null);
 
   // Bitácora / close form
   const [showCloseForm, setShowCloseForm] = useState(false);
@@ -386,14 +392,12 @@ export default function Tasks() {
   const loadThread = async (task: any) => {
     setThreadParent(null);
     setThreadChildren([]);
-    // Load parent
     if (task.parentTaskId) {
       try {
         const r = await fetch(`${API}/api/tasks/${task.parentTaskId}`, { credentials: "include" });
         if (r.ok) setThreadParent(await r.json());
       } catch {}
     }
-    // Load children
     try {
       const r = await fetch(`${API}/api/tasks?parentTaskId=${task.id}`, { credentials: "include" });
       if (r.ok) {
@@ -401,6 +405,26 @@ export default function Tasks() {
         setThreadChildren(Array.isArray(j) ? j : []);
       }
     } catch {}
+  };
+
+  const loadChain = async (task: any) => {
+    setChainLoading(true);
+    setChain([]);
+    setExpandedChainNode(null);
+    try {
+      const r = await fetch(`${API}/api/tasks/${task.id}/chain`, { credentials: "include" });
+      if (r.ok) {
+        const j = await r.json();
+        setChain(Array.isArray(j) ? j : []);
+      }
+    } catch {} finally {
+      setChainLoading(false);
+    }
+  };
+
+  const openChain = (task: any) => {
+    setChainOpen(true);
+    loadChain(task);
   };
 
   const openDetail = (task: any) => {
@@ -1095,9 +1119,17 @@ export default function Tasks() {
                   </div>
                 )}
 
-                {/* If no thread yet, show a create-followup shortcut */}
-                {!selected.parentTaskId && threadChildren.length === 0 && (
-                  <div className="flex justify-end">
+                {/* Ver cadena completa + create-followup shortcut */}
+                <div className="flex items-center justify-between">
+                  {(selected.parentTaskId || threadChildren.length > 0) && (
+                    <button
+                      onClick={() => openChain(selected)}
+                      className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors"
+                    >
+                      <History className="w-3 h-3" />Ver cadena completa
+                    </button>
+                  )}
+                  {!selected.parentTaskId && threadChildren.length === 0 && (
                     <button
                       onClick={() => {
                         setChildForm({
@@ -1109,12 +1141,12 @@ export default function Tasks() {
                         });
                         setChildModal({ open: true, parentTask: selected });
                       }}
-                      className="text-xs text-muted-foreground hover:text-violet-400 flex items-center gap-1 transition-colors"
+                      className="text-xs text-muted-foreground hover:text-violet-400 flex items-center gap-1 transition-colors ml-auto"
                     >
                       <GitBranch className="w-3 h-3" />Crear tarea de seguimiento vinculada
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <hr className="border-border/40" />
                 {showCloseForm ? (
@@ -1273,6 +1305,198 @@ export default function Tasks() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Chain sidebar ── */}
+      {chainOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setChainOpen(false)}
+          />
+          {/* Panel */}
+          <div className="relative w-full max-w-md bg-background border-l border-border flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5 text-violet-400" />
+                <div>
+                  <h2 className="font-semibold text-base">Cadena de seguimiento</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {selected?.clientName && <span className="text-foreground font-medium">{selected.clientName} · </span>}
+                    {chain.length} {chain.length === 1 ? "tarea" : "tareas"} en el hilo
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setChainOpen(false)}
+                className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Timeline */}
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {chainLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <RefreshCw className="w-5 h-5 text-muted-foreground animate-spin" />
+                </div>
+              ) : chain.length === 0 ? (
+                <div className="text-center py-16">
+                  <GitBranch className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
+                  <p className="text-muted-foreground text-sm">Sin historial de cadena</p>
+                </div>
+              ) : (
+                <ol className="relative">
+                  {chain.map((node, idx) => {
+                    const isCurrent = node.id === selected?.id;
+                    const isLast = idx === chain.length - 1;
+                    const isExpanded = expandedChainNode === node.id;
+                    const isCompleted = node.status === "completed";
+
+                    return (
+                      <li key={node.id} className="relative pl-8 pb-6 last:pb-0">
+                        {/* Vertical line */}
+                        {!isLast && (
+                          <span className="absolute left-[11px] top-5 bottom-0 w-px bg-border" />
+                        )}
+
+                        {/* Node dot */}
+                        <span className={`absolute left-0 top-1 w-[22px] h-[22px] rounded-full flex items-center justify-center border-2 ${
+                          isCurrent
+                            ? "border-violet-500 bg-violet-500/20"
+                            : isCompleted
+                            ? "border-green-500 bg-green-500/20"
+                            : "border-border bg-background"
+                        }`}>
+                          {isCurrent
+                            ? <ArrowRight className="w-2.5 h-2.5 text-violet-400" />
+                            : isCompleted
+                            ? <CheckCircle2 className="w-3 h-3 text-green-400" />
+                            : <Circle className="w-3 h-3 text-muted-foreground" />
+                          }
+                        </span>
+
+                        {/* Card */}
+                        <div className={`rounded-lg border p-3 space-y-2 transition-all ${
+                          isCurrent
+                            ? "border-violet-500/40 bg-violet-500/8"
+                            : "border-border/50 bg-white/3 hover:bg-white/5"
+                        }`}>
+                          {/* Top row */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {isCurrent && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wide text-violet-400 bg-violet-500/15 px-1.5 py-0.5 rounded">actual</span>
+                                )}
+                                {idx === 0 && chain.length > 1 && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wide text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded">origen</span>
+                                )}
+                                <span className="text-xs text-muted-foreground">#{node.id}</span>
+                              </div>
+                              <p className={`text-sm font-medium mt-0.5 leading-snug ${isCompleted && !isCurrent ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                {node.title}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setExpandedChainNode(isExpanded ? null : node.id)}
+                              className="shrink-0 p-1 rounded hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
+                            >
+                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+
+                          {/* Dates row */}
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                            {node.createdAt && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                Creada: {format(parseISO(node.createdAt), "d MMM yyyy", { locale: es })}
+                              </span>
+                            )}
+                            {node.dueDate && (
+                              <span className={`flex items-center gap-1 ${!isCompleted && new Date(node.dueDate) < new Date() ? "text-red-400" : ""}`}>
+                                <Clock className="w-3 h-3" />
+                                Vence: {format(parseISO(node.dueDate), "d MMM yyyy", { locale: es })}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Expanded detail */}
+                          {isExpanded && (
+                            <div className="pt-2 border-t border-border/40 space-y-2">
+                              {node.completedAt && (
+                                <div className="flex items-center gap-1.5 text-xs text-green-400">
+                                  <CheckCircle2 className="w-3 h-3 shrink-0" />
+                                  <span>
+                                    Cerrada el {format(parseISO(node.completedAt), "d MMM yyyy 'a las' HH:mm", { locale: es })}
+                                    {node.closedByName && <> · por <strong>{node.closedByName}</strong></>}
+                                  </span>
+                                </div>
+                              )}
+                              {node.createdByName && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <User className="w-3 h-3 shrink-0" />
+                                  <span>Creada por <strong className="text-foreground">{node.createdByName}</strong></span>
+                                </div>
+                              )}
+                              {node.assigneeNames && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <Users className="w-3 h-3 shrink-0" />
+                                  <span>Equipo: <strong className="text-blue-300">{node.assigneeNames}</strong></span>
+                                </div>
+                              )}
+                              {node.description && (
+                                <div className="text-xs text-muted-foreground bg-white/5 rounded p-2 leading-relaxed">
+                                  {node.description}
+                                </div>
+                              )}
+                              <div className="flex gap-2 pt-1">
+                                <Badge className={`text-xs ${PRIORITY_COLORS[node.priority]}`}>{PRIORITY_LABELS[node.priority]}</Badge>
+                                <Badge variant="outline" className={`text-xs ${STATUS_CONFIG[node.status]?.color}`}>{STATUS_CONFIG[node.status]?.label}</Badge>
+                              </div>
+                              {!isCurrent && (
+                                <button
+                                  onClick={() => {
+                                    setChainOpen(false);
+                                    openDetailById(node.id);
+                                  }}
+                                  className="w-full mt-1 text-xs flex items-center justify-center gap-1.5 py-1.5 rounded-md border border-border/50 hover:border-violet-500/40 hover:bg-violet-500/10 text-muted-foreground hover:text-violet-300 transition-all"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  Abrir esta tarea
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Arrow connector between nodes */}
+                        {!isLast && (
+                          <div className="absolute left-[5px] bottom-1.5 flex items-center">
+                            <ChevronRight className="w-3 h-3 text-border" />
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
+
+            {/* Footer */}
+            {chain.length > 1 && (
+              <div className="px-5 py-3 border-t border-border shrink-0">
+                <p className="text-xs text-muted-foreground text-center">
+                  Hacé clic en <ChevronDown className="w-3 h-3 inline" /> para expandir cualquier tarea y ver el detalle completo
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Quote followup detail modal ── */}
       <Dialog open={quoteDetailOpen} onOpenChange={setQuoteDetailOpen}>
