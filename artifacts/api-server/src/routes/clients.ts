@@ -140,7 +140,7 @@ router.get("/clients", async (req, res) => {
 router.post("/clients", async (req, res) => {
   try {
     const body = { ...req.body };
-    const callerRole = (req as any).session?.role;
+    const callerRole = (req as any).session?.userRole;
     const isAdminOrManager = callerRole === "admin" || callerRole === "gerente" || callerRole === "gerente_comercial";
 
     // Only admin/gerente can assign a team at creation time
@@ -271,7 +271,7 @@ router.patch("/clients/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     const body = req.body;
     const session = (req as any).session;
-    const callerRole = session?.role;
+    const callerRole = session?.userRole;
     const callerUserId = session?.userId;
 
     // Load existing to preserve final status
