@@ -13,7 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, ArrowLeft, FileText, ShoppingCart, Contact2, Activity,
   Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X,
-  CheckCircle2, Circle, Clock, ListTodo, UserSquare, Users, UserCheck, Loader2
+  CheckCircle2, Circle, Clock, ListTodo, UserSquare, Users, UserCheck, Loader2,
+  CalendarClock, GitBranch, History, ChevronDown, ChevronUp, ArrowRight,
+  RefreshCw, Bell, Trash2, AlertCircle,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
@@ -85,6 +87,81 @@ export default function ClientDetail() {
   const [reminderDismissed, setReminderDismissed] = useState(false);
   const [completingTask, setCompletingTask] = useState(false);
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
+
+  // ── Inline task edit modal ──
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskModalData, setTaskModalData] = useState<any>(null);
+  const [taskSaving, setTaskSaving] = useState(false);
+  const [taskShowFollowup, setTaskShowFollowup] = useState(false);
+  const [taskFollowupDate, setTaskFollowupDate] = useState("");
+  const [taskFollowupDesc, setTaskFollowupDesc] = useState("");
+
+  const openTaskModal = (task: any) => {
+    setTaskModalData({ ...task });
+    setTaskModalOpen(true);
+    setTaskShowFollowup(false);
+    setTaskFollowupDate("");
+    setTaskFollowupDesc("");
+  };
+
+  const patchTask = async (taskId: number, fields: any) => {
+    setTaskSaving(true);
+    try {
+      const r = await fetch(`${API}/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(fields),
+      });
+      if (r.ok) {
+        const updated = await r.json();
+        setTaskModalData((prev: any) => ({ ...prev, ...updated }));
+        load();
+      }
+    } finally { setTaskSaving(false); }
+  };
+
+  const closeTaskWithFollowup = async (createFollowup: boolean) => {
+    if (!taskModalData) return;
+    setTaskSaving(true);
+    try {
+      // Close current task
+      await fetch(`${API}/api/tasks/${taskModalData.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
+      });
+      setTaskModalData((prev: any) => ({ ...prev, status: "completed" }));
+
+      if (createFollowup && taskFollowupDate && id) {
+        const memberIds = data?.teamInfo?.members?.map((m: any) => m.userId).filter(Boolean) || [];
+        await fetch(`${API}/api/tasks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            title: taskModalData.title,
+            type: "followup",
+            priority: taskModalData.priority || "medium",
+            status: "pending",
+            description: taskFollowupDesc || undefined,
+            dueDate: new Date(taskFollowupDate + "T12:00:00").toISOString(),
+            clientId: parseInt(id),
+            parentTaskId: taskModalData.id,
+            assigneeIds: memberIds.length ? memberIds : undefined,
+          }),
+        });
+        toast({ title: "Tarea cerrada y seguimiento agendado" });
+      } else {
+        toast({ title: "Tarea cerrada" });
+      }
+      setTaskShowFollowup(false);
+      setTaskFollowupDate("");
+      setTaskFollowupDesc("");
+      load();
+    } finally { setTaskSaving(false); }
+  };
   const defaultFollowup = () => {
     const d = new Date();
     d.setDate(d.getDate() + 3);
@@ -868,44 +945,40 @@ export default function ClientDetail() {
                 // Task item
                 const isCompleted = item.status === "completed";
                 const taskQuoteId = item.quoteId ?? item.quote_id ?? null;
-                const cardContent = (
-                  <CardContent className="p-3 flex items-start gap-3">
-                    <span className="text-xl mt-0.5">{TASK_TYPE_ICONS[item.type] || "📋"}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <p className="font-medium text-sm truncate">{item.title}</p>
-                          <Badge className={`text-xs shrink-0 ${isCompleted ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
-                            {TASK_STATUS_LABELS[item.status] || item.status}
-                          </Badge>
+                return (
+                  <Card
+                    key={`task-${item.id}`}
+                    className={`cursor-pointer transition-colors hover:border-primary/40 ${isCompleted ? "border-green-500/20" : "border-orange-500/20"}`}
+                    onClick={() => openTaskModal(item)}
+                  >
+                    <CardContent className="p-3 flex items-start gap-3">
+                      <span className="text-xl mt-0.5">{TASK_TYPE_ICONS[item.type] || "📋"}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="font-medium text-sm truncate">{item.title}</p>
+                            <Badge className={`text-xs shrink-0 ${isCompleted ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
+                              {TASK_STATUS_LABELS[item.status] || item.status}
+                            </Badge>
+                            {item.parent_task_id && <GitBranch className="w-3 h-3 text-violet-400 shrink-0" />}
+                          </div>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {item._date ? new Date(item._date).toLocaleDateString("es-AR") : "—"}
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {item._date ? new Date(item._date).toLocaleDateString("es-AR") : "—"}
-                        </span>
-                      </div>
-                      {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
-                      {item.assignee_name && (
-                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
-                          {item.completed_at && <span className="ml-2 text-green-400">· Cerrada el {new Date(item.completed_at).toLocaleDateString("es-AR")}</span>}
+                        {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
+                        {item.assignee_name && (
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
+                            {item.completed_at && <span className="ml-2 text-green-400">· Cerrada el {new Date(item.completed_at).toLocaleDateString("es-AR")}</span>}
+                          </p>
+                        )}
+                        <p className={`text-xs mt-0.5 flex items-center gap-1 ${taskQuoteId ? "text-primary/70" : "text-blue-400/60"}`}>
+                          <ListTodo className="h-3 w-3" />
+                          {taskQuoteId ? "Tarea — Ver cotización →" : "Clic para ver / editar"}
                         </p>
-                      )}
-                      <p className={`text-xs mt-0.5 flex items-center gap-1 ${taskQuoteId ? "text-primary/70" : "text-blue-400/60"}`}>
-                        <ListTodo className="h-3 w-3" />
-                        {taskQuoteId ? "Tarea — Ver cotización →" : "Tarea"}
-                      </p>
-                    </div>
-                  </CardContent>
-                );
-                return taskQuoteId ? (
-                  <Link key={`task-${item.id}`} href={`/quotes/${taskQuoteId}`}>
-                    <Card className={`cursor-pointer transition-colors hover:border-primary/40 ${isCompleted ? "border-green-500/20" : "border-orange-500/20"}`}>
-                      {cardContent}
-                    </Card>
-                  </Link>
-                ) : (
-                  <Card key={`task-${item.id}`} className={isCompleted ? "border-green-500/20" : "border-orange-500/20"}>
-                    {cardContent}
+                      </div>
+                    </CardContent>
                   </Card>
                 );
               })}
@@ -1033,6 +1106,215 @@ export default function ClientDetail() {
               {completingTask ? "Guardando…" : "Completar y agendar"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal de tarea editable ── */}
+      <Dialog open={taskModalOpen} onOpenChange={setTaskModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogDescription className="sr-only">Detalle de tarea</DialogDescription>
+          {taskModalData && (
+            <>
+              <DialogHeader>
+                <div className="flex items-start gap-3 pr-6">
+                  <div className="mt-1 shrink-0">
+                    {taskModalData.status === "completed"
+                      ? <CheckCircle2 className="w-5 h-5 text-green-400" />
+                      : <Circle className="w-5 h-5 text-muted-foreground" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {/* Título inline editable */}
+                    <input
+                      className="w-full bg-transparent text-lg font-semibold outline-none border-b border-transparent hover:border-border/50 focus:border-primary/50 transition-colors py-0.5 text-foreground"
+                      value={taskModalData.title || ""}
+                      onChange={e => setTaskModalData((p: any) => ({ ...p, title: e.target.value }))}
+                      onBlur={() => patchTask(taskModalData.id, { title: taskModalData.title })}
+                      placeholder="Título de la tarea"
+                    />
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <Badge className={`text-xs ${taskModalData.status === "completed" ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
+                        {TASK_STATUS_LABELS[taskModalData.status] || taskModalData.status}
+                      </Badge>
+                      {taskModalData.parent_task_id && (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-violet-400 border border-violet-500/30 rounded-full px-2 py-0.5 bg-violet-500/8">
+                          <GitBranch className="w-3 h-3" />Hilo de seguimiento
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 pt-1">
+                {/* Fecha de vencimiento inline */}
+                <div className="flex items-center gap-2 text-sm">
+                  <CalendarClock className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground w-24 shrink-0">Vence:</span>
+                  <input
+                    type="date"
+                    className="flex-1 bg-transparent border-b border-transparent hover:border-border/50 focus:border-primary/50 transition-colors outline-none text-foreground py-0.5"
+                    value={taskModalData.dueDate ? taskModalData.dueDate.slice(0, 10) : ""}
+                    onChange={e => setTaskModalData((p: any) => ({ ...p, dueDate: e.target.value }))}
+                    onBlur={() => {
+                      if (taskModalData.dueDate) {
+                        patchTask(taskModalData.id, { dueDate: new Date(taskModalData.dueDate + "T12:00:00").toISOString() });
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Estado inline */}
+                <div className="flex items-center gap-2 text-sm">
+                  <ListTodo className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground w-24 shrink-0">Estado:</span>
+                  <Select
+                    value={taskModalData.status}
+                    onValueChange={v => {
+                      setTaskModalData((p: any) => ({ ...p, status: v }));
+                      patchTask(taskModalData.id, { status: v, ...(v === "completed" ? { completedAt: new Date().toISOString() } : {}) });
+                    }}
+                  >
+                    <SelectTrigger className="h-7 text-xs border-0 bg-transparent px-0 w-auto gap-1 focus:ring-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Abierta</SelectItem>
+                      <SelectItem value="in_progress">En progreso</SelectItem>
+                      <SelectItem value="completed">Cerrada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Prioridad inline */}
+                <div className="flex items-center gap-2 text-sm">
+                  <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground w-24 shrink-0">Prioridad:</span>
+                  <Select
+                    value={taskModalData.priority || "medium"}
+                    onValueChange={v => {
+                      setTaskModalData((p: any) => ({ ...p, priority: v }));
+                      patchTask(taskModalData.id, { priority: v });
+                    }}
+                  >
+                    <SelectTrigger className="h-7 text-xs border-0 bg-transparent px-0 w-auto gap-1 focus:ring-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baja</SelectItem>
+                      <SelectItem value="medium">Media</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Asignados */}
+                {taskModalData.assignee_name && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Users className="w-4 h-4 shrink-0" />
+                    <span className="w-24 shrink-0">Equipo:</span>
+                    <span className="text-blue-300 font-medium">{taskModalData.assignee_name}</span>
+                  </div>
+                )}
+
+                {/* Descripción inline editable */}
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Descripción</label>
+                  <textarea
+                    className="w-full bg-white/5 border border-border/40 hover:border-border/70 focus:border-primary/50 rounded-lg p-2.5 text-sm outline-none resize-none transition-colors text-foreground placeholder:text-muted-foreground/50 min-h-[80px]"
+                    value={taskModalData.description || ""}
+                    onChange={e => setTaskModalData((p: any) => ({ ...p, description: e.target.value }))}
+                    onBlur={() => patchTask(taskModalData.id, { description: taskModalData.description || null })}
+                    placeholder="Agregar descripción…"
+                  />
+                </div>
+
+                {/* Cierre con seguimiento */}
+                {taskModalData.status !== "completed" && (
+                  <div className="border-t border-border/40 pt-3 space-y-3">
+                    {!taskShowFollowup ? (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          onClick={() => closeTaskWithFollowup(false)}
+                          disabled={taskSaving}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Cerrar tarea
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+                          onClick={() => setTaskShowFollowup(true)}
+                        >
+                          <CalendarClock className="w-3.5 h-3.5 mr-1.5" />Cerrar y agendar
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 p-3 rounded-lg bg-violet-500/5 border border-violet-500/20">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium flex items-center gap-2">
+                            <CalendarClock className="w-4 h-4 text-violet-400" />
+                            Próximo seguimiento
+                          </p>
+                          <button onClick={() => setTaskShowFollowup(false)}>
+                            <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                          </button>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Fecha <span className="text-red-400">*</span></label>
+                          <Input
+                            type="date"
+                            className="mt-1"
+                            value={taskFollowupDate}
+                            onChange={e => setTaskFollowupDate(e.target.value)}
+                            min={new Date().toISOString().slice(0, 10)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Nota (opcional)</label>
+                          <Textarea
+                            rows={2}
+                            className="mt-1 text-sm"
+                            value={taskFollowupDesc}
+                            onChange={e => setTaskFollowupDesc(e.target.value)}
+                            placeholder="¿Qué hay que hacer en el próximo seguimiento?"
+                          />
+                        </div>
+                        {data?.teamInfo?.members?.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {data.teamInfo.members.map((m: any) => (
+                              <span key={m.id} className="text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2 py-0.5">
+                                {m.fullName || m.username}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <Button
+                          className="w-full bg-violet-600 hover:bg-violet-500"
+                          size="sm"
+                          disabled={!taskFollowupDate || taskSaving}
+                          onClick={() => closeTaskWithFollowup(true)}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                          {taskSaving ? "Guardando…" : "Confirmar cierre y seguimiento"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {taskModalData.status === "completed" && taskModalData.completedAt && (
+                  <div className="flex items-center gap-2 text-xs text-green-400 border-t border-border/40 pt-3">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    Cerrada el {new Date(taskModalData.completedAt).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })}
+                    {taskModalData.closed_by_name && <> · por <strong>{taskModalData.closed_by_name}</strong></>}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

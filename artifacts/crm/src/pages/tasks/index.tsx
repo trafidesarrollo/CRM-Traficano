@@ -428,6 +428,10 @@ export default function Tasks() {
   };
 
   const openDetail = (task: any) => {
+    if (task.clientId) {
+      window.open(`/clients/${task.clientId}?taskId=${task.id}`, "_blank");
+      return;
+    }
     setSelected(task); setDetailOpen(true);
     setShowFollowupForm(false); setFollowupDate(""); setFollowupNote("");
     setShowCloseForm(false); setCloseNote("");
@@ -439,6 +443,10 @@ export default function Tasks() {
       const r = await fetch(`${API}/api/tasks/${id}`, { credentials: "include" });
       if (r.ok) {
         const task = await r.json();
+        if (task.clientId) {
+          window.open(`/clients/${task.clientId}?taskId=${task.id}`, "_blank");
+          return;
+        }
         setSelected(task);
         setDetailOpen(true);
         setShowFollowupForm(false); setFollowupDate(""); setFollowupNote("");
