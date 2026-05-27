@@ -212,12 +212,10 @@ export default function Tasks() {
         dueDate: form.dueDate || null,
       };
 
-      // Build assigneeIds — if team checked: one shared task; otherwise single
+      // Build assigneeIds — always group-based; fallback to creator
       const assigneeIds: number[] = teamAssignees.size > 0
         ? Array.from(teamAssignees).filter(Boolean) as number[]
-        : form.assignedTo
-          ? [parseInt(form.assignedTo)]
-          : user?.id ? [user.id] : [];
+        : user?.id ? [user.id] : [];
 
       const r = await fetch(`${API}/api/tasks`, {
         method: "POST",
@@ -491,9 +489,9 @@ export default function Tasks() {
                 </div>
                 <div><Label>Vencimiento</Label><Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
 
-                {clientTeamMembers.length > 0 ? (
+                {clientTeamMembers.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Asignar al equipo comercial</Label>
+                    <Label>Equipo asignado</Label>
                     <div className="rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
                       {clientTeamMembers.map((m: any) => {
                         const checked = teamAssignees.has(m.userId);
@@ -523,17 +521,6 @@ export default function Tasks() {
                       <p className="text-xs text-muted-foreground">Seleccioná al menos un miembro.</p>
                     )}
                   </div>
-                ) : (
-                  <div><Label>Asignar a</Label>
-                    <Select value={form.assignedTo} onValueChange={v => setForm({ ...form, assignedTo: v })}>
-                      <SelectTrigger><SelectValue placeholder="Yo" /></SelectTrigger>
-                      <SelectContent>
-                        {users.map((u: any) => (
-                          <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 )}
 
                 <Button
@@ -541,11 +528,7 @@ export default function Tasks() {
                   onClick={create}
                   disabled={creating || (clientTeamMembers.length > 0 && teamAssignees.size === 0)}
                 >
-                  {creating
-                    ? "Creando..."
-                    : teamAssignees.size > 1
-                      ? `Crear tarea grupal (${teamAssignees.size} vendedores)`
-                      : "Crear tarea"}
+                  {creating ? "Creando..." : "Crear tarea"}
                 </Button>
               </div>
             </DialogContent>
@@ -737,11 +720,7 @@ export default function Tasks() {
                         {t.clientName && <span className="text-xs text-muted-foreground">· {t.clientName}</span>}
                         {!isVendedor && t.assigneeName && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            ·
-                            {(t.assigneeIds?.length ?? 0) > 1
-                              ? <><User className="w-3 h-3 text-blue-400" /><span className="text-blue-300">{t.assigneeName}</span></>
-                              : t.assigneeName
-                            }
+                            · <User className="w-3 h-3 text-blue-400" /><span className="text-blue-300">{t.assigneeName}</span>
                           </span>
                         )}
                         {(t.deferCount ?? 0) > 0 && <span className="text-xs text-orange-400 flex items-center gap-0.5"><RefreshCw className="w-3 h-3" />Diferida {t.deferCount}x</span>}
@@ -895,10 +874,7 @@ export default function Tasks() {
                   {selected.assigneeName && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <User className="w-4 h-4 shrink-0" />
-                      {(selected.assigneeIds?.length ?? 0) > 1
-                        ? <span>Equipo: <strong className="text-blue-300">{selected.assigneeName}</strong></span>
-                        : <span>Asignado a: <strong className="text-foreground">{selected.assigneeName}</strong></span>
-                      }
+                      <span>Equipo: <strong className="text-blue-300">{selected.assigneeName}</strong></span>
                     </div>
                   )}
                   {selected.clientName && (
@@ -1190,17 +1166,6 @@ export default function Tasks() {
                     min={new Date().toISOString().slice(0, 10)}
                   />
                 </div>
-              </div>
-              <div>
-                <Label className="text-sm">Asignar a</Label>
-                <Select value={childForm.assignedTo} onValueChange={v => setChildForm((f: any) => ({ ...f, assignedTo: v }))}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Mismo que la tarea anterior" /></SelectTrigger>
-                  <SelectContent>
-                    {users.map((u: any) => (
-                      <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               <div className="flex gap-3 pt-1">
                 <Button variant="ghost" className="flex-1" onClick={() => setChildModal(null)}>
