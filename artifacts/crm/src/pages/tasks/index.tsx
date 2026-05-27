@@ -966,9 +966,15 @@ export default function Tasks() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <DialogTitle className="text-left text-lg leading-snug">{selected.title}</DialogTitle>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
                       <Badge className={`text-xs ${PRIORITY_COLORS[selected.priority]}`}>{PRIORITY_LABELS[selected.priority]}</Badge>
                       <Badge variant="outline" className={`text-xs ${STATUS_CONFIG[selected.status]?.color}`}>{STATUS_CONFIG[selected.status]?.label}</Badge>
+                      <button
+                        onClick={() => openChain(selected)}
+                        className="ml-1 inline-flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 border border-violet-500/30 hover:border-violet-400/50 rounded-full px-2 py-0.5 transition-colors bg-violet-500/8 hover:bg-violet-500/15"
+                      >
+                        <History className="w-3 h-3" />Cadena
+                      </button>
                     </div>
                   </div>
                 </div>
