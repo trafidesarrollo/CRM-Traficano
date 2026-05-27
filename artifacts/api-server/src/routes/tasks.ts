@@ -99,7 +99,6 @@ router.get("/tasks", async (req, res) => {
       assigneeName: usersTable.fullName,
       clientName: clientsTable.companyName,
       childrenCount: sql<number>`coalesce(${childCounts.cnt}, 0)`,
-      // Aggregate all assignee names from junction table
       assigneeNames: sql<string>`(
         SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
         FROM task_assignees ta2
@@ -110,6 +109,9 @@ router.get("/tasks", async (req, res) => {
         SELECT string_agg(ta2.user_id::text, ',' ORDER BY ta2.user_id)
         FROM task_assignees ta2
         WHERE ta2.task_id = ${tasksTable.id}
+      )`,
+      closedByName: sql<string | null>`(
+        SELECT u3.full_name FROM users u3 WHERE u3.id = ${tasksTable.closedBy}
       )`,
     }).from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
@@ -126,6 +128,7 @@ router.get("/tasks", async (req, res) => {
       assigneeIds: r.assigneeIds ? r.assigneeIds.split(",").map(Number) : (r.t.assignedTo ? [r.t.assignedTo] : []),
       clientName: r.clientName,
       childrenCount: Number(r.childrenCount),
+      closedByName: r.closedByName ?? null,
     })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -153,6 +156,9 @@ router.get("/tasks/:id", async (req, res) => {
           FROM task_assignees ta2
           WHERE ta2.task_id = ${tasksTable.id}
         )`,
+        closedByName: sql<string | null>`(
+          SELECT u3.full_name FROM users u3 WHERE u3.id = ${tasksTable.closedBy}
+        )`,
       })
       .from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
@@ -167,6 +173,7 @@ router.get("/tasks/:id", async (req, res) => {
       clientName: row.clientName,
       childrenCount: Number(row.childrenCount),
       parentTitle: row.parentTitle ?? null,
+      closedByName: row.closedByName ?? null,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -248,6 +255,7 @@ router.patch("/tasks/:id", async (req, res) => {
     }
     if (data.status === "completed" && !data.completedAt) {
       data.completedAt = new Date();
+      if (userId) data.closedBy = userId;
     }
 
     const [prev] = await db.select().from(tasksTable).where(eq(tasksTable.id, id));

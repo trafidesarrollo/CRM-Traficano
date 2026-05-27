@@ -793,6 +793,11 @@ export default function Tasks() {
                             · <User className="w-3 h-3 text-blue-400" /><span className="text-blue-300">{t.assigneeName}</span>
                           </span>
                         )}
+                        {done && t.closedByName && (
+                          <span className="text-xs text-green-400 flex items-center gap-1">
+                            · <CheckCircle2 className="w-3 h-3" />Cerrada por <strong>{t.closedByName}</strong>
+                          </span>
+                        )}
                         {(t.deferCount ?? 0) > 0 && <span className="text-xs text-orange-400 flex items-center gap-0.5"><RefreshCw className="w-3 h-3" />Diferida {t.deferCount}x</span>}
                         {(t.childrenCount ?? 0) > 0 && (
                           <span className="text-xs text-violet-400 flex items-center gap-0.5">
@@ -956,7 +961,10 @@ export default function Tasks() {
                   {selected.completedAt && (
                     <div className="flex items-center gap-2 text-green-400">
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <span>Cerrada el {format(parseISO(selected.completedAt), "d MMM yyyy 'a las' HH:mm", { locale: es })}</span>
+                      <span>
+                        Cerrada el {format(parseISO(selected.completedAt), "d MMM yyyy 'a las' HH:mm", { locale: es })}
+                        {selected.closedByName && <> · por <strong>{selected.closedByName}</strong></>}
+                      </span>
                     </div>
                   )}
                   {(selected.deferCount ?? 0) > 0 && (

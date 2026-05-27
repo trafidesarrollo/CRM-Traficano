@@ -26,6 +26,7 @@ export const tasksTable = pgTable("tasks", {
   dueDate: timestamp("due_date", { withTimezone: true }),
   reminderAt: timestamp("reminder_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  closedBy: integer("closed_by"),
   notifyOnDue: boolean("notify_on_due").notNull().default(true),
   deferCount: integer("defer_count").notNull().default(0),
   deferredAt: timestamp("deferred_at", { withTimezone: true }),
