@@ -1,10 +1,13 @@
 import { Router, type IRouter } from "express";
-import { db, tasksTable, activitiesTable, clientsTable, taskAssigneesTable, commercialTeamMembersTable } from "@workspace/db";
+import { db, tasksTable, activitiesTable, clientsTable, taskAssigneesTable, commercialTeamMembersTable, usersTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 
 // Look up the team members for a client and insert task_assignees rows.
 // Falls back to [fallbackUserId] if client has no team.
-async function assignTaskToClientTeam(taskId: number, clientId: number, fallbackUserId: number): Promise<void> {
+// Returns { memberIds, memberNames } for summary reporting.
+async function assignTaskToClientTeam(
+  taskId: number, clientId: number, fallbackUserId: number
+): Promise<{ memberIds: number[]; memberNames: string[] }> {
   const [client] = await db.select({ assignedTeamId: clientsTable.assignedTeamId })
     .from(clientsTable).where(eq(clientsTable.id, clientId)).limit(1);
   const teamId = client?.assignedTeamId;
@@ -15,8 +18,14 @@ async function assignTaskToClientTeam(taskId: number, clientId: number, fallback
     memberIds = members.map(m => m.userId);
   }
   if (memberIds.length === 0) memberIds = [fallbackUserId];
-  const rows = [...new Set(memberIds)].map(uid => ({ taskId, userId: uid }));
+  const uniqueIds = [...new Set(memberIds)];
+  const rows = uniqueIds.map(uid => ({ taskId, userId: uid }));
   await db.insert(taskAssigneesTable).values(rows).onConflictDoNothing();
+  // Fetch names for summary
+  const userRows = await db.select({ id: usersTable.id, fullName: usersTable.fullName })
+    .from(usersTable).where(inArray(usersTable.id, uniqueIds));
+  const memberNames = userRows.map(u => u.fullName ?? `Usuario ${u.id}`);
+  return { memberIds: uniqueIds, memberNames };
 }
 
 const router: IRouter = Router();
@@ -253,6 +262,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
 
     let saved = 0;
     let createdTasks = 0;
+    const taskSummary: { clientName: string; taskTitle: string; assigneeNames: string[] }[] = [];
 
     for (const row of rows) {
       const shouldClose = row.accion_vendedor === "asociar_y_cerrar" && row.tareasACerrar.length > 0;
@@ -288,17 +298,20 @@ router.post("/bulk-activities/resolve", async (req, res) => {
           const due = parseDate(ft.dueDate);
           if (due) {
             const assignedTo = ft.assignedTo ? parseInt(ft.assignedTo) : userId;
+            const effectiveAssignedTo = isNaN(assignedTo) ? userId : assignedTo;
+            const taskTitle = ft.title || row.clientName;
             const [inserted] = await db.insert(tasksTable).values({
-              title: ft.title || row.clientName,
+              title: taskTitle,
               description: ft.description || baseDescription,
               clientId: row.clientId,
-              assignedTo: isNaN(assignedTo) ? userId : assignedTo,
+              assignedTo: effectiveAssignedTo,
               status: (ft.status || "pending") as any,
               priority: (ft.priority || "medium") as any,
               dueDate: due,
             } as any).returning({ id: tasksTable.id });
             if (inserted && row.clientId) {
-              await assignTaskToClientTeam(inserted.id, row.clientId, isNaN(assignedTo) ? userId : assignedTo);
+              const assignment = await assignTaskToClientTeam(inserted.id, row.clientId, effectiveAssignedTo);
+              taskSummary.push({ clientName: row.clientName, taskTitle, assigneeNames: assignment.memberNames });
             }
             createdTasks++;
           }
@@ -331,17 +344,20 @@ router.post("/bulk-activities/resolve", async (req, res) => {
         const due = parseDate(sfRow.followupTask.dueDate);
         if (due) {
           const assignedTo = sfRow.followupTask.assignedTo ? parseInt(sfRow.followupTask.assignedTo) : userId;
+          const effectiveAssignedTo = isNaN(assignedTo) ? userId : assignedTo;
+          const sfTaskTitle = sfRow.followupTask.title || sfRow.clientName;
           const [sfInserted] = await db.insert(tasksTable).values({
-            title: sfRow.followupTask.title || sfRow.clientName,
+            title: sfTaskTitle,
             description: sfRow.followupTask.description || description,
             clientId: sfRow.clientId,
-            assignedTo: isNaN(assignedTo) ? userId : assignedTo,
+            assignedTo: effectiveAssignedTo,
             status: "pending" as any,
             priority: (sfRow.followupTask.priority || "medium") as any,
             dueDate: due,
           } as any).returning({ id: tasksTable.id });
           if (sfInserted && sfRow.clientId) {
-            await assignTaskToClientTeam(sfInserted.id, sfRow.clientId, isNaN(assignedTo) ? userId : assignedTo);
+            const sfAssignment = await assignTaskToClientTeam(sfInserted.id, sfRow.clientId, effectiveAssignedTo);
+            taskSummary.push({ clientName: sfRow.clientName, taskTitle: sfTaskTitle, assigneeNames: sfAssignment.memberNames });
           }
           createdTasks++;
         }
@@ -359,7 +375,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
       }
     }
 
-    res.json({ saved, createdTasks });
+    res.json({ saved, createdTasks, taskSummary });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

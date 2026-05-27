@@ -84,6 +84,7 @@ export default function CargaMasivaPage() {
   const [resolutions, setResolutions] = useState<Record<number, Resolution>>({});
   const [savedResolved, setSavedResolved] = useState(0);
   const [createdTasksResolved, setCreatedTasksResolved] = useState(0);
+  const [taskSummary, setTaskSummary] = useState<{ clientName: string; taskTitle: string; assigneeNames: string[] }[]>([]);
 
   // Assignable users for the schedule modal
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
@@ -268,6 +269,7 @@ export default function CargaMasivaPage() {
       if (!r.ok) throw new Error(data.error || "Error al resolver");
       setSavedResolved(data.saved);
       setCreatedTasksResolved(data.createdTasks || 0);
+      setTaskSummary(data.taskSummary || []);
       setStep("done");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -314,6 +316,7 @@ export default function CargaMasivaPage() {
     setResolutions({});
     setSavedResolved(0);
     setCreatedTasksResolved(0);
+    setTaskSummary([]);
     setSinFecha([]);
     setSinFechaResolutions({});
   }
@@ -649,10 +652,28 @@ export default function CargaMasivaPage() {
                 </div>
               </div>
 
-              {(createdTasksDirect + createdTasksResolved) > 0 && (
-                <p className="text-xs text-cyan-400/80 bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 max-w-xs mx-auto">
-                  Las tareas quedaron asignadas con la fecha y detalles especificados.
-                </p>
+              {taskSummary.length > 0 && (
+                <div className="mt-2 w-full max-w-sm mx-auto space-y-2 text-left">
+                  <p className="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5" />
+                    Asignaciones de equipo
+                  </p>
+                  <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 divide-y divide-cyan-500/10">
+                    {taskSummary.map((ts, i) => (
+                      <div key={i} className="px-3 py-2.5 space-y-0.5">
+                        <p className="text-xs font-medium text-foreground">{ts.clientName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{ts.taskTitle}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {ts.assigneeNames.map((name, j) => (
+                            <span key={j} className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2 py-0.5">
+                              <User className="w-2.5 h-2.5" />{name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {errors.length > 0 && (
