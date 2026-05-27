@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import {
   Plus, Trash2, Clock, AlertCircle, Calendar, ListTodo, RefreshCw,
-  CheckCircle2, Circle, CalendarClock, User, Building2,
+  CheckCircle2, Circle, CalendarClock, User, Users, Building2,
   ChevronRight, Bell, X, FileText, DollarSign, ExternalLink, Filter,
   GitBranch, Link2
 } from "lucide-react";
@@ -464,71 +464,141 @@ export default function Tasks() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Nueva tarea</DialogTitle>
-                <DialogDescription>Completá los datos de la nueva tarea.</DialogDescription>
+                <DialogDescription>
+                  {isVendedor
+                    ? "La tarea quedará asignada a vos automáticamente."
+                    : "Seleccioná el cliente y el equipo que recibirá la tarea."}
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
-                {!isVendedor && (
-                  <div><Label>Cliente relacionado</Label>
+
+                {/* ── Admin / Gerente: selector de cliente ── */}
+                {isAdmin && (
+                  <div>
+                    <Label>Cliente <span className="text-destructive">*</span></Label>
                     <Select value={form.clientId} onValueChange={handleClientChange}>
-                      <SelectTrigger><SelectValue placeholder="Sin cliente" /></SelectTrigger>
-                      <SelectContent>{clients.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>)}</SelectContent>
+                      <SelectTrigger><SelectValue placeholder="Seleccioná un cliente" /></SelectTrigger>
+                      <SelectContent>
+                        {clients.map((c: any) => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
                   </div>
                 )}
-                <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-                <div><Label>Prioridad</Label>
-                  <Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baja</SelectItem>
-                      <SelectItem value="medium">Media</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="urgent">Urgente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Vencimiento</Label><Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
 
-                {clientTeamMembers.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Equipo asignado</Label>
-                    <div className="rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
-                      {clientTeamMembers.map((m: any) => {
-                        const checked = teamAssignees.has(m.userId);
-                        return (
-                          <label key={m.userId} className="flex items-center gap-3 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => {
-                                setTeamAssignees(prev => {
-                                  const next = new Set(prev);
-                                  checked ? next.delete(m.userId) : next.add(m.userId);
-                                  return next;
-                                });
-                              }}
-                              className="w-4 h-4 rounded accent-primary"
-                            />
-                            <div>
-                              <span className="text-sm font-medium">{m.fullName || m.username}</span>
-                              <span className="text-xs text-muted-foreground ml-2">{m.role === "vendedor" ? "Vendedor" : "Apoyo"}</span>
-                            </div>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    {teamAssignees.size === 0 && (
-                      <p className="text-xs text-muted-foreground">Seleccioná al menos un miembro.</p>
-                    )}
+                {/* ── Vendedor: aviso de auto-asignación ── */}
+                {isVendedor && (
+                  <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-sm text-blue-300">
+                    <User className="w-4 h-4 shrink-0" />
+                    Esta tarea se asignará a <strong className="ml-1">{(user as any)?.fullName || (user as any)?.username}</strong>
                   </div>
+                )}
+
+                <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Prioridad</Label>
+                    <Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Baja</SelectItem>
+                        <SelectItem value="medium">Media</SelectItem>
+                        <SelectItem value="high">Alta</SelectItem>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div><Label>Vencimiento</Label><Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
+                </div>
+
+                {/* ── Admin/Gerente: equipo del cliente ── */}
+                {isAdmin && (
+                  <>
+                    {!form.clientId && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 px-1">
+                        <Users className="w-3.5 h-3.5" />
+                        Seleccioná un cliente para ver el equipo disponible.
+                      </p>
+                    )}
+
+                    {form.clientId && clientTeamMembers.length === 0 && (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-300">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>Este cliente no tiene un equipo comercial asignado. Podés asignarlo desde la ficha del cliente.</span>
+                      </div>
+                    )}
+
+                    {clientTeamMembers.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Asignar al equipo</Label>
+                          <div className="flex gap-2 text-xs text-muted-foreground">
+                            <button
+                              type="button"
+                              className="hover:text-foreground underline-offset-2 hover:underline"
+                              onClick={() => setTeamAssignees(new Set(clientTeamMembers.map((m: any) => m.userId)))}
+                            >Todos</button>
+                            <span>·</span>
+                            <button
+                              type="button"
+                              className="hover:text-foreground underline-offset-2 hover:underline"
+                              onClick={() => setTeamAssignees(new Set())}
+                            >Ninguno</button>
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
+                          {clientTeamMembers.map((m: any) => {
+                            const checked = teamAssignees.has(m.userId);
+                            return (
+                              <label key={m.userId} className="flex items-center gap-3 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setTeamAssignees(prev => {
+                                      const next = new Set(prev);
+                                      checked ? next.delete(m.userId) : next.add(m.userId);
+                                      return next;
+                                    });
+                                  }}
+                                  className="w-4 h-4 rounded accent-primary"
+                                />
+                                <div>
+                                  <span className="text-sm font-medium">{m.fullName || m.username}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {m.role === "vendedor" ? "Vendedor" : "Apoyo"}
+                                  </span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {teamAssignees.size === 0 && (
+                          <p className="text-xs text-destructive">Seleccioná al menos un miembro del equipo.</p>
+                        )}
+                        {teamAssignees.size > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {teamAssignees.size === 1 ? "1 persona recibirá esta tarea." : `${teamAssignees.size} personas recibirán esta tarea compartida.`}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <Button
                   className="w-full"
                   onClick={create}
-                  disabled={creating || (clientTeamMembers.length > 0 && teamAssignees.size === 0)}
+                  disabled={
+                    creating ||
+                    (isAdmin && !form.clientId) ||
+                    (isAdmin && clientTeamMembers.length > 0 && teamAssignees.size === 0)
+                  }
                 >
-                  {creating ? "Creando..." : "Crear tarea"}
+                  {creating ? "Creando..." : isAdmin && teamAssignees.size > 1
+                    ? `Crear tarea grupal (${teamAssignees.size} vendedores)`
+                    : "Crear tarea"}
                 </Button>
               </div>
             </DialogContent>
