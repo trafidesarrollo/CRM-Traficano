@@ -135,6 +135,59 @@ router.get("/tasks", async (req, res) => {
   }
 });
 
+// Weekly view for manager — MUST be before /tasks/:id to avoid Express matching "weekly" as an id
+router.get("/tasks/weekly", async (req, res) => {
+  try {
+    const weekStart = req.query.weekStart ? new Date(req.query.weekStart as string) : (() => {
+      const d = new Date(); d.setHours(0,0,0,0);
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      return d;
+    })();
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 5);
+    weekEnd.setHours(0,0,0,0);
+
+    const assignedTo = req.query.assignedTo ? parseInt(req.query.assignedTo as string) : undefined;
+    const conds: any[] = [gte(tasksTable.dueDate, weekStart), lt(tasksTable.dueDate, weekEnd)];
+    if (assignedTo) {
+      conds.push(
+        or(
+          eq(tasksTable.assignedTo, assignedTo),
+          sql`EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = ${tasksTable.id} AND ta.user_id = ${assignedTo})`
+        )
+      );
+    }
+
+    const data = await db.select({
+      t: tasksTable,
+      assigneeName: usersTable.fullName,
+      clientName: clientsTable.companyName,
+      assigneeNames: sql<string>`(
+        SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
+        FROM task_assignees ta2
+        JOIN users u2 ON u2.id = ta2.user_id
+        WHERE ta2.task_id = ${tasksTable.id}
+      )`,
+    }).from(tasksTable)
+      .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
+      .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
+      .where(and(...conds))
+      .orderBy(
+        sql`case when ${tasksTable.priority}='urgent' then 0 when ${tasksTable.priority}='high' then 1 when ${tasksTable.priority}='medium' then 2 else 3 end`,
+        tasksTable.dueDate
+      )
+      .limit(500);
+
+    res.json(data.map(r => ({
+      ...r.t,
+      assigneeName: r.assigneeNames ?? r.assigneeName,
+      clientName: r.clientName,
+    })));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/tasks/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -308,58 +361,6 @@ router.delete("/tasks/:id", async (req, res) => {
   }
 });
 
-// Weekly view for manager
-router.get("/tasks/weekly", async (req, res) => {
-  try {
-    const weekStart = req.query.weekStart ? new Date(req.query.weekStart as string) : (() => {
-      const d = new Date(); d.setHours(0,0,0,0);
-      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-      return d;
-    })();
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 5);
-    weekEnd.setHours(0,0,0,0);
-
-    const assignedTo = req.query.assignedTo ? parseInt(req.query.assignedTo as string) : undefined;
-    const conds: any[] = [gte(tasksTable.dueDate, weekStart), lt(tasksTable.dueDate, weekEnd)];
-    if (assignedTo) {
-      conds.push(
-        or(
-          eq(tasksTable.assignedTo, assignedTo),
-          sql`EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = ${tasksTable.id} AND ta.user_id = ${assignedTo})`
-        )
-      );
-    }
-
-    const data = await db.select({
-      t: tasksTable,
-      assigneeName: usersTable.fullName,
-      clientName: clientsTable.companyName,
-      assigneeNames: sql<string>`(
-        SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
-        FROM task_assignees ta2
-        JOIN users u2 ON u2.id = ta2.user_id
-        WHERE ta2.task_id = ${tasksTable.id}
-      )`,
-    }).from(tasksTable)
-      .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
-      .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
-      .where(and(...conds))
-      .orderBy(
-        sql`case when ${tasksTable.priority}='urgent' then 0 when ${tasksTable.priority}='high' then 1 when ${tasksTable.priority}='medium' then 2 else 3 end`,
-        tasksTable.dueDate
-      )
-      .limit(500);
-
-    res.json(data.map(r => ({
-      ...r.t,
-      assigneeName: r.assigneeNames ?? r.assigneeName,
-      clientName: r.clientName,
-    })));
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // GET /api/tasks/:id/chain — full ancestor chain for a task (oldest first)
 router.get("/tasks/:id/chain", async (req, res) => {

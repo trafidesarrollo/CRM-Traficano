@@ -85,8 +85,6 @@ export default function ClientDetail() {
   const taskId = new URLSearchParams(window.location.search).get("taskId");
   const [reminderTask, setReminderTask] = useState<any>(null);
   const [reminderDismissed, setReminderDismissed] = useState(false);
-  const [completingTask, setCompletingTask] = useState(false);
-  const [completeModalOpen, setCompleteModalOpen] = useState(false);
 
   // ── Task detail modal (read-only + full thread + close/followup) ──
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -105,7 +103,7 @@ export default function ClientDetail() {
     setTaskModalOpen(true);
     setTaskShowFollowup(false);
     setTaskFollowupDate((() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })());
-    setTaskFollowupTitle(task.title || "");
+    setTaskFollowupTitle(data?.client?.companyName || data?.client?.company_name || task.title || "");
     setTaskFollowupDesc("");
     setTaskThread(null);
     if (task.id) {
@@ -133,12 +131,16 @@ export default function ClientDetail() {
     if (!taskModalData) return;
     setTaskSaving(true);
     try {
-      await fetch(`${API}/api/tasks/${taskModalData.id}`, {
+      const closeRes = await fetch(`${API}/api/tasks/${taskModalData.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
       });
+      if (!closeRes.ok) {
+        toast({ title: "Error al cerrar la tarea", variant: "destructive" });
+        return;
+      }
 
       if (createFollowup && taskFollowupDate && taskFollowupTitle.trim() && id) {
         const memberIds = data?.teamInfo?.members?.map((m: any) => m.userId).filter(Boolean) || [];
@@ -169,26 +171,6 @@ export default function ClientDetail() {
       load();
     } finally { setTaskSaving(false); }
   };
-  const defaultFollowup = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + 3);
-    return {
-      title: data?.client?.company_name || data?.client?.companyName || "",
-      date: d.toISOString().slice(0, 10),
-      priority: "medium" as "low" | "medium" | "high",
-      status: "pending" as "pending" | "completed",
-      description: "",
-      assignedToUserId: String((user as any)?.id || ""),
-    };
-  };
-  const [followupForm, setFollowupForm] = useState(defaultFollowup());
-
-  useEffect(() => {
-    if (completeModalOpen) {
-      setFollowupForm(defaultFollowup());
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completeModalOpen]);
 
   useEffect(() => {
     if (!taskId) return;
@@ -198,47 +180,6 @@ export default function ClientDetail() {
       .catch(() => {});
   }, [taskId]);
 
-  const completeTask = async (createFollowup: boolean) => {
-    if (!reminderTask) return;
-    setCompletingTask(true);
-    try {
-      const r = await fetch(`${API}/api/tasks/${reminderTask.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
-      });
-      if (r.ok) {
-        if (createFollowup && id) {
-          await fetch(`${API}/api/tasks`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              title: followupForm.title,
-              type: "followup",
-              priority: followupForm.priority,
-              status: "pending",
-              description: followupForm.description || undefined,
-              dueDate: followupForm.date ? new Date(followupForm.date + "T12:00:00").toISOString() : undefined,
-              clientId: parseInt(id),
-              parentTaskId: reminderTask.id,
-              assigneeIds: data?.teamInfo?.members?.length
-                ? data.teamInfo.members.map((m: any) => m.userId).filter(Boolean)
-                : undefined,
-            }),
-          }).catch(() => {});
-        }
-        toast({ title: createFollowup ? "Tarea cerrada y seguimiento agendado" : "Tarea cerrada" });
-        setReminderTask((t: any) => ({ ...t, status: "completed" }));
-        setCompleteModalOpen(false);
-        setFollowupForm(defaultFollowup());
-        load();
-      } else {
-        toast({ title: "Error al completar la tarea", variant: "destructive" });
-      }
-    } finally { setCompletingTask(false); }
-  };
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
