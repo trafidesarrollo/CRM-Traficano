@@ -89,6 +89,9 @@ export default function CargaMasivaPage() {
   // Assignable users for the schedule modal
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [clients, setClients] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [modalTeamMembers, setModalTeamMembers] = useState<{ userId: number; fullName: string; role: string }[]>([]);
 
   // Rows pendientes sin fecha de seguimiento (requieren acción antes de guardar)
   const [sinFecha, setSinFecha] = useState<SinFechaRow[]>([]);
@@ -111,12 +114,24 @@ export default function CargaMasivaPage() {
     Promise.all([
       fetch(`${API}/api/users/assignable`, { credentials: "include" }).then(r => r.json()).catch(() => []),
       fetch(`${API}/api/auth/me`, { credentials: "include" }).then(r => r.json()).catch(() => null),
-    ]).then(([users, me]) => {
+      fetch(`${API}/api/clients?limit=500`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+      fetch(`${API}/api/commercial-teams`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+    ]).then(([users, me, clientsRes, teamsRes]) => {
       const userList = Array.isArray(users) ? users : [];
       setAssignableUsers(userList);
       if (me?.id) setCurrentUserId(String(me.id));
+      const clientList = Array.isArray(clientsRes?.data) ? clientsRes.data : Array.isArray(clientsRes) ? clientsRes : [];
+      setClients(clientList);
+      setTeams(Array.isArray(teamsRes) ? teamsRes : []);
     });
   }, []);
+
+  function getTeamMembersForClient(clientId: number) {
+    const client = clients.find((c: any) => c.id === clientId);
+    if (!client?.assignedTeamId) return [];
+    const team = teams.find((t: any) => t.id === client.assignedTeamId);
+    return (team?.members || []).filter((m: any) => m.userId != null) as { userId: number; fullName: string; role: string }[];
+  }
 
   function toggleTask(conflictIdx: number, taskId: number) {
     setResolutions(prev => {
@@ -140,6 +155,7 @@ export default function CargaMasivaPage() {
   function openScheduleModal(conflictIdx: number) {
     const c = conflicts[conflictIdx];
     setScheduleForm(defaultFollowup(c, currentUserId));
+    setModalTeamMembers(getTeamMembersForClient(c.clientId));
     setScheduleModal({ open: true, conflictIdx });
   }
 
@@ -279,6 +295,7 @@ export default function CargaMasivaPage() {
   }
 
   function openSinFechaModal(row: SinFechaRow, idx: number) {
+    setModalTeamMembers(getTeamMembersForClient(row.clientId));
     setSinFechaForm({
       title: row.clientName,
       tipo: "Seguimiento",
@@ -716,6 +733,29 @@ export default function CargaMasivaPage() {
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
+            {/* Empresa (read-only) */}
+            <div>
+              <Label className="text-sm">Empresa</Label>
+              <div className="mt-1 px-3 py-2 rounded-md border border-border/50 bg-muted/20 text-sm font-medium text-foreground">
+                {scheduleModal !== null ? conflicts[scheduleModal.conflictIdx]?.clientName : ""}
+              </div>
+            </div>
+
+            {/* Equipo asignado */}
+            <div>
+              <Label className="text-sm">Equipo que recibirá la tarea</Label>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {modalTeamMembers.length > 0
+                  ? modalTeamMembers.map(m => (
+                      <span key={m.userId} className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2.5 py-1">
+                        <User className="w-3 h-3" />{m.fullName}
+                      </span>
+                    ))
+                  : <span className="text-xs text-muted-foreground italic">Sin equipo asignado — se asignará al usuario actual</span>
+                }
+              </div>
+            </div>
+
             <div>
               <Label className="text-sm">Fecha de seguimiento</Label>
               <Input
@@ -752,22 +792,6 @@ export default function CargaMasivaPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div>
-              <Label className="text-sm">Asignar a</Label>
-              <Select value={scheduleForm.assignedTo} onValueChange={v => setScheduleForm(f => ({ ...f, assignedTo: v }))}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Seleccionar usuario..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignableUsers.map((u: any) => (
-                    <SelectItem key={u.id} value={String(u.id)}>
-                      {u.name || u.username}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <div>
@@ -815,6 +839,29 @@ export default function CargaMasivaPage() {
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
+            {/* Empresa (read-only) */}
+            <div>
+              <Label className="text-sm">Empresa</Label>
+              <div className="mt-1 px-3 py-2 rounded-md border border-border/50 bg-muted/20 text-sm font-medium text-foreground">
+                {sinFechaModal?.row.clientName}
+              </div>
+            </div>
+
+            {/* Equipo asignado */}
+            <div>
+              <Label className="text-sm">Equipo que recibirá la tarea</Label>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {modalTeamMembers.length > 0
+                  ? modalTeamMembers.map(m => (
+                      <span key={m.userId} className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2.5 py-1">
+                        <User className="w-3 h-3" />{m.fullName}
+                      </span>
+                    ))
+                  : <span className="text-xs text-muted-foreground italic">Sin equipo asignado — se asignará al usuario actual</span>
+                }
+              </div>
+            </div>
+
             <div>
               <Label className="text-sm">Fecha de seguimiento <span className="text-red-400">*</span></Label>
               <Input
@@ -825,29 +872,16 @@ export default function CargaMasivaPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm">Prioridad</Label>
-                <Select value={sinFechaForm.priority} onValueChange={v => setSinFechaForm(f => ({ ...f, priority: v }))}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="medium">Media</SelectItem>
-                    <SelectItem value="low">Baja</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm">Asignar a</Label>
-                <Select value={sinFechaForm.assignedTo} onValueChange={v => setSinFechaForm(f => ({ ...f, assignedTo: v }))}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Usuario..." /></SelectTrigger>
-                  <SelectContent>
-                    {assignableUsers.map((u: any) => (
-                      <SelectItem key={u.id} value={String(u.id)}>{u.name || u.username}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label className="text-sm">Prioridad</Label>
+              <Select value={sinFechaForm.priority} onValueChange={v => setSinFechaForm(f => ({ ...f, priority: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="medium">Media</SelectItem>
+                  <SelectItem value="low">Baja</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
