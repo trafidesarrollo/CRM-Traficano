@@ -723,7 +723,12 @@ export default function Clients() {
   const totalCols = 2 + visibleCols.size + 1; // Nro + Empresa + visible + actions
 
   const statusQuery = statusFilter.length ? statusFilter.join(",") : undefined;
-  const { data: response, isLoading, refetch } = useGetClients({ search: search || undefined, status: statusQuery } as any);
+  const { data: response, isLoading, refetch } = useGetClients({
+    search: search || undefined,
+    status: statusQuery,
+    importance: importanceFilter !== "all" ? importanceFilter : undefined,
+    teamId: spFilter !== "all" ? spFilter : undefined,
+  } as any);
   const { data: salespeopleRes } = useGetSalespeople();
   const salespeople = (salespeopleRes as any) || [];
 
@@ -751,6 +756,21 @@ export default function Clients() {
   const [contactForm, setContactForm] = useState(BLANK_CONTACT);
   const [savingContact, setSavingContact] = useState(false);
   const [contactClientSearch, setContactClientSearch] = useState("");
+  const [pickerClients, setPickerClients] = useState<any[]>([]);
+  const pickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!contactOpen) return;
+    if (pickerTimer.current) clearTimeout(pickerTimer.current);
+    pickerTimer.current = setTimeout(() => {
+      const q = contactClientSearch.trim();
+      fetch(`${API}/api/clients?limit=30${q ? `&search=${encodeURIComponent(q)}` : ""}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : { data: [] })
+        .then(d => setPickerClients(d.data || []))
+        .catch(() => {});
+    }, 200);
+    return () => { if (pickerTimer.current) clearTimeout(pickerTimer.current); };
+  }, [contactClientSearch, contactOpen]);
 
   // ── Sorting ──
   const [sortKey, setSortKey] = useState<"company" | "scale" | "status" | "city" | "industry" | null>(null);
@@ -1067,9 +1087,9 @@ export default function Clients() {
               />
               {!contactForm.clientId && (
                 <div className="border rounded-md max-h-36 overflow-y-auto">
-                  {filteredForPicker.length === 0
-                    ? <p className="text-xs text-muted-foreground p-2">Sin resultados</p>
-                    : filteredForPicker.map((c: any) => (
+                  {pickerClients.length === 0
+                    ? <p className="text-xs text-muted-foreground p-2">{contactClientSearch ? "Sin resultados" : "Escribí para buscar..."}</p>
+                    : pickerClients.map((c: any) => (
                       <button key={c.id} type="button"
                         className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
                         onClick={() => { setContactForm(f => ({ ...f, clientId: String(c.id) })); setContactClientSearch(c.company_name || c.companyName || ""); }}>
