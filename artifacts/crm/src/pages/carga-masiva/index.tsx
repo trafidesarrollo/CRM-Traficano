@@ -715,199 +715,204 @@ export default function CargaMasivaPage() {
         )}
       </div>
 
-      {/* ── Agendar seguimiento modal ── */}
+      {/* ── Modal: Agendar seguimiento (conflictos) ── */}
       <Dialog open={!!scheduleModal?.open} onOpenChange={(open) => { if (!open) setScheduleModal(null); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md gap-0 p-0 overflow-hidden">
           <DialogDescription className="sr-only">Agendar próximo seguimiento</DialogDescription>
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center">
-                <CalendarCheck2 className="w-5 h-5 text-green-400" />
-              </div>
-              <div>
-                <DialogTitle>Agendar seguimiento</DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Completá los datos del próximo seguimiento antes de cerrar la tarea.
-                </p>
-              </div>
+          {/* Header */}
+          <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-border/40">
+            <div className="w-9 h-9 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
+              <CalendarCheck2 className="w-4.5 h-4.5 text-green-400" />
             </div>
-          </DialogHeader>
-
-          <div className="space-y-4 pt-2">
-            {/* Empresa (read-only) */}
-            <div>
-              <Label className="text-sm">Empresa</Label>
-              <div className="mt-1 px-3 py-2 rounded-md border border-border/50 bg-muted/20 text-sm font-medium text-foreground">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-base font-semibold leading-snug">Próximo seguimiento</DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {scheduleModal !== null ? conflicts[scheduleModal.conflictIdx]?.clientName : ""}
-              </div>
+              </p>
             </div>
+          </div>
 
-            {/* Equipo asignado */}
-            <div>
-              <Label className="text-sm">Equipo que recibirá la tarea</Label>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {modalTeamMembers.length > 0
-                  ? modalTeamMembers.map(m => (
-                      <span key={m.userId} className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2.5 py-1">
-                        <User className="w-3 h-3" />{m.fullName}
-                      </span>
-                    ))
-                  : <span className="text-xs text-muted-foreground italic">Sin equipo asignado — se asignará al usuario actual</span>
-                }
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-sm">Fecha de seguimiento</Label>
+          <div className="px-6 py-5 space-y-4">
+            {/* Título editable */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Título</Label>
               <Input
-                type="date"
-                className="mt-1"
-                value={scheduleForm.dueDate}
-                onChange={e => setScheduleForm(f => ({ ...f, dueDate: e.target.value }))}
+                value={scheduleForm.title}
+                onChange={e => setScheduleForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="¿Qué hay que hacer?"
+                className="text-sm"
               />
             </div>
 
+            {/* Equipo */}
+            {modalTeamMembers.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Se asignará a</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {modalTeamMembers.map(m => (
+                    <span key={m.userId} className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2.5 py-1">
+                      <User className="w-3 h-3" />{m.fullName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fecha + Prioridad */}
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm">Prioridad</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Fecha <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={scheduleForm.dueDate}
+                  onChange={e => setScheduleForm(f => ({ ...f, dueDate: e.target.value }))}
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prioridad</Label>
                 <Select value={scheduleForm.priority} onValueChange={v => setScheduleForm(f => ({ ...f, priority: v }))}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="urgent">Urgente</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
                     <SelectItem value="medium">Media</SelectItem>
                     <SelectItem value="low">Baja</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="text-sm">Estado</Label>
-                <Select value={scheduleForm.status} onValueChange={v => setScheduleForm(f => ({ ...f, status: v }))}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
+            </div>
+
+            {/* Descripción */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Nota <span className="font-normal normal-case">(opcional)</span>
+              </Label>
+              <Textarea
+                className="text-sm resize-none"
+                rows={3}
+                value={scheduleForm.description}
+                onChange={e => setScheduleForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Contexto para el próximo contacto…"
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex gap-3 px-6 pb-6 pt-2 border-t border-border/40">
+            <Button variant="outline" className="flex-1" onClick={handleScheduleSkip}>
+              Cerrar sin agendar
+            </Button>
+            <Button
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              disabled={!scheduleForm.dueDate || !scheduleForm.title.trim()}
+              onClick={handleScheduleConfirm}
+            >
+              <CalendarCheck2 className="w-4 h-4 mr-2" />
+              Cerrar y agendar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: asignar fecha a fila sin seguimiento ── */}
+      <Dialog open={!!sinFechaModal?.open} onOpenChange={(open) => { if (!open) setSinFechaModal(null); }}>
+        <DialogContent className="sm:max-w-md gap-0 p-0 overflow-hidden">
+          <DialogDescription className="sr-only">Asignar fecha de seguimiento</DialogDescription>
+          {/* Header */}
+          <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-border/40">
+            <div className="w-9 h-9 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+              <CalendarCheck2 className="w-4.5 h-4.5 text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-base font-semibold leading-snug">Agendar seguimiento</DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">{sinFechaModal?.row.clientName}</p>
+            </div>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            {/* Título editable */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Título</Label>
+              <Input
+                value={sinFechaForm.title}
+                onChange={e => setSinFechaForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="¿Qué hay que hacer?"
+                className="text-sm"
+              />
+            </div>
+
+            {/* Equipo */}
+            {modalTeamMembers.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Se asignará a</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {modalTeamMembers.map(m => (
+                    <span key={m.userId} className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2.5 py-1">
+                      <User className="w-3 h-3" />{m.fullName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fecha + Prioridad */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Fecha <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={sinFechaForm.dueDate}
+                  onChange={e => setSinFechaForm(f => ({ ...f, dueDate: e.target.value }))}
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prioridad</Label>
+                <Select value={sinFechaForm.priority} onValueChange={v => setSinFechaForm(f => ({ ...f, priority: v }))}>
+                  <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">Abierta</SelectItem>
-                    <SelectItem value="in_progress">En progreso</SelectItem>
+                    <SelectItem value="urgent">Urgente</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="medium">Media</SelectItem>
+                    <SelectItem value="low">Baja</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div>
-              <Label className="text-sm">Descripción <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            {/* Descripción */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Nota <span className="font-normal normal-case">(opcional)</span>
+              </Label>
               <Textarea
-                className="mt-1 text-sm"
-                rows={3}
-                value={scheduleForm.description}
-                onChange={e => setScheduleForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="Ej: Confirmar disponibilidad para reunión..."
-              />
-            </div>
-
-            <div className="flex gap-3 pt-1">
-              <Button variant="ghost" className="flex-1" onClick={handleScheduleSkip}>
-                Cerrar sin agendar
-              </Button>
-              <Button
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                onClick={handleScheduleConfirm}
-              >
-                <CalendarCheck2 className="w-4 h-4 mr-2" />
-                Completar y agendar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/* ── Modal: asignar fecha a fila sin seguimiento ── */}
-      <Dialog open={!!sinFechaModal?.open} onOpenChange={(open) => { if (!open) setSinFechaModal(null); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogDescription className="sr-only">Asignar fecha de seguimiento</DialogDescription>
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center">
-                <CalendarCheck2 className="w-5 h-5 text-amber-400" />
-              </div>
-              <div>
-                <DialogTitle>Asignar fecha de seguimiento</DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {sinFechaModal?.row.clientName} — asigná una fecha para crear la tarea.
-                </p>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <div className="space-y-4 pt-2">
-            {/* Empresa (read-only) */}
-            <div>
-              <Label className="text-sm">Empresa</Label>
-              <div className="mt-1 px-3 py-2 rounded-md border border-border/50 bg-muted/20 text-sm font-medium text-foreground">
-                {sinFechaModal?.row.clientName}
-              </div>
-            </div>
-
-            {/* Equipo asignado */}
-            <div>
-              <Label className="text-sm">Equipo que recibirá la tarea</Label>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {modalTeamMembers.length > 0
-                  ? modalTeamMembers.map(m => (
-                      <span key={m.userId} className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2.5 py-1">
-                        <User className="w-3 h-3" />{m.fullName}
-                      </span>
-                    ))
-                  : <span className="text-xs text-muted-foreground italic">Sin equipo asignado — se asignará al usuario actual</span>
-                }
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-sm">Fecha de seguimiento <span className="text-red-400">*</span></Label>
-              <Input
-                type="date"
-                className="mt-1"
-                value={sinFechaForm.dueDate}
-                onChange={e => setSinFechaForm(f => ({ ...f, dueDate: e.target.value }))}
-              />
-            </div>
-
-            <div>
-              <Label className="text-sm">Prioridad</Label>
-              <Select value={sinFechaForm.priority} onValueChange={v => setSinFechaForm(f => ({ ...f, priority: v }))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="medium">Media</SelectItem>
-                  <SelectItem value="low">Baja</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-sm">Descripción <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-              <Textarea
-                className="mt-1 text-sm"
+                className="text-sm resize-none"
                 rows={2}
                 value={sinFechaForm.description}
                 onChange={e => setSinFechaForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Contexto para el próximo contacto…"
               />
             </div>
+          </div>
 
-            <div className="flex gap-3 pt-1">
-              <Button variant="ghost" className="flex-1" onClick={handleSinFechaSkip}>
-                Guardar como nota
-              </Button>
-              <Button
-                className="flex-1 bg-amber-600 hover:bg-amber-500 text-white"
-                disabled={!sinFechaForm.dueDate}
-                onClick={handleSinFechaConfirm}
-              >
-                <CalendarCheck2 className="w-4 h-4 mr-2" />
-                Agendar seguimiento
-              </Button>
-            </div>
+          {/* Footer */}
+          <div className="flex gap-3 px-6 pb-6 pt-2 border-t border-border/40">
+            <Button variant="outline" className="flex-1" onClick={handleSinFechaSkip}>
+              Guardar como nota
+            </Button>
+            <Button
+              className="flex-1 bg-amber-600 hover:bg-amber-500 text-white"
+              disabled={!sinFechaForm.dueDate || !sinFechaForm.title.trim()}
+              onClick={handleSinFechaConfirm}
+            >
+              <CalendarCheck2 className="w-4 h-4 mr-2" />
+              Agendar seguimiento
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
