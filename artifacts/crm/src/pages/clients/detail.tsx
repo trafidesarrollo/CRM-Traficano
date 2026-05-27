@@ -203,7 +203,7 @@ export default function ClientDetail() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ status: "completed" }),
+        body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
       });
       if (r.ok) {
         if (createFollowup && id) {
@@ -215,20 +215,22 @@ export default function ClientDetail() {
               title: followupForm.title,
               type: "followup",
               priority: followupForm.priority,
-              status: followupForm.status,
+              status: "pending",
               description: followupForm.description || undefined,
               dueDate: followupForm.date ? new Date(followupForm.date + "T12:00:00").toISOString() : undefined,
               clientId: parseInt(id),
+              parentTaskId: reminderTask.id,
               assigneeIds: data?.teamInfo?.members?.length
                 ? data.teamInfo.members.map((m: any) => m.userId).filter(Boolean)
                 : undefined,
             }),
           }).catch(() => {});
         }
-        toast({ title: "Tarea completada", description: createFollowup ? "Seguimiento agendado." : undefined });
+        toast({ title: createFollowup ? "Tarea cerrada y seguimiento agendado" : "Tarea cerrada" });
         setReminderTask((t: any) => ({ ...t, status: "completed" }));
         setCompleteModalOpen(false);
         setFollowupForm(defaultFollowup());
+        load();
       } else {
         toast({ title: "Error al completar la tarea", variant: "destructive" });
       }
