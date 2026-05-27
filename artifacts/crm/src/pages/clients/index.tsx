@@ -810,7 +810,7 @@ export default function Clients() {
       if (av > bv) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-  }, [allClients, sortKey, sortDir]);
+  }, [filteredClients, sortKey, sortDir]);
 
   const filteredForPicker = contactClientSearch.trim()
     ? allClients.filter((c: any) =>
