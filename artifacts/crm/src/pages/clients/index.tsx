@@ -773,7 +773,7 @@ export default function Clients() {
   }, [contactClientSearch, contactOpen]);
 
   // ── Sorting ──
-  const [sortKey, setSortKey] = useState<"company" | "scale" | "status" | "city" | "industry" | "totalCotizado" | null>(null);
+  const [sortKey, setSortKey] = useState<"id" | "company" | "scale" | "status" | "city" | "industry" | "totalCotizado" | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const toggleSort = (key: typeof sortKey) => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -801,6 +801,7 @@ export default function Clients() {
     if (!sortKey) return filteredClients;
     return [...filteredClients].sort((a, b) => {
       let av: any, bv: any;
+      if (sortKey === "id")            { av = a.id ?? 0; bv = b.id ?? 0; }
       if (sortKey === "company")       { av = (a.companyName || "").toLowerCase(); bv = (b.companyName || "").toLowerCase(); }
       if (sortKey === "scale")         { av = a.consumptionScale ?? -1; bv = b.consumptionScale ?? -1; }
       if (sortKey === "status")        { av = STATUS_ORDER[a.status] ?? 0; bv = STATUS_ORDER[b.status] ?? 0; }
@@ -938,7 +939,7 @@ export default function Clients() {
         <Table>
           <TableHeader className="bg-white/5">
             <TableRow>
-              <TableHead className="w-24">Nro.</TableHead>
+              <TableHead className="w-24"><SortHead label="Nro." sk="id" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>
               <SortHead label="Empresa" sk="company" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               {col("emails")      && <TableHead>Emails</TableHead>}
               {col("phone")       && <TableHead>Teléfono</TableHead>}
