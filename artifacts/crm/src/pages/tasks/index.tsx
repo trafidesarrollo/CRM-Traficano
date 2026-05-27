@@ -51,8 +51,9 @@ const QUOTE_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 const getQuoteStatusBadge = (q: any): { label: string; color: string } => {
-  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada", color: "bg-green-500/20 text-green-300 border-green-500/30" };
-  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",    color: "bg-red-500/20 text-red-300 border-red-500/30" };
+  if (q.quoteStatus === "FINALIZADA") return { label: "Finalizada",  color: "bg-green-500/20 text-green-300 border-green-500/30" };
+  if (q.quoteStatus === "PERDIDA")    return { label: "Perdida",     color: "bg-red-500/20 text-red-300 border-red-500/30" };
+  if (q.quoteStatus === "DESISTIDA")  return { label: "Desistida",   color: "bg-slate-500/20 text-slate-300 border-slate-500/30" };
   return QUOTE_STATUS[q.status] || { label: q.status, color: "bg-gray-500/20 text-gray-300 border-gray-500/30" };
 };
 
