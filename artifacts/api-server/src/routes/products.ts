@@ -138,9 +138,14 @@ router.get("/products/catalog", async (req, res) => {
     const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
     const offset = (page - 1) * limit;
 
+    // Split search into tokens for multi-word AND matching
+    const searchTokens = search ? search.split(/\s+/).filter(Boolean) : [];
+
     // Build accesorios query conditions
     const accConds: string[] = [];
-    if (search) accConds.push(`(pa.name ILIKE '%${esc(search)}%' OR pa.code ILIKE '%${esc(search)}%')`);
+    for (const token of searchTokens) {
+      accConds.push(`(pa.name ILIKE '%${esc(token)}%' OR pa.code ILIKE '%${esc(token)}%')`);
+    }
     if (accessoryType) accConds.push(`pa.accessory_type = '${esc(accessoryType)}'`);
     if (standard) accConds.push(`pa.standard = '${esc(standard)}'`);
     if (hasPrice) accConds.push(`pa.${priceCol} IS NOT NULL AND pa.${priceCol} > 0`);
@@ -149,7 +154,9 @@ router.get("/products/catalog", async (req, res) => {
 
     // Build medidas query conditions
     const medConds: string[] = [];
-    if (search) medConds.push(`(pm.name ILIKE '%${esc(search)}%' OR pm.code ILIKE '%${esc(search)}%')`);
+    for (const token of searchTokens) {
+      medConds.push(`(pm.name ILIKE '%${esc(token)}%' OR pm.code ILIKE '%${esc(token)}%')`);
+    }
     if (category) medConds.push(`pm.category = '${esc(category)}'`);
     if (seamType) medConds.push(`pm.seam_type = '${esc(seamType)}'`);
     if (shape) medConds.push(`pm.shape = '${esc(shape)}'`);
