@@ -139,8 +139,15 @@ router.get("/clients", async (req, res) => {
 
 router.post("/clients", async (req, res) => {
   try {
-    const body = req.body;
-    // Auto-compute status unless admin is explicitly setting it to a specific value
+    const body = { ...req.body };
+    const callerRole = (req as any).session?.role;
+    const isAdminOrManager = callerRole === "admin" || callerRole === "gerente" || callerRole === "gerente_comercial";
+
+    // Only admin/gerente can assign a team at creation time
+    if (!isAdminOrManager && "assignedTeamId" in body) {
+      delete body.assignedTeamId;
+    }
+
     const status = computeStatus(body, undefined);
     const [client] = await db.insert(clientsTable).values({ ...body, status }).returning();
     res.status(201).json(client);
@@ -270,6 +277,15 @@ router.patch("/clients/:id", async (req, res) => {
     // Load existing to preserve final status
     const [existing] = await db.select().from(clientsTable).where(eq(clientsTable.id, id)).limit(1);
     if (!existing) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
+
+    // Team assignment — only admin/gerente can set or change assignedTeamId
+    if ("assignedTeamId" in body) {
+      const isAdminOrManager = callerRole === "admin" || callerRole === "gerente" || callerRole === "gerente_comercial";
+      if (!isAdminOrManager) {
+        res.status(403).json({ error: "Solo el administrador o gerente puede asignar equipos a un cliente" });
+        return;
+      }
+    }
 
     // Salesperson assignment permission check
     if ("assignedSalespersonId" in body) {
