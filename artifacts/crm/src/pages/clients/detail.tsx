@@ -163,6 +163,9 @@ export default function ClientDetail() {
         toast({ title: "Tarea cerrada" });
       }
       setTaskModalOpen(false);
+      if (reminderTask && taskModalData && reminderTask.id === taskModalData.id) {
+        setReminderTask((t: any) => ({ ...t, status: "completed", completedAt: new Date().toISOString() }));
+      }
       load();
     } finally { setTaskSaving(false); }
   };
@@ -488,142 +491,49 @@ export default function ClientDetail() {
 
         {/* ── Task reminder banner ── */}
         {reminderTask && !reminderDismissed && (
-          <div className={`rounded-lg border ${reminderTask.status === "completed" ? "border-green-500/30 bg-green-500/10" : "border-amber-500/30 bg-amber-500/5"}`}>
-            {/* Header row */}
-            <div className="flex items-start gap-3 px-4 py-3">
-              {reminderTask.status === "completed"
-                ? <CheckCircle2 className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
-                : <Bell className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-300">
-                  {reminderTask.status === "completed" ? "✓ Tarea completada" : "Tarea pendiente"}
-                </p>
-                <p className="text-sm font-medium mt-0.5">{reminderTask.title}</p>
-                {reminderTask.description && (
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{reminderTask.description}</p>
+          <div className={`rounded-lg border flex items-start gap-3 px-4 py-3 ${reminderTask.status === "completed" ? "border-green-500/30 bg-green-500/10" : "border-amber-500/30 bg-amber-500/5"}`}>
+            {reminderTask.status === "completed"
+              ? <CheckCircle2 className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+              : <Bell className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-300">
+                {reminderTask.status === "completed" ? "✓ Tarea completada" : "Tarea pendiente"}
+              </p>
+              <p className="text-sm font-medium mt-0.5">{reminderTask.title}</p>
+              {reminderTask.description && (
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{reminderTask.description}</p>
+              )}
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                {reminderTask.dueDate && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <CalendarClock className="w-3 h-3" />
+                    Vence: {new Date(reminderTask.dueDate).toLocaleDateString("es-AR")}
+                  </span>
                 )}
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  {reminderTask.dueDate && (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <CalendarClock className="w-3 h-3" />
-                      Vence: {new Date(reminderTask.dueDate).toLocaleDateString("es-AR")}
-                    </span>
-                  )}
-                  {reminderTask.assignee_name && (
-                    <span className="text-xs text-blue-300 flex items-center gap-1">
-                      <Users className="w-3 h-3" />{reminderTask.assignee_name}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {reminderTask.status !== "completed" && !completeModalOpen && (
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => { setCompleteModalOpen(true); setFollowupForm(defaultFollowup()); }}
-                    disabled={completingTask}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Cerrar tarea
-                  </Button>
+                {reminderTask.assignee_name && (
+                  <span className="text-xs text-blue-300 flex items-center gap-1">
+                    <Users className="w-3 h-3" />{reminderTask.assignee_name}
+                  </span>
                 )}
-                <button onClick={() => { setReminderDismissed(true); setCompleteModalOpen(false); }} className="text-muted-foreground hover:text-foreground">
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             </div>
-
-            {/* Inline close form */}
-            {reminderTask.status !== "completed" && completeModalOpen && (
-              <div className="border-t border-amber-500/20 px-4 pb-4 pt-3 space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                  <CalendarClock className="w-3.5 h-3.5" />Agendar próximo seguimiento
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="sm:col-span-2 space-y-1">
-                    <Label className="text-xs">Título del seguimiento</Label>
-                    <Input
-                      value={followupForm.title}
-                      onChange={(e) => setFollowupForm((f) => ({ ...f, title: e.target.value }))}
-                      placeholder="¿Qué hay que hacer?"
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Fecha <span className="text-red-400">*</span></Label>
-                    <Input
-                      type="date"
-                      value={followupForm.date}
-                      onChange={(e) => setFollowupForm((f) => ({ ...f, date: e.target.value }))}
-                      className="h-8 text-sm"
-                      min={new Date().toISOString().slice(0, 10)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Prioridad</Label>
-                    <Select
-                      value={followupForm.priority}
-                      onValueChange={(v) => setFollowupForm((f) => ({ ...f, priority: v as any }))}
-                    >
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="urgent">Urgente</SelectItem>
-                        <SelectItem value="high">Alta</SelectItem>
-                        <SelectItem value="medium">Media</SelectItem>
-                        <SelectItem value="low">Baja</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="sm:col-span-2 space-y-1">
-                    <Label className="text-xs">Nota (opcional)</Label>
-                    <Textarea
-                      value={followupForm.description}
-                      onChange={(e) => setFollowupForm((f) => ({ ...f, description: e.target.value }))}
-                      placeholder="Contexto para el próximo contacto…"
-                      rows={2}
-                      className="text-sm resize-none"
-                    />
-                  </div>
-                </div>
-
-                {data?.teamInfo?.members?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 items-center">
-                    <span className="text-xs text-muted-foreground mr-1">Se asignará a:</span>
-                    {data.teamInfo.members.map((m: any) => (
-                      <span key={m.id} className="text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2 py-0.5">
-                        {m.fullName || m.username}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => completeTask(false)}
-                    disabled={completingTask}
-                    className="flex-1"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-green-400" />
-                    {completingTask ? "Cerrando…" : "Cerrar sin agendar"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => completeTask(true)}
-                    disabled={completingTask || !followupForm.title.trim() || !followupForm.date}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                    {completingTask ? "Guardando…" : "Completar y agendar"}
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              {reminderTask.status !== "completed" && (
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => openTaskModal(reminderTask)}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Cerrar tarea
+                </Button>
+              )}
+              <button onClick={() => setReminderDismissed(true)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
