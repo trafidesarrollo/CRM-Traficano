@@ -116,6 +116,7 @@ const GLOBAL_NAV_ITEMS = [
   { href: "/prompts",          label: "Prompts IA" },
   { href: "/audit",            label: "Auditoría" },
   { href: "/production",       label: "Producción (MES)" },
+  { href: "/industries",       label: "Rubros / Industrias" },
   { href: "/users",            label: "Usuarios" },
 ];
 
