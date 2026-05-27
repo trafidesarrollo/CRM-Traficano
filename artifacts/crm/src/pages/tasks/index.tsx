@@ -466,34 +466,37 @@ export default function Tasks() {
                 <DialogTitle>Nueva tarea</DialogTitle>
                 <DialogDescription>
                   {isVendedor
-                    ? "La tarea quedará asignada a vos automáticamente."
+                    ? "Seleccioná un cliente tuyo para crear la tarea para su equipo."
                     : "Seleccioná el cliente y el equipo que recibirá la tarea."}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
 
-                {/* ── Admin / Gerente: selector de cliente ── */}
-                {isAdmin && (
-                  <div>
-                    <Label>Cliente <span className="text-destructive">*</span></Label>
-                    <Select value={form.clientId} onValueChange={handleClientChange}>
-                      <SelectTrigger><SelectValue placeholder="Seleccioná un cliente" /></SelectTrigger>
-                      <SelectContent>
-                        {clients.map((c: any) => (
-                          <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {/* ── Vendedor: aviso de auto-asignación ── */}
-                {isVendedor && (
-                  <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-sm text-blue-300">
-                    <User className="w-4 h-4 shrink-0" />
-                    Esta tarea se asignará a <strong className="ml-1">{(user as any)?.fullName || (user as any)?.username}</strong>
-                  </div>
-                )}
+                {/* ── Selector de cliente: Admin ve todos, Vendedor ve los suyos ── */}
+                {(() => {
+                  const clientList = isVendedor
+                    ? clients.filter((c: any) => {
+                        const team = teams.find((t: any) => t.id === c.assignedTeamId);
+                        return team?.members?.some((m: any) => m.userId === (user as any)?.id);
+                      })
+                    : clients;
+                  return (
+                    <div>
+                      <Label>Cliente {isAdmin && <span className="text-destructive">*</span>}</Label>
+                      <Select value={form.clientId} onValueChange={handleClientChange}>
+                        <SelectTrigger><SelectValue placeholder={isVendedor ? "Seleccioná uno de tus clientes" : "Seleccioná un cliente"} /></SelectTrigger>
+                        <SelectContent>
+                          {clientList.length === 0
+                            ? <div className="px-3 py-2 text-sm text-muted-foreground">No tenés clientes asignados</div>
+                            : clientList.map((c: any) => (
+                                <SelectItem key={c.id} value={String(c.id)}>{c.companyName}</SelectItem>
+                              ))
+                          }
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })()}
 
                 <div><Label>Descripción</Label><Textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
 
@@ -512,27 +515,27 @@ export default function Tasks() {
                   <div><Label>Vencimiento</Label><Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
                 </div>
 
-                {/* ── Admin/Gerente: equipo del cliente ── */}
-                {isAdmin && (
-                  <>
-                    {!form.clientId && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 px-1">
-                        <Users className="w-3.5 h-3.5" />
-                        Seleccioná un cliente para ver el equipo disponible.
-                      </p>
-                    )}
+                {/* ── Equipo del cliente (todos los roles) ── */}
+                <>
+                  {!form.clientId && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 px-1">
+                      <Users className="w-3.5 h-3.5" />
+                      Seleccioná un cliente para ver el equipo disponible.
+                    </p>
+                  )}
 
-                    {form.clientId && clientTeamMembers.length === 0 && (
-                      <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-300">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>Este cliente no tiene un equipo comercial asignado. Podés asignarlo desde la ficha del cliente.</span>
-                      </div>
-                    )}
+                  {form.clientId && clientTeamMembers.length === 0 && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-300">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>Este cliente no tiene un equipo comercial asignado.</span>
+                    </div>
+                  )}
 
-                    {clientTeamMembers.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label>Asignar al equipo</Label>
+                  {clientTeamMembers.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Equipo que recibirá la tarea</Label>
+                        {isAdmin && (
                           <div className="flex gap-2 text-xs text-muted-foreground">
                             <button
                               type="button"
@@ -546,46 +549,54 @@ export default function Tasks() {
                               onClick={() => setTeamAssignees(new Set())}
                             >Ninguno</button>
                           </div>
-                        </div>
-                        <div className="rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
-                          {clientTeamMembers.map((m: any) => {
-                            const checked = teamAssignees.has(m.userId);
-                            return (
-                              <label key={m.userId} className="flex items-center gap-3 cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => {
-                                    setTeamAssignees(prev => {
-                                      const next = new Set(prev);
-                                      checked ? next.delete(m.userId) : next.add(m.userId);
-                                      return next;
-                                    });
-                                  }}
-                                  className="w-4 h-4 rounded accent-primary"
-                                />
-                                <div>
-                                  <span className="text-sm font-medium">{m.fullName || m.username}</span>
-                                  <span className="text-xs text-muted-foreground ml-2">
-                                    {m.role === "vendedor" ? "Vendedor" : "Apoyo"}
-                                  </span>
-                                </div>
-                              </label>
-                            );
-                          })}
-                        </div>
-                        {teamAssignees.size === 0 && (
-                          <p className="text-xs text-destructive">Seleccioná al menos un miembro del equipo.</p>
-                        )}
-                        {teamAssignees.size > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {teamAssignees.size === 1 ? "1 persona recibirá esta tarea." : `${teamAssignees.size} personas recibirán esta tarea compartida.`}
-                          </p>
                         )}
                       </div>
-                    )}
-                  </>
-                )}
+                      <div className="rounded-lg border border-border/50 bg-muted/10 p-3 space-y-2">
+                        {clientTeamMembers.map((m: any) => {
+                          const checked = teamAssignees.has(m.userId);
+                          return isAdmin ? (
+                            <label key={m.userId} className="flex items-center gap-3 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setTeamAssignees(prev => {
+                                    const next = new Set(prev);
+                                    checked ? next.delete(m.userId) : next.add(m.userId);
+                                    return next;
+                                  });
+                                }}
+                                className="w-4 h-4 rounded accent-primary"
+                              />
+                              <div>
+                                <span className="text-sm font-medium">{m.fullName || m.username}</span>
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  {m.role === "vendedor" ? "Vendedor" : "Apoyo"}
+                                </span>
+                              </div>
+                            </label>
+                          ) : (
+                            <div key={m.userId} className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                              <span className="text-sm font-medium">{m.fullName || m.username}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {m.role === "vendedor" ? "Vendedor" : "Apoyo"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {isAdmin && teamAssignees.size === 0 && (
+                        <p className="text-xs text-destructive">Seleccioná al menos un miembro del equipo.</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {isVendedor
+                          ? `La tarea se asignará a todo el equipo (${clientTeamMembers.length} ${clientTeamMembers.length === 1 ? "persona" : "personas"}).`
+                          : teamAssignees.size === 1 ? "1 persona recibirá esta tarea." : `${teamAssignees.size} personas recibirán esta tarea compartida.`}
+                      </p>
+                    </div>
+                  )}
+                </>
 
                 <Button
                   className="w-full"
