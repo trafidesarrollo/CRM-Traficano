@@ -773,11 +773,11 @@ export default function Clients() {
   }, [contactClientSearch, contactOpen]);
 
   // ── Sorting ──
-  const [sortKey, setSortKey] = useState<"company" | "scale" | "status" | "city" | "industry" | null>(null);
+  const [sortKey, setSortKey] = useState<"company" | "scale" | "status" | "city" | "industry" | "totalCotizado" | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const toggleSort = (key: typeof sortKey) => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir(key === "scale" ? "desc" : "asc"); }
+    else { setSortKey(key); setSortDir(key === "scale" || key === "totalCotizado" ? "desc" : "asc"); }
   };
   const STATUS_ORDER: Record<string, number> = { final: 4, potential: 3, inactive: 2, prospect: 1 };
 
@@ -801,11 +801,12 @@ export default function Clients() {
     if (!sortKey) return filteredClients;
     return [...filteredClients].sort((a, b) => {
       let av: any, bv: any;
-      if (sortKey === "company")  { av = (a.companyName || "").toLowerCase(); bv = (b.companyName || "").toLowerCase(); }
-      if (sortKey === "scale")    { av = a.consumptionScale ?? -1; bv = b.consumptionScale ?? -1; }
-      if (sortKey === "status")   { av = STATUS_ORDER[a.status] ?? 0; bv = STATUS_ORDER[b.status] ?? 0; }
-      if (sortKey === "city")     { av = (a.city || "").toLowerCase(); bv = (b.city || "").toLowerCase(); }
-      if (sortKey === "industry") { av = (a.industry || "").toLowerCase(); bv = (b.industry || "").toLowerCase(); }
+      if (sortKey === "company")       { av = (a.companyName || "").toLowerCase(); bv = (b.companyName || "").toLowerCase(); }
+      if (sortKey === "scale")         { av = a.consumptionScale ?? -1; bv = b.consumptionScale ?? -1; }
+      if (sortKey === "status")        { av = STATUS_ORDER[a.status] ?? 0; bv = STATUS_ORDER[b.status] ?? 0; }
+      if (sortKey === "city")          { av = (a.city || "").toLowerCase(); bv = (b.city || "").toLowerCase(); }
+      if (sortKey === "industry")      { av = (a.industry || "").toLowerCase(); bv = (b.industry || "").toLowerCase(); }
+      if (sortKey === "totalCotizado") { av = a.totalCotizadoAbierto ?? 0; bv = b.totalCotizadoAbierto ?? 0; }
       if (av < bv) return sortDir === "asc" ? -1 : 1;
       if (av > bv) return sortDir === "asc" ? 1 : -1;
       return 0;
@@ -948,7 +949,7 @@ export default function Clients() {
               {col("scale")          && <TableHead><SortHead label="Escala USD" sk="scale" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               {col("salesperson")    && <TableHead>Vendedor</TableHead>}
               {col("importance")     && <TableHead>Importancia</TableHead>}
-              {col("totalCotizado")  && <TableHead>Tot. Cotizado Abierto</TableHead>}
+              {col("totalCotizado")  && <TableHead><SortHead label="Tot. Cotizado Abierto" sk="totalCotizado" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
               {col("ultimaTarea")    && <TableHead>Próxima Tarea</TableHead>}
               {col("ultimoContacto") && <TableHead>Último Contacto</TableHead>}
               {col("status")         && <TableHead><SortHead label="Estado" sk="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} inline /></TableHead>}
