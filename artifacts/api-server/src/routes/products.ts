@@ -164,6 +164,14 @@ router.get("/products/catalog", async (req, res) => {
     if (noPrice) medConds.push(`(pm.${priceCol} IS NULL OR pm.${priceCol} = 0)`);
     const medWhere = medConds.length ? `WHERE ${medConds.join(" AND ")}` : "";
 
+    // Relevance: 0 = exact phrase match, 1 = token-only match
+    const relevanceAcc = search
+      ? `CASE WHEN (pa.name ILIKE '%${esc(search)}%' OR pa.code ILIKE '%${esc(search)}%') THEN 0 ELSE 1 END`
+      : "0";
+    const relevanceMed = search
+      ? `CASE WHEN (pm.name ILIKE '%${esc(search)}%' OR pm.code ILIKE '%${esc(search)}%') THEN 0 ELSE 1 END`
+      : "0";
+
     const accSelect = `
       SELECT pa.id, pa.code, pa.name, pa.standard,
              pa.sale_price::text AS sale_price,
@@ -172,7 +180,8 @@ router.get("/products/catalog", async (req, res) => {
              pa.accessory_type AS sub_type, pa.subtype AS sub_type2,
              pa.weight::text AS weight, NULL::text AS category,
              NULL::text AS outer_diameter, NULL::text AS nominal_thickness,
-             NULL::text AS seam_type, 'accesorios' AS source
+             NULL::text AS seam_type, 'accesorios' AS source,
+             ${relevanceAcc} AS _relevance
       FROM products_accesorios pa ${accWhere}
     `;
 
@@ -184,7 +193,8 @@ router.get("/products/catalog", async (req, res) => {
              pm.category AS sub_type, NULL::text AS sub_type2,
              NULL::text AS weight, pm.category,
              pm.outer_diameter::text AS outer_diameter, pm.nominal_thickness::text AS nominal_thickness,
-             pm.seam_type, 'medidas' AS source
+             pm.seam_type, 'medidas' AS source,
+             ${relevanceMed} AS _relevance
       FROM products_medidas pm ${medWhere}
     `;
 
@@ -192,13 +202,13 @@ router.get("/products/catalog", async (req, res) => {
     let countQuery: string;
 
     if (type === "accesorios") {
-      dataQuery = `${accSelect} ORDER BY name LIMIT ${limit} OFFSET ${offset}`;
+      dataQuery = `${accSelect} ORDER BY _relevance, name LIMIT ${limit} OFFSET ${offset}`;
       countQuery = `SELECT COUNT(*) FROM products_accesorios pa ${accWhere}`;
     } else if (type === "medidas") {
-      dataQuery = `${medSelect} ORDER BY name LIMIT ${limit} OFFSET ${offset}`;
+      dataQuery = `${medSelect} ORDER BY _relevance, name LIMIT ${limit} OFFSET ${offset}`;
       countQuery = `SELECT COUNT(*) FROM products_medidas pm ${medWhere}`;
     } else {
-      dataQuery = `SELECT * FROM (${accSelect} UNION ALL ${medSelect}) combined ORDER BY name LIMIT ${limit} OFFSET ${offset}`;
+      dataQuery = `SELECT * FROM (${accSelect} UNION ALL ${medSelect}) combined ORDER BY _relevance, name LIMIT ${limit} OFFSET ${offset}`;
       countQuery = `SELECT COUNT(*) FROM (${accSelect} UNION ALL ${medSelect}) combined`;
     }
 
