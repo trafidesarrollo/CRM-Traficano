@@ -138,7 +138,9 @@ export default function ClientDetail() {
               description: followupForm.description || undefined,
               dueDate: followupForm.date ? new Date(followupForm.date + "T12:00:00").toISOString() : undefined,
               clientId: parseInt(id),
-              assignedTo: followupForm.assignedToUserId ? parseInt(followupForm.assignedToUserId) : undefined,
+              assigneeIds: data?.teamInfo?.members?.length
+                ? data.teamInfo.members.map((m: any) => m.userId).filter(Boolean)
+                : undefined,
             }),
           }).catch(() => {});
         }
@@ -990,24 +992,19 @@ export default function ClientDetail() {
               </div>
             </div>
 
-            {/* Asignar a */}
-            <div className="space-y-1.5">
-              <Label>Asignar a</Label>
-              <Select
-                value={followupForm.assignedToUserId || "none"}
-                onValueChange={(v) => setFollowupForm((f) => ({ ...f, assignedToUserId: v === "none" ? "" : v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin asignar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
-                  {assignableUsers.map((u: any) => (
-                    <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+            {/* Equipo asignado automáticamente */}
+            {data?.teamInfo?.members?.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Equipo que recibirá el seguimiento</Label>
+                <div className="flex flex-wrap gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2">
+                  {data.teamInfo.members.map((m: any) => (
+                    <span key={m.id} className="text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2 py-0.5">
+                      {m.fullName || m.username}
+                    </span>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
+                </div>
+              </div>
+            )}
 
             {/* Descripción */}
             <div className="space-y-1.5">
