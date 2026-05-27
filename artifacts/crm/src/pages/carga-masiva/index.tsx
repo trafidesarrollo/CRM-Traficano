@@ -58,7 +58,7 @@ type Resolution = {
 
 function defaultFollowup(c: ConflictRow, currentUserId?: string): FollowupTask {
   return {
-    title: c.titulo ? `Seguimiento: ${c.titulo}` : `Seguimiento - ${c.clientName}`,
+    title: c.clientName,
     tipo: "Seguimiento",
     dueDate: c.fechaSeguimiento || "",
     priority: c.urgencia?.toLowerCase() === "alta" ? "high" : c.urgencia?.toLowerCase() === "baja" ? "low" : "medium",
@@ -280,7 +280,7 @@ export default function CargaMasivaPage() {
 
   function openSinFechaModal(row: SinFechaRow, idx: number) {
     setSinFechaForm({
-      title: row.titulo || row.clientName,
+      title: row.clientName,
       tipo: "Seguimiento",
       dueDate: "",
       priority: row.urgencia?.toLowerCase() === "alta" ? "high" : row.urgencia?.toLowerCase() === "baja" ? "low" : "medium",
@@ -717,30 +717,6 @@ export default function CargaMasivaPage() {
 
           <div className="space-y-4 pt-2">
             <div>
-              <Label className="text-sm">Título</Label>
-              <Input
-                className="mt-1"
-                value={scheduleForm.title}
-                onChange={e => setScheduleForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="Ej: Seguimiento - Cliente OPS"
-              />
-            </div>
-
-            <div>
-              <Label className="text-sm">Tipo</Label>
-              <Select value={scheduleForm.tipo} onValueChange={v => setScheduleForm(f => ({ ...f, tipo: v }))}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["Seguimiento", "Llamada", "Reunión", "Email", "Visita", "Cotización", "Otro"].map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
               <Label className="text-sm">Fecha de seguimiento</Label>
               <Input
                 type="date"
@@ -839,16 +815,6 @@ export default function CargaMasivaPage() {
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
-            <div>
-              <Label className="text-sm">Título de la tarea</Label>
-              <Input
-                className="mt-1"
-                value={sinFechaForm.title}
-                onChange={e => setSinFechaForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="Ej: Seguimiento - Cliente OPS"
-              />
-            </div>
-
             <div>
               <Label className="text-sm">Fecha de seguimiento <span className="text-red-400">*</span></Label>
               <Input
