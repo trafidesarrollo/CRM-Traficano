@@ -23,6 +23,7 @@ export const tasksTable = pgTable("tasks", {
   deferCount: integer("defer_count").notNull().default(0),
   deferredAt: timestamp("deferred_at", { withTimezone: true }),
   originalDueDate: timestamp("original_due_date", { withTimezone: true }),
+  parentTaskId: integer("parent_task_id"),
   googleEventId: text("google_event_id"),
   googleCalendarId: text("google_calendar_id"),
   googleSyncedAt: timestamp("google_synced_at", { withTimezone: true }),

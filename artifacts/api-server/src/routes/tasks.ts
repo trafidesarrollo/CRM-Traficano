@@ -35,18 +35,27 @@ router.get("/tasks", async (req, res) => {
     }
     const where = conds.length ? and(...conds) : undefined;
 
-    const data = await db.select({
+    const childCounts = db.$with("child_counts").as(
+      db.select({
+        parentTaskId: tasksTable.parentTaskId,
+        cnt: sql<number>`count(*)`.as("cnt"),
+      }).from(tasksTable).where(sql`${tasksTable.parentTaskId} is not null`).groupBy(tasksTable.parentTaskId)
+    );
+
+    const data = await db.with(childCounts).select({
       t: tasksTable,
       assigneeName: usersTable.fullName,
       clientName: clientsTable.companyName,
+      childrenCount: sql<number>`coalesce(${childCounts.cnt}, 0)`,
     }).from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
       .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
+      .leftJoin(childCounts, eq(tasksTable.id, childCounts.parentTaskId))
       .where(where as any)
       .orderBy(sql`case when ${tasksTable.status}='completed' then 1 else 0 end, ${tasksTable.dueDate} asc nulls last`)
       .limit(500);
 
-    res.json(data.map(r => ({ ...r.t, assigneeName: r.assigneeName, clientName: r.clientName })));
+    res.json(data.map(r => ({ ...r.t, assigneeName: r.assigneeName, clientName: r.clientName, childrenCount: Number(r.childrenCount) })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -60,13 +69,21 @@ router.get("/tasks/:id", async (req, res) => {
         t: tasksTable,
         assigneeName: sql<string>`coalesce(${usersTable.fullName}, '')`,
         clientName: sql<string>`coalesce(${clientsTable.companyName}, '')`,
+        childrenCount: sql<number>`(select count(*) from tasks c where c.parent_task_id = ${tasksTable.id})`,
+        parentTitle: sql<string | null>`(select p.title from tasks p where p.id = ${tasksTable.parentTaskId})`,
       })
       .from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
       .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
       .where(eq(tasksTable.id, id));
     if (!row) { res.status(404).json({ error: "Tarea no encontrada" }); return; }
-    res.json({ ...row.t, assigneeName: row.assigneeName, clientName: row.clientName });
+    res.json({
+      ...row.t,
+      assigneeName: row.assigneeName,
+      clientName: row.clientName,
+      childrenCount: Number(row.childrenCount),
+      parentTitle: row.parentTitle ?? null,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

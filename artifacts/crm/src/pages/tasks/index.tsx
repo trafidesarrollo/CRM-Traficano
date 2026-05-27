@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import {
   Plus, Trash2, Clock, AlertCircle, Calendar, ListTodo, RefreshCw,
   CheckCircle2, Circle, CalendarClock, User, Building2,
-  ChevronRight, Bell, X, FileText, DollarSign, ExternalLink, Filter
+  ChevronRight, Bell, X, FileText, DollarSign, ExternalLink, Filter,
+  GitBranch, Link2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -105,6 +106,11 @@ export default function Tasks() {
   // Bitácora / close form
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closeNote, setCloseNote] = useState("");
+
+  // Child task modal (shown after closing a task)
+  const [childModal, setChildModal] = useState<{ open: boolean; parentTask: any } | null>(null);
+  const [childForm, setChildForm] = useState<any>({ title: "", description: "", priority: "medium", dueDate: "", assignedTo: "" });
+  const [creatingChild, setCreatingChild] = useState(false);
 
   // Quote followup modal
   const [selQuote, setSelQuote] = useState<any>(null);
@@ -275,6 +281,46 @@ export default function Tasks() {
     setCloseNote("");
     toast({ title: "Tarea cerrada", description: closeNote.trim() ? "Bitácora registrada en el cliente" : undefined });
     load();
+
+    // Offer to create a child (follow-up) task
+    const parentSnapshot = { ...selected };
+    setDetailOpen(false);
+    setChildForm({
+      title: parentSnapshot.title || "",
+      description: "",
+      priority: parentSnapshot.priority || "medium",
+      dueDate: "",
+      assignedTo: String(parentSnapshot.assignedTo || ""),
+    });
+    setChildModal({ open: true, parentTask: parentSnapshot });
+  };
+
+  const createChildTask = async () => {
+    if (!childModal || !childForm.dueDate) return;
+    setCreatingChild(true);
+    try {
+      const r = await fetch(`${API}/api/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: childForm.title || childModal.parentTask.title,
+          description: childForm.description || undefined,
+          type: childModal.parentTask.type || "task",
+          priority: childForm.priority,
+          status: "pending",
+          clientId: childModal.parentTask.clientId || undefined,
+          assignedTo: childForm.assignedTo ? parseInt(childForm.assignedTo) : undefined,
+          dueDate: new Date(childForm.dueDate).toISOString(),
+          parentTaskId: childModal.parentTask.id,
+        }),
+      });
+      if (r.ok) {
+        toast({ title: "Tarea hija creada", description: `Vinculada a Tarea #${childModal.parentTask.id}` });
+        setChildModal(null);
+        load();
+      } else toast({ title: "Error al crear tarea", variant: "destructive" });
+    } finally { setCreatingChild(false); }
   };
 
   const closeTask = () => {
@@ -647,6 +693,16 @@ export default function Tasks() {
                         {t.clientName && <span className="text-xs text-muted-foreground">· {t.clientName}</span>}
                         {!isVendedor && t.assigneeName && <span className="text-xs text-muted-foreground">· {t.assigneeName}</span>}
                         {(t.deferCount ?? 0) > 0 && <span className="text-xs text-orange-400 flex items-center gap-0.5"><RefreshCw className="w-3 h-3" />Diferida {t.deferCount}x</span>}
+                        {(t.childrenCount ?? 0) > 0 && (
+                          <span className="text-xs text-violet-400 flex items-center gap-0.5">
+                            <GitBranch className="w-3 h-3" />Tareas relacionadas: {t.childrenCount}
+                          </span>
+                        )}
+                        {t.parentTaskId && (
+                          <span className="text-xs text-cyan-400 flex items-center gap-0.5">
+                            <Link2 className="w-3 h-3" />Hilo
+                          </span>
+                        )}
                       </div>
                       {t.description && <p className="text-xs text-muted-foreground mt-1 truncate max-w-xl">{t.description}</p>}
                       <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
@@ -809,6 +865,20 @@ export default function Tasks() {
                       <span>Diferida {selected.deferCount} vez{selected.deferCount > 1 ? "ces" : ""}</span>
                     </div>
                   )}
+                  {selected.parentTaskId && (
+                    <div className="flex items-center gap-2 text-cyan-400">
+                      <Link2 className="w-4 h-4 shrink-0" />
+                      <span>
+                        Viene de: <strong className="text-foreground">Tarea #{selected.parentTaskId}{selected.parentTitle ? ` — ${selected.parentTitle}` : ""}</strong>
+                      </span>
+                    </div>
+                  )}
+                  {(selected.childrenCount ?? 0) > 0 && (
+                    <div className="flex items-center gap-2 text-violet-400">
+                      <GitBranch className="w-4 h-4 shrink-0" />
+                      <span>Tareas relacionadas: <strong className="text-foreground">{selected.childrenCount}</strong></span>
+                    </div>
+                  )}
                 </div>
                 {selected.description && (
                   <div className="p-3 bg-white/5 rounded-lg text-sm text-muted-foreground leading-relaxed">{selected.description}</div>
@@ -886,6 +956,98 @@ export default function Tasks() {
                 )}
               </div>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Child task modal (post-close) ── */}
+      <Dialog open={!!childModal?.open} onOpenChange={(open) => { if (!open) setChildModal(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogDescription className="sr-only">Crear tarea hija</DialogDescription>
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-violet-500/15 flex items-center justify-center shrink-0">
+                <GitBranch className="w-5 h-5 text-violet-400" />
+              </div>
+              <div>
+                <DialogTitle>¿Creás una tarea de seguimiento?</DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Quedará vinculada a <strong className="text-foreground">Tarea #{childModal?.parentTask?.id}</strong>
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {childModal && (
+            <div className="space-y-3 pt-1">
+              <div>
+                <Label className="text-sm">Título</Label>
+                <Input
+                  className="mt-1"
+                  value={childForm.title}
+                  onChange={e => setChildForm((f: any) => ({ ...f, title: e.target.value }))}
+                  placeholder={childModal.parentTask.title}
+                />
+              </div>
+              <div>
+                <Label className="text-sm">Descripción <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                <Textarea
+                  className="mt-1 text-sm"
+                  rows={2}
+                  value={childForm.description}
+                  onChange={e => setChildForm((f: any) => ({ ...f, description: e.target.value }))}
+                  placeholder="¿Qué hay que hacer en este seguimiento?"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm">Prioridad</Label>
+                  <Select value={childForm.priority} onValueChange={v => setChildForm((f: any) => ({ ...f, priority: v }))}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baja</SelectItem>
+                      <SelectItem value="medium">Media</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm">Fecha <span className="text-red-400">*</span></Label>
+                  <Input
+                    type="date"
+                    className="mt-1"
+                    value={childForm.dueDate}
+                    onChange={e => setChildForm((f: any) => ({ ...f, dueDate: e.target.value }))}
+                    min={new Date().toISOString().slice(0, 10)}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Asignar a</Label>
+                <Select value={childForm.assignedTo} onValueChange={v => setChildForm((f: any) => ({ ...f, assignedTo: v }))}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Mismo que la tarea anterior" /></SelectTrigger>
+                  <SelectContent>
+                    {users.map((u: any) => (
+                      <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <Button variant="ghost" className="flex-1" onClick={() => setChildModal(null)}>
+                  No, gracias
+                </Button>
+                <Button
+                  className="flex-1 bg-violet-600 hover:bg-violet-500 text-white"
+                  disabled={!childForm.dueDate || creatingChild}
+                  onClick={createChildTask}
+                >
+                  <GitBranch className="w-4 h-4 mr-2" />
+                  {creatingChild ? "Creando..." : "Crear tarea hija"}
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
