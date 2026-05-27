@@ -62,13 +62,14 @@ router.use(importErpRouter);
 router.use(requireAuth);
 router.use(exchangeRateRouter);
 
-// Lista simple de usuarios asignable — accesible a cualquier usuario autenticado
+// Lista simple de usuarios asignables — excluye al rol "admin"
 router.get("/users/assignable", async (req, res) => {
   const { db: database, usersTable } = await import("@workspace/db");
-  const { asc } = await import("drizzle-orm");
+  const { asc, ne } = await import("drizzle-orm");
   const users = await database
     .select({ id: usersTable.id, fullName: usersTable.fullName, role: usersTable.role })
     .from(usersTable)
+    .where(ne(usersTable.role, "admin"))
     .orderBy(asc(usersTable.fullName));
   res.json(users);
 });
