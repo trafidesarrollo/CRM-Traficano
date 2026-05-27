@@ -944,14 +944,6 @@ export default function ClientDetail() {
               />
             </div>
 
-            {/* Tipo (fijo) */}
-            <div className="space-y-1.5">
-              <Label>Tipo</Label>
-              <div className="flex items-center h-9 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground">
-                Seguimiento
-              </div>
-            </div>
-
             {/* Fecha */}
             <div className="space-y-1.5">
               <Label htmlFor="fu-date">Fecha de seguimiento</Label>
