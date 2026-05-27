@@ -16,6 +16,7 @@ import {
 import {
   Upload, FileUp, CheckCircle2, AlertCircle, AlertTriangle,
   ChevronRight, RotateCcw, X, Loader2, ListTodo, CalendarCheck2,
+  User, Users,
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
