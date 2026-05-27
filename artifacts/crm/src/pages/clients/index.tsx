@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2, ListTodo, Columns3, ChevronsUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Building2, Search, Mail, X, Pencil, FileUp, Upload, CheckCircle2, AlertCircle, UserPlus, DollarSign, Filter, Contact2, Columns3, ChevronsUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { DuplicateWarning } from "@/components/duplicate-warning";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -358,9 +358,6 @@ const BLANK_FORM = {
   companyName: "", taxId: "", industry: "", city: "",
   notes: "", consumptionScale: "",
   importance: "ninguna",
-  assignedSalespersonId: undefined as number | undefined,
-  assignedUserId: undefined as number | undefined,
-  assignedTeamId: undefined as number | undefined,
 };
 
 type ClientForm = typeof BLANK_FORM;
@@ -390,23 +387,6 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
   const [savingContact, setSavingContact] = useState(false);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
-  // Task inline creation
-  const BLANK_TASK = { title: "", type: "task", priority: "medium", dueDate: "", assignedToUserId: "" };
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [taskForm, setTaskForm] = useState(BLANK_TASK);
-  const [users, setUsers] = useState<any[]>([]);
-  const [teams, setTeams] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetch(`${API}/api/users/assignable`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(setUsers)
-      .catch(() => {});
-    fetch(`${API}/api/commercial-teams`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(setTeams)
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (open) {
@@ -419,9 +399,6 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
           notes: editClient.notes || "",
           consumptionScale: editClient.consumptionScale != null ? String(editClient.consumptionScale) : "",
           importance: editClient.importance || "ninguna",
-          assignedSalespersonId: editClient.assignedSalespersonId || undefined,
-          assignedUserId: editClient.assignedUserId || undefined,
-          assignedTeamId: editClient.assignedTeamId || undefined,
         });
       } else {
         setForm({ ...BLANK_FORM });
@@ -429,8 +406,6 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
       setShowContactForm(false);
       setContactForm({ firstName: "", lastName: "", email: "", phone: "", position: "" });
       setCreatedClientId(null);
-      setShowTaskForm(false);
-      setTaskForm(BLANK_TASK);
     }
   }, [open, editClient]);
 
@@ -458,9 +433,6 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         city: form.city.trim() || undefined,
         notes: form.notes.trim() || undefined,
         importance: form.importance || "ninguna",
-        assignedSalespersonId: form.assignedSalespersonId || undefined,
-        assignedUserId: form.assignedUserId || undefined,
-        assignedTeamId: form.assignedTeamId || undefined,
       };
       if (form.consumptionScale.trim() !== "") payload.consumptionScale = form.consumptionScale.trim();
       // Preserve existing status on edit; only override if explicitly "final"
@@ -481,29 +453,6 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
         savedId = created.id;
         setCreatedClientId(savedId);
         toast({ title: "Cliente creado" });
-      }
-
-      // Create linked task if requested
-      if (showTaskForm && taskForm.title.trim() && savedId) {
-        try {
-          await fetch(`${API}/api/tasks`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              title: taskForm.title.trim(),
-              type: taskForm.type,
-              priority: taskForm.priority,
-              status: "pending",
-              clientId: savedId,
-              assignedTo: taskForm.assignedToUserId ? Number(taskForm.assignedToUserId) : undefined,
-              dueDate: taskForm.dueDate || undefined,
-            }),
-          });
-          toast({ title: "Tarea asignada correctamente" });
-        } catch {
-          toast({ title: "Cliente guardado, pero no se pudo crear la tarea", variant: "destructive" });
-        }
       }
 
       if (showContactForm && contactForm.firstName.trim() && savedId) {
@@ -642,64 +591,10 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             </Select>
           </div>
 
-          {/* ── Equipo comercial ── */}
-          {isAdmin && teams.length > 0 && (
-            <div className="space-y-2">
-              <Label>Equipo comercial asignado</Label>
-              <Select
-                value={form.assignedTeamId ? String(form.assignedTeamId) : "none"}
-                onValueChange={v => setForm(prev => ({ ...prev, assignedTeamId: v === "none" ? undefined : parseInt(v) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin equipo asignado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin equipo asignado</SelectItem>
-                  {teams.map((t: any) => (
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      {t.name}
-                      {t.members?.length > 0 && (
-                        <span className="text-muted-foreground ml-1.5 text-xs">
-                          ({t.members.map((m: any) => m.fullName || m.username).filter(Boolean).join(", ")})
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.assignedTeamId && (() => {
-                const team = teams.find((t: any) => t.id === form.assignedTeamId);
-                if (!team?.members?.length) return null;
-                return (
-                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 flex flex-wrap gap-1.5">
-                    {team.members.map((m: any) => (
-                      <span key={m.id} className="text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2 py-0.5">
-                        {m.fullName || m.username}
-                      </span>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
           <div>
             <Label>Notas</Label>
             <Textarea value={form.notes} onChange={f("notes")} placeholder="Observaciones..." rows={2} />
           </div>
-
-          {/* ── Usuario a cargo (solo lectura, se llena desde "Asignar a" en la tarea) ── */}
-          {isAdmin && (
-            <div>
-              <Label>Usuario a cargo</Label>
-              <div className="flex items-center h-9 rounded-md border border-border/50 bg-muted/30 px-3 text-sm">
-                {form.assignedUserId
-                  ? <span className="text-foreground">{users.find((u: any) => u.id === form.assignedUserId)?.fullName || "—"}</span>
-                  : <span className="text-muted-foreground">Se asigna desde "Asignar a" en la tarea</span>
-                }
-              </div>
-            </div>
-          )}
 
           {/* ── Contacto inline ── */}
           {!showContactForm ? (
@@ -738,64 +633,6 @@ function ClientDialog({ open, onOpenChange, editClient, salespeople, onSaved }: 
             </div>
           )}
 
-          {/* ── Tarea inline — solo si el cliente no tiene vendedor ya asignado ── */}
-          {!editClient?.assignedSalespersonId && (
-            !showTaskForm ? (
-              <button type="button" onClick={() => setShowTaskForm(true)}
-                className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border border-dashed border-border/50 rounded-lg px-3 py-2 hover:border-border transition-colors">
-                <ListTodo className="w-4 h-4" />
-                Asignar tarea a un vendedor (opcional)
-              </button>
-            ) : (
-              <div className="rounded-lg border border-border/50 p-3 space-y-3 bg-muted/10">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium flex items-center gap-1.5"><ListTodo className="w-4 h-4" />Nueva Tarea</p>
-                  <button type="button" onClick={() => setShowTaskForm(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
-                </div>
-                <div>
-                  <Label className="text-xs">Descripción de la tarea *</Label>
-                  <Input value={taskForm.title} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} placeholder="Ej: Llamar para seguimiento inicial" />
-                </div>
-                <div>
-                  <Label className="text-xs">Prioridad</Label>
-                  <Select value={taskForm.priority} onValueChange={v => setTaskForm(p => ({ ...p, priority: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baja</SelectItem>
-                      <SelectItem value="medium">Media</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="urgent">Urgente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Asignar a</Label>
-                    <Select
-                      value={taskForm.assignedToUserId || "none"}
-                      onValueChange={v => {
-                        const uid = v === "none" ? "" : v;
-                        setTaskForm(p => ({ ...p, assignedToUserId: uid }));
-                        setForm(p => ({ ...p, assignedUserId: uid ? Number(uid) : undefined }));
-                      }}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin asignar</SelectItem>
-                        {users.map((u: any) => (
-                          <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Fecha límite</Label>
-                    <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm(p => ({ ...p, dueDate: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-            )
-          )}
 
           <div className="flex justify-end gap-3 pt-1">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
