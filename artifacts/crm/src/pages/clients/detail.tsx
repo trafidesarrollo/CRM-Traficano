@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, ArrowLeft, FileText, ShoppingCart, Contact2, Activity,
   Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X,
-  CheckCircle2, Circle, Clock, ListTodo, UserSquare, Users, UserCheck, Loader2,
+  CheckCircle2, Circle, Clock, ListTodo, UserSquare, Users, UserCheck, User, Loader2,
   CalendarClock, GitBranch, History, ChevronDown, ChevronUp, ArrowRight,
   RefreshCw, Bell, Trash2, AlertCircle,
 } from "lucide-react";
@@ -872,11 +872,19 @@ export default function ClientDetail() {
                           </div>
                           {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
                           {item.outcome && <p className="text-xs text-primary/80 mt-1">Resultado: {item.outcome}</p>}
-                          {spName && (
-                            <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
-                              <UserSquare className="h-3 w-3" />{spName}
-                            </p>
-                          )}
+                          <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-2 flex-wrap">
+                            {spName && (
+                              <span className="flex items-center gap-1">
+                                <UserSquare className="h-3 w-3" />{spName}
+                              </span>
+                            )}
+                            {item.created_by_name && (
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3 text-blue-400" />
+                                <span className="text-blue-300">Cargado por {item.created_by_name}</span>
+                              </span>
+                            )}
+                          </p>
                         </div>
                       </CardContent>
                     </Card>

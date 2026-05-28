@@ -341,6 +341,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
           description: baseDescription,
           outcome: row.accion || undefined,
           completedAt: (row.fecha ? parseDate(row.fecha) : null) || new Date(),
+          createdBy: userId,
         }).returning();
       }
       saved++;
@@ -379,6 +380,7 @@ router.post("/bulk-activities/resolve", async (req, res) => {
           description,
           outcome: sfRow.accion || undefined,
           completedAt: (sfRow.fecha ? parseDate(sfRow.fecha) : null) || new Date(),
+          createdBy: userId,
         });
         saved++;
       }

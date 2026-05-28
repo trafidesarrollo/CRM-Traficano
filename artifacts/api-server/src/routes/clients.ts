@@ -222,7 +222,14 @@ router.get("/clients/:id/overview", async (req, res) => {
         LIMIT 100
       `),
       db.select().from(contactsTable).where(eq(contactsTable.clientId, id)).orderBy(desc(contactsTable.isPrimary)),
-      db.select().from(activitiesTable).where(eq(activitiesTable.clientId, id)).orderBy(desc(activitiesTable.createdAt)).limit(50),
+      db.execute(sql`
+        SELECT a.*, u.full_name AS created_by_name
+        FROM activities a
+        LEFT JOIN users u ON u.id = a.created_by
+        WHERE a.client_id = ${id}
+        ORDER BY a.created_at DESC
+        LIMIT 50
+      `),
       db.execute(sql`
         SELECT t.*, u.full_name AS assignee_name,
           cb.full_name AS closed_by_name
@@ -264,13 +271,15 @@ router.get("/clients/:id/overview", async (req, res) => {
       teamInfo = teamRes.rows[0] || null;
     }
 
+    const activitiesData = (activities as any).rows as any[];
+
     res.json({
       client,
       teamInfo,
       quotes: quotesData,
       orders: ordersData,
       contacts: contacts,
-      activities: activities,
+      activities: activitiesData,
       tasks: tasks.rows as any[],
       stats: { totalQuoted, totalOrdered, totalApproved, quotesCount: quotesData.length, ordersCount: ordersData.length, wonQuotes, conversionRate },
     });

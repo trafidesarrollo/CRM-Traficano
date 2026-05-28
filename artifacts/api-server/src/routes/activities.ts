@@ -42,9 +42,11 @@ router.post("/activities", async (req, res) => {
       return;
     }
 
+    const actorUserId = (req as any).session?.userId;
     const insertData: any = {
       type,
       title: String(title),
+      ...(actorUserId ? { createdBy: actorUserId } : {}),
     };
 
     if (clientId != null) insertData.clientId = Number(clientId);

@@ -12,6 +12,7 @@ export const activitiesTable = pgTable("activities", {
   salespersonId: integer("salesperson_id"),
   opportunityId: integer("opportunity_id"),
   emailId: integer("email_id"),
+  createdBy: integer("created_by"),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   outcome: text("outcome"),
