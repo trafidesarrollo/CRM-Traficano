@@ -148,7 +148,11 @@ export default function ClientDetail() {
       }
 
       if (createFollowup && taskFollowupDate && taskFollowupTitle.trim() && id) {
-        const assigneeId = taskFollowupAssigneeId;
+        const allMemberIds: number[] = data?.teamInfo?.members?.map((m: any) => m.userId).filter(Boolean) || [];
+        // Designated person first (becomes assignedTo), rest follow so all team members see it
+        const orderedIds = taskFollowupAssigneeId
+          ? [taskFollowupAssigneeId, ...allMemberIds.filter((uid) => uid !== taskFollowupAssigneeId)]
+          : allMemberIds;
         await fetch(`${API}/api/tasks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -162,7 +166,7 @@ export default function ClientDetail() {
             dueDate: new Date(taskFollowupDate + "T12:00:00").toISOString(),
             clientId: parseInt(id),
             parentTaskId: taskModalData.id,
-            assigneeIds: assigneeId ? [assigneeId] : undefined,
+            assigneeIds: orderedIds.length ? orderedIds : undefined,
           }),
         });
         toast({ title: "Tarea cerrada y seguimiento agendado" });
