@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   FileText, Plus, Users, CalendarDays, Package, Clock,
-  CheckCircle2, Send, ListTodo, AlertCircle, Activity, Target,
+  CheckCircle2, Send, ListTodo, AlertCircle, Activity,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -23,14 +23,6 @@ const QUOTE_STATUS: Record<string, { label: string; color: string }> = {
   expired:  { label: "Vencida",   color: "bg-orange-500/20 text-orange-300" },
 };
 
-const OPP_STATUS: Record<string, { label: string; color: string }> = {
-  new:             { label: "Nueva",       color: "bg-indigo-500/20 text-indigo-300" },
-  quote_requested: { label: "Cot. pedida", color: "bg-purple-500/20 text-purple-300" },
-  quoted:          { label: "Cotizada",    color: "bg-violet-500/20 text-violet-300" },
-  negotiating:     { label: "Negociando",  color: "bg-yellow-500/20 text-yellow-300" },
-  won:             { label: "Ganada",      color: "bg-green-500/20 text-green-300" },
-  lost:            { label: "Perdida",     color: "bg-red-500/20 text-red-300" },
-};
 
 const ACTIVITY_LABELS: Record<string, string> = {
   call: "Llamada", visit: "Visita", email: "Email",
@@ -48,7 +40,6 @@ export default function DashboardVendedor() {
   const { user } = useAuth();
   const [quotes, setQuotes] = useState<any[]>([]);
   const [taskStats, setTaskStats] = useState<any>({});
-  const [opportunities, setOpportunities] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,15 +51,11 @@ export default function DashboardVendedor() {
         .then(r => r.json()).catch(() => ({ data: [] })),
       fetch(`${API}/api/tasks/stats/summary?assignedTo=${user.id}`, { credentials: "include" })
         .then(r => r.json()).catch(() => ({})),
-      fetch(`${API}/api/opportunities?limit=100`, { credentials: "include" })
-        .then(r => r.json()).catch(() => ({ data: [] })),
       fetch(`${API}/api/activities?limit=6`, { credentials: "include" })
         .then(r => r.json()).catch(() => []),
-    ]).then(([quotesData, stats, oppsData, actsData]) => {
+    ]).then(([quotesData, stats, actsData]) => {
       setQuotes(quotesData.data || []);
       setTaskStats(stats && typeof stats === "object" && !Array.isArray(stats) ? stats : {});
-      const oppsArray = Array.isArray(oppsData) ? oppsData : (oppsData.data || []);
-      setOpportunities(oppsArray);
       setActivities(Array.isArray(actsData) ? actsData : (actsData.data || []));
       setLoading(false);
     });
@@ -79,20 +66,6 @@ export default function DashboardVendedor() {
     sent:     quotes.filter(q => q.status === "sent").length,
     approved: quotes.filter(q => q.status === "approved").length,
   };
-
-  const activeOpps = opportunities.filter(o => !["won", "lost", "closed"].includes(o.status));
-  const wonOpps = opportunities.filter(o => o.status === "won").length;
-  const lostOpps = opportunities.filter(o => o.status === "lost").length;
-  const closeRate = (wonOpps + lostOpps) > 0
-    ? Math.round((wonOpps / (wonOpps + lostOpps)) * 100)
-    : null;
-
-  const oppsByStatus = Object.entries(
-    activeOpps.reduce((acc: Record<string, number>, o) => {
-      acc[o.status] = (acc[o.status] || 0) + 1;
-      return acc;
-    }, {})
-  ).sort((a, b) => b[1] - a[1]);
 
   const recentQuotes = quotes.slice(0, 8);
 
@@ -275,115 +248,39 @@ export default function DashboardVendedor() {
         </div>
       </div>
 
-      {/* Row 2: Mis oportunidades + Actividad reciente */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pipeline personal */}
-        <Card className="bg-card/50 border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Target className="w-4 h-4 text-primary" />
-              Mis oportunidades
-            </CardTitle>
-            <Link href="/opportunities">
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">Ver todas</Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="py-6 text-center text-muted-foreground text-sm">Cargando...</div>
-            ) : opportunities.length === 0 ? (
-              <div className="py-6 text-center text-muted-foreground text-sm">
-                Sin oportunidades asignadas.{" "}
-                <Link href="/opportunities" className="text-primary underline">Ver pipeline</Link>
-              </div>
-            ) : (
-              <>
-                {/* Summary pills */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {oppsByStatus.map(([status, count]) => {
-                    const cfg = OPP_STATUS[status] || { label: status, color: "bg-gray-500/20 text-gray-300" };
-                    return (
-                      <Badge key={status} className={`${cfg.color} text-xs`}>
-                        {cfg.label} · {count}
-                      </Badge>
-                    );
-                  })}
-                </div>
-
-                {/* Stats row */}
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="text-center p-3 bg-white/5 rounded-lg">
-                    <p className="text-xl font-bold">{activeOpps.length}</p>
-                    <p className="text-xs text-muted-foreground">Activas</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-500/5 rounded-lg">
-                    <p className="text-xl font-bold text-green-400">{wonOpps}</p>
-                    <p className="text-xs text-muted-foreground">Ganadas</p>
-                  </div>
-                  <div className="text-center p-3 bg-white/5 rounded-lg">
-                    <p className="text-xl font-bold">{closeRate !== null ? `${closeRate}%` : "—"}</p>
-                    <p className="text-xs text-muted-foreground">Cierre</p>
+      {/* Actividad reciente */}
+      <Card className="bg-card/50 border-white/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            Actividad reciente
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="py-6 text-center text-muted-foreground text-sm">Cargando...</div>
+          ) : activities.length === 0 ? (
+            <div className="py-6 text-center text-muted-foreground text-sm">Sin actividad registrada aún</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {activities.slice(0, 6).map((act: any, i: number) => (
+                <div key={act.id ?? i} className="flex gap-3 p-3 rounded-lg bg-white/5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium leading-tight truncate">{act.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {act.createdAt
+                        ? format(new Date(act.createdAt), "dd MMM, HH:mm", { locale: es })
+                        : "—"}
+                      {" · "}{ACTIVITY_LABELS[act.type] ?? act.type}
+                    </p>
                   </div>
                 </div>
-
-                {/* Last 5 active */}
-                <div className="space-y-2">
-                  {activeOpps.slice(0, 5).map((opp: any) => {
-                    const cfg = OPP_STATUS[opp.status] || { label: opp.status, color: "bg-gray-500/20 text-gray-300" };
-                    return (
-                      <Link key={opp.id} href={`/opportunities`}>
-                        <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{opp.title || opp.clientName || `Opp #${opp.id}`}</p>
-                            {opp.clientName && opp.title && (
-                              <p className="text-xs text-muted-foreground truncate">{opp.clientName}</p>
-                            )}
-                          </div>
-                          <Badge className={`${cfg.color} text-xs shrink-0`}>{cfg.label}</Badge>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Actividad reciente */}
-        <Card className="bg-card/50 border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary" />
-              Actividad reciente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="py-6 text-center text-muted-foreground text-sm">Cargando...</div>
-            ) : activities.length === 0 ? (
-              <div className="py-6 text-center text-muted-foreground text-sm">Sin actividad registrada aún</div>
-            ) : (
-              <div className="space-y-3">
-                {activities.slice(0, 6).map((act: any, i: number) => (
-                  <div key={act.id ?? i} className="flex gap-3 p-3 rounded-lg bg-white/5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-tight truncate">{act.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {act.createdAt
-                          ? format(new Date(act.createdAt), "dd MMM, HH:mm", { locale: es })
-                          : "—"}
-                        {" · "}{ACTIVITY_LABELS[act.type] ?? act.type}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </AppLayout>
   );
 }
