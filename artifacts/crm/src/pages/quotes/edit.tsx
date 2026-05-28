@@ -49,6 +49,7 @@ import {
   ChevronsUpDown,
   ScrollText,
   Send,
+  Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -186,6 +187,7 @@ export default function QuoteEdit() {
   const [creatingContact, setCreatingContact] = useState(false);
   const [salespeople, setSalespeople] = useState<any[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
+  const [commercialTeams, setCommercialTeams] = useState<any[]>([]);
   const [otrosOpen, setOtrosOpen] = useState(false);
   const [otrosText, setOtrosText] = useState("");
   const isPrivilegedUser = user?.role === "admin" || user?.role === "gerente_comercial";
@@ -532,11 +534,18 @@ export default function QuoteEdit() {
         ),
         { data: [] },
       ),
-    ]).then(([cl, sp, pr, pl, users, op]) => {
+      safe(
+        fetch(`${API}/api/commercial-teams`, { credentials: "include" }).then(
+          (r) => r.json(),
+        ),
+        [],
+      ),
+    ]).then(([cl, sp, pr, pl, users, op, teams]) => {
       const spData: any[] = Array.isArray(sp) ? sp : [];
       setClients(cl.data || cl || []);
       setSalespeople(spData);
       setProducts(Array.isArray(pr) ? pr : pr.data || []);
+      setCommercialTeams(Array.isArray(teams) ? teams : []);
       setPriceLists(pl || []);
       setAssignableUsers(Array.isArray(users) ? users : []);
       setOpportunities(op.data || op || []);
@@ -655,6 +664,51 @@ export default function QuoteEdit() {
       setForm((prev: any) => ({ ...prev, salespersonId: String(client.assignedSalespersonId) }));
     }
   }, [isNew, form.clientId, clients]);
+
+  // When salesperson changes: find their commercial team and auto-assign to client if missing
+  useEffect(() => {
+    if (!form.salespersonId || !form.clientId || commercialTeams.length === 0) return;
+
+    // Resolve userId for the selected salesperson
+    let selectedUserId: number | null = null;
+    const matchedUser = assignableUsers.find((u: any) => String(u.id) === String(form.salespersonId));
+    if (matchedUser) {
+      selectedUserId = matchedUser.id;
+    } else {
+      const matchedSp = salespeople.find((s: any) => String(s.id) === String(form.salespersonId));
+      if (matchedSp?.userId) selectedUserId = matchedSp.userId;
+    }
+    if (!selectedUserId) return;
+
+    // Find which commercial team this user belongs to
+    const spTeam = commercialTeams.find((t: any) =>
+      t.members?.some((m: any) => Number(m.userId) === Number(selectedUserId))
+    );
+    if (!spTeam) return;
+
+    // Only auto-assign if the client has no team yet and user has permissions
+    const selectedClient = clients.find((c: any) => String(c.id) === String(form.clientId));
+    if (selectedClient?.assignedTeamId) return;
+
+    const canAssign = ["admin", "gerente", "gerente_comercial"].includes((user as any)?.role);
+    if (!canAssign) return;
+
+    fetch(`${API}/api/clients/${form.clientId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ assignedTeamId: spTeam.id }),
+    }).then(r => {
+      if (r.ok) {
+        setClients((prev: any[]) =>
+          prev.map((c: any) =>
+            String(c.id) === String(form.clientId) ? { ...c, assignedTeamId: spTeam.id } : c
+          )
+        );
+        toast({ title: `Equipo "${spTeam.name}" asignado al cliente` });
+      }
+    }).catch(() => {});
+  }, [form.salespersonId, form.clientId, commercialTeams, assignableUsers, salespeople]);
 
   const createContact = async () => {
     if (
@@ -1581,6 +1635,27 @@ export default function QuoteEdit() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">Se le asignará una tarea de seguimiento automáticamente</p>
+              {(() => {
+                if (!form.salespersonId || commercialTeams.length === 0) return null;
+                let uid: number | null = null;
+                const mu = assignableUsers.find((u: any) => String(u.id) === String(form.salespersonId));
+                if (mu) uid = mu.id;
+                else {
+                  const ms = salespeople.find((s: any) => String(s.id) === String(form.salespersonId));
+                  if (ms?.userId) uid = ms.userId;
+                }
+                if (!uid) return null;
+                const team = commercialTeams.find((t: any) =>
+                  t.members?.some((m: any) => Number(m.userId) === Number(uid))
+                );
+                if (!team) return null;
+                return (
+                  <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+                    <Users className="w-3 h-3 text-primary shrink-0" />
+                    <span>Equipo: <span className="font-medium text-foreground">{team.name}</span></span>
+                  </div>
+                );
+              })()}
             </div>
             <div>
               <Label>Tipo de orden <span className="text-destructive">*</span></Label>
