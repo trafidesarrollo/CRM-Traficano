@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, tasksTable, taskAssigneesTable, notificationsTable, salespeopleTable, clientsTable, usersTable, quotesTable } from "@workspace/db";
+import { db, tasksTable, taskAssigneesTable, notificationsTable, salespeopleTable, clientsTable, usersTable, quotesTable, commercialTeamMembersTable } from "@workspace/db";
 import { eq, desc, sql, and, or, lt, gt, gte, lte, isNull, inArray, ne } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -83,6 +83,33 @@ router.get("/tasks", async (req, res) => {
           sql`EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = ${tasksTable.id} AND ta.user_id = ${assignedTo})`
         )
       );
+    }
+
+    // Team-based filter: non-admin/gerente_comercial users only see tasks for clients in their team
+    const callerRole = (req as any).userRole as string | undefined;
+    const callerId = (req as any).session?.userId as number | undefined;
+    if (callerRole && !["admin", "gerente_comercial"].includes(callerRole) && callerId) {
+      const userTeams = await db
+        .select({ teamId: commercialTeamMembersTable.teamId })
+        .from(commercialTeamMembersTable)
+        .where(eq(commercialTeamMembersTable.userId, callerId));
+
+      if (userTeams.length > 0) {
+        const teamIds = userTeams.map((t) => t.teamId);
+        const teamClients = await db
+          .select({ id: clientsTable.id })
+          .from(clientsTable)
+          .where(inArray(clientsTable.assignedTeamId, teamIds));
+
+        const allowedClientIds = teamClients.map((c) => c.id);
+        // Show tasks for team clients OR tasks with no client (personal tasks)
+        if (allowedClientIds.length > 0) {
+          conds.push(or(isNull(tasksTable.clientId), inArray(tasksTable.clientId, allowedClientIds)));
+        } else {
+          conds.push(isNull(tasksTable.clientId));
+        }
+      }
+      // If not in any team, no restriction beyond assignedTo
     }
 
     const where = conds.length ? and(...conds) : undefined;
