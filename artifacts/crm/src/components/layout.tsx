@@ -6,7 +6,7 @@ import {
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
   Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo,
   CalendarDays, BarChart3, Workflow, Sliders, MailOpen, GitBranch, CalendarClock, ShieldCheck, Factory, Kanban, Upload,
-  FileUp, CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight
+  FileUp, CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight, Eye, EyeOff, Pencil
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -400,6 +400,24 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
   });
+  const [customizing, setCustomizing] = useState(false);
+  const [hiddenHrefs, setHiddenHrefs] = useState<string[]>(() => {
+    try {
+      const key = `sidebar-hidden-${(user as any)?.id ?? "guest"}`;
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch { return []; }
+  });
+
+  const toggleHidden = (href: string) => {
+    setHiddenHrefs(prev => {
+      const next = prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href];
+      try {
+        const key = `sidebar-hidden-${(user as any)?.id ?? "guest"}`;
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const toggleCollapsed = () => {
     setCollapsed((v) => {
@@ -415,39 +433,63 @@ export function AppLayout({ children }: { children: ReactNode }) {
     const modulePerms: string[] | null = (user as any)?.modulePermissions ?? null;
     const globalDisabled: string[] = (user as any)?.globalDisabledModules ?? [];
 
-    const visible = navItems.filter((item) => {
-      // Always apply global disabled nav items by href (affects everyone including admins)
+    const roleVisible = navItems.filter((item) => {
       if (globalDisabled.includes(item.href)) return false;
-      // If user has explicit module permissions set, use them (works for all roles)
       if (modulePerms !== null && item.module) return modulePerms.includes(item.module);
-      // Privileged with no explicit permissions: show everything not globally disabled
       if (isPrivileged) return true;
       if ((item as any).roles && !(item as any).roles.includes(role)) return false;
       if ((item as any).hiddenFromRoles?.includes(role)) return false;
       return true;
     });
 
+    const visible = customizing
+      ? roleVisible
+      : roleVisible.filter(item => !hiddenHrefs.includes(item.href));
+
     return (
       <nav className="space-y-1 mt-6">
+        {customizing && !mini && (
+          <p className="text-xs text-muted-foreground px-2 pb-2 opacity-70">
+            Tocá el ojo para ocultar/mostrar ítems
+          </p>
+        )}
         {visible.map((item) => {
           const isActive = location.startsWith(item.href);
+          const isHidden = hiddenHrefs.includes(item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={mini ? item.label : undefined}
-              className={`
-                flex items-center gap-3 rounded-xl transition-all duration-200 group
-                ${mini ? "justify-center px-2 py-3" : "px-4 py-3"}
-                ${isActive
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
-                }
-              `}
-            >
-              <item.icon className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? 'text-primary' : 'group-hover:text-foreground'}`} />
-              {!mini && <span>{item.label}</span>}
-            </Link>
+            <div key={item.href} className="relative group/item">
+              <Link
+                href={customizing ? "#" : item.href}
+                onClick={customizing ? (e) => e.preventDefault() : undefined}
+                title={mini ? item.label : undefined}
+                className={`
+                  flex items-center gap-3 rounded-xl transition-all duration-200 group
+                  ${mini ? "justify-center px-2 py-3" : "px-4 py-3"}
+                  ${customizing ? "pr-10" : ""}
+                  ${isActive && !customizing
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : isHidden
+                    ? 'opacity-40 text-muted-foreground'
+                    : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                  }
+                `}
+              >
+                <item.icon className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive && !customizing ? 'text-primary' : 'group-hover:text-foreground'}`} />
+                {!mini && <span>{item.label}</span>}
+              </Link>
+              {customizing && !mini && (
+                <button
+                  onClick={() => toggleHidden(item.href)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+                  title={isHidden ? "Mostrar" : "Ocultar"}
+                >
+                  {isHidden
+                    ? <EyeOff className="w-4 h-4 text-muted-foreground/50" />
+                    : <Eye className="w-4 h-4" />
+                  }
+                </button>
+              )}
+            </div>
           );
         })}
       </nav>
@@ -487,6 +529,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {!collapsed && (
             <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={logout}>
               <LogOut className="w-4 h-4 mr-2" />Cerrar Sesión
+            </Button>
+          )}
+          {!collapsed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`w-full justify-start text-muted-foreground hover:text-foreground hover:bg-white/5 ${customizing ? "text-primary bg-primary/10 hover:bg-primary/15 hover:text-primary" : ""}`}
+              onClick={() => setCustomizing(v => !v)}
+              title="Personalizar menú"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              <span className="text-xs">{customizing ? "Listo" : "Personalizar menú"}</span>
             </Button>
           )}
           <Button
