@@ -62,8 +62,10 @@ router.get("/admin/reset/counts", async (req, res) => {
     const results: Record<string, { label: string; count: number }> = {};
     await Promise.all(
       Object.entries(ALLOWED_TABLES).map(async ([key, cfg]) => {
-        const rows = await db.execute(sql.raw(cfg.countQuery));
-        results[key] = { label: cfg.label, count: Number((rows as any)[0]?.count ?? 0) };
+        const raw = await db.execute(sql.raw(cfg.countQuery));
+        // db.execute with node-postgres returns { rows: [...] }
+        const rows: any[] = (raw as any).rows ?? raw;
+        results[key] = { label: cfg.label, count: Number(rows[0]?.count ?? 0) };
       })
     );
     res.json(results);
