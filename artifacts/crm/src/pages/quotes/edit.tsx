@@ -187,6 +187,7 @@ export default function QuoteEdit() {
   const [salespeople, setSalespeople] = useState<any[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
   const [commercialTeams, setCommercialTeams] = useState<any[]>([]);
+  const [spFromTeam, setSpFromTeam] = useState(false);
   const [otrosOpen, setOtrosOpen] = useState(false);
   const [otrosText, setOtrosText] = useState("");
   const isPrivilegedUser = user?.role === "admin" || user?.role === "gerente_comercial";
@@ -665,6 +666,7 @@ export default function QuoteEdit() {
     // Priority 1: client has a directly assigned salesperson
     if (client.assignedSalespersonId) {
       setForm((prev: any) => ({ ...prev, salespersonId: String(client.assignedSalespersonId) }));
+      setSpFromTeam(false);
       return;
     }
 
@@ -673,7 +675,6 @@ export default function QuoteEdit() {
       const team = commercialTeams.find((t: any) => Number(t.id) === Number(client.assignedTeamId));
       if (team?.members?.length > 0) {
         const teamUserIds = team.members.map((m: any) => Number(m.userId));
-        // Prefer a user with role "vendedor" from the team
         const vendedor = assignableUsers.find(
           (u: any) => teamUserIds.includes(Number(u.id)) && u.role === "vendedor"
         );
@@ -682,6 +683,7 @@ export default function QuoteEdit() {
         );
         if (match) {
           setForm((prev: any) => ({ ...prev, salespersonId: String(match.id) }));
+          setSpFromTeam(true);
         }
       }
     }
@@ -1637,6 +1639,7 @@ export default function QuoteEdit() {
               <Select
                 value={form.salespersonId}
                 onValueChange={(v) => setForm({ ...form, salespersonId: v })}
+                disabled={spFromTeam}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar responsable..." />
