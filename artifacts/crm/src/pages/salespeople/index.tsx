@@ -39,6 +39,7 @@ export default function Salespeople() {
   // ── Metas ──
   const [targetsData, setTargetsData] = useState<any[]>([]);
   const [targetYear, setTargetYear] = useState(() => new Date().getFullYear());
+  const [targetModalOpen, setTargetModalOpen] = useState(false);
   const [savingTarget, setSavingTarget] = useState(false);
   const [targetForm, setTargetForm] = useState({
     amount: "", currency: "USD",
@@ -216,6 +217,7 @@ export default function Salespeople() {
       });
       if (!r.ok) throw new Error();
       toast({ title: "Meta guardada" });
+      setTargetModalOpen(false);
       setTargetForm(f => ({ ...f, amount: "" }));
       await loadTargets(spId, targetYear);
     } catch { toast({ title: "Error al guardar meta", variant: "destructive" }); }
@@ -820,136 +822,156 @@ export default function Salespeople() {
                 </TabsContent>
 
                 {/* ── Metas de ventas ── */}
-                <TabsContent value="targets" className="mt-4 space-y-5">
-                  {/* Formulario nueva meta */}
-                  <div className="rounded-lg border border-white/10 bg-white/3 p-4 space-y-3">
-                    {(() => {
-                      const PERIOD_LABELS: Record<string, string> = {
-                        monthly: "Mensual", quarterly: "Trimestral",
-                        semiannual: "Semestral", annual: "Anual",
-                      };
-                      const METRIC_LABELS: Record<string, string> = {
-                        amount_approved: "Monto aprobado (cot.)",
-                        count_quotes:    "Cotizaciones generadas",
-                        count_approved:  "Cotizaciones aprobadas",
-                        count_orders:    "Pedidos generados",
-                        amount_orders:   "Monto de pedidos",
-                      };
-                      const isAmountMetric = targetForm.metricType.startsWith("amount_");
-                      const periodOptions: Record<string, { label: string; value: number }[]> = {
-                        monthly: ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
-                          .map((m, i) => ({ label: m, value: i + 1 })),
-                        quarterly: [
-                          { label: "Q1 — Ene-Mar", value: 1 }, { label: "Q2 — Abr-Jun", value: 2 },
-                          { label: "Q3 — Jul-Sep", value: 3 }, { label: "Q4 — Oct-Dic", value: 4 },
-                        ],
-                        semiannual: [
-                          { label: "S1 — Ene-Jun", value: 1 }, { label: "S2 — Jul-Dic", value: 2 },
-                        ],
-                        annual: [{ label: String(targetYear), value: 1 }],
-                      };
-                      const opts = periodOptions[targetForm.periodType] || [];
-                      return (
-                        <>
-                          <p className="text-sm font-medium">Establecer meta</p>
+                <TabsContent value="targets" className="mt-4 space-y-4">
 
-                          {/* Tipo de métrica — full width */}
-                          <div>
-                            <Label className="text-xs text-muted-foreground mb-1 block">Tipo de métrica</Label>
-                            <Select
-                              value={targetForm.metricType}
-                              onValueChange={v => setTargetForm(f => ({ ...f, metricType: v as any }))}
-                            >
-                              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {Object.entries(METRIC_LABELS).map(([k, l]) => (
-                                  <SelectItem key={k} value={k}>{l}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <Label className="text-xs text-muted-foreground mb-1 block">Año</Label>
-                              <Input
-                                type="number"
-                                value={targetYear}
-                                onChange={e => { const y = parseInt(e.target.value); setTargetYear(y); loadTargets(panelSp.id, y); }}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs text-muted-foreground mb-1 block">Tipo de período</Label>
-                              <Select
-                                value={targetForm.periodType}
-                                onValueChange={v => setTargetForm(f => ({
-                                  ...f,
-                                  periodType: v as any,
-                                  period: v === "annual" ? 1 : 1,
-                                }))}
-                              >
-                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {Object.entries(PERIOD_LABELS).map(([k, l]) => (
-                                    <SelectItem key={k} value={k}>{l}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          {targetForm.periodType !== "annual" && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground mb-1 block">
-                                {targetForm.periodType === "monthly" ? "Mes" : targetForm.periodType === "quarterly" ? "Trimestre" : "Semestre"}
-                              </Label>
-                              <Select value={String(targetForm.period)} onValueChange={v => setTargetForm(f => ({ ...f, period: parseInt(v) }))}>
-                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {opts.map(o => <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-
-                          <div className={`grid gap-2 ${isAmountMetric ? "grid-cols-3" : "grid-cols-1"}`}>
-                            <div className={isAmountMetric ? "col-span-2" : ""}>
-                              <Label className="text-xs text-muted-foreground mb-1 block">
-                                {isAmountMetric ? "Monto objetivo" : "Cantidad objetivo"}
-                              </Label>
-                              <Input
-                                type="number"
-                                placeholder={isAmountMetric ? "ej. 500000" : "ej. 20"}
-                                value={targetForm.amount}
-                                onChange={e => setTargetForm(f => ({ ...f, amount: e.target.value }))}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            {isAmountMetric && (
-                              <div>
-                                <Label className="text-xs text-muted-foreground mb-1 block">Moneda</Label>
-                                <Select value={targetForm.currency} onValueChange={v => setTargetForm(f => ({ ...f, currency: v }))}>
-                                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  {/* Cabecera: año + botón */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground">Año</Label>
+                      <Input
+                        type="number"
+                        value={targetYear}
+                        onChange={e => { const y = parseInt(e.target.value); setTargetYear(y); loadTargets(panelSp.id, y); }}
+                        className="h-7 w-20 text-sm"
+                      />
+                    </div>
+                    <Dialog open={targetModalOpen} onOpenChange={open => {
+                      setTargetModalOpen(open);
+                      if (!open) setTargetForm(f => ({ ...f, amount: "" }));
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                          <Plus className="w-3.5 h-3.5" /> Nueva meta
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Nueva meta — {panelSp?.name}</DialogTitle>
+                        </DialogHeader>
+                        {(() => {
+                          const PERIOD_LABELS: Record<string, string> = {
+                            monthly: "Mensual", quarterly: "Trimestral",
+                            semiannual: "Semestral", annual: "Anual",
+                          };
+                          const METRIC_LABELS: Record<string, string> = {
+                            amount_approved: "Monto aprobado (cotizaciones)",
+                            count_quotes:    "Cotizaciones generadas",
+                            count_approved:  "Cotizaciones aprobadas",
+                            count_orders:    "Pedidos generados",
+                            amount_orders:   "Monto de pedidos",
+                          };
+                          const isAmountMetric = targetForm.metricType.startsWith("amount_");
+                          const periodOptions: Record<string, { label: string; value: number }[]> = {
+                            monthly: ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+                              .map((m, i) => ({ label: m, value: i + 1 })),
+                            quarterly: [
+                              { label: "Q1 — Ene-Mar", value: 1 }, { label: "Q2 — Abr-Jun", value: 2 },
+                              { label: "Q3 — Jul-Sep", value: 3 }, { label: "Q4 — Oct-Dic", value: 4 },
+                            ],
+                            semiannual: [
+                              { label: "S1 — Ene-Jun", value: 1 }, { label: "S2 — Jul-Dic", value: 2 },
+                            ],
+                            annual: [{ label: String(targetYear), value: 1 }],
+                          };
+                          const opts = periodOptions[targetForm.periodType] || [];
+                          return (
+                            <div className="space-y-4 pt-2">
+                              {/* Tipo de métrica */}
+                              <div className="space-y-1.5">
+                                <Label>Tipo de métrica</Label>
+                                <Select
+                                  value={targetForm.metricType}
+                                  onValueChange={v => setTargetForm(f => ({ ...f, metricType: v as any }))}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="USD">USD</SelectItem>
-                                    <SelectItem value="ARS">ARS</SelectItem>
+                                    {Object.entries(METRIC_LABELS).map(([k, l]) => (
+                                      <SelectItem key={k} value={k}>{l}</SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               </div>
-                            )}
-                          </div>
 
-                          <Button
-                            size="sm" className="w-full" disabled={savingTarget || !targetForm.amount}
-                            onClick={() => saveTarget(panelSp.id)}
-                          >
-                            {savingTarget ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-2" />}
-                            Guardar meta
-                          </Button>
-                        </>
-                      );
-                    })()}
+                              {/* Tipo de período + Año */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                  <Label>Tipo de período</Label>
+                                  <Select
+                                    value={targetForm.periodType}
+                                    onValueChange={v => setTargetForm(f => ({ ...f, periodType: v as any, period: 1 }))}
+                                  >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {Object.entries(PERIOD_LABELS).map(([k, l]) => (
+                                        <SelectItem key={k} value={k}>{l}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label>Año</Label>
+                                  <Input
+                                    type="number"
+                                    value={targetYear}
+                                    onChange={e => setTargetYear(parseInt(e.target.value))}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Período específico (no aplica para anual) */}
+                              {targetForm.periodType !== "annual" && (
+                                <div className="space-y-1.5">
+                                  <Label>
+                                    {targetForm.periodType === "monthly" ? "Mes" : targetForm.periodType === "quarterly" ? "Trimestre" : "Semestre"}
+                                  </Label>
+                                  <Select value={String(targetForm.period)} onValueChange={v => setTargetForm(f => ({ ...f, period: parseInt(v) }))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {opts.map(o => <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+
+                              {/* Objetivo + Moneda */}
+                              <div className={`grid gap-3 ${isAmountMetric ? "grid-cols-3" : "grid-cols-1"}`}>
+                                <div className={`space-y-1.5 ${isAmountMetric ? "col-span-2" : ""}`}>
+                                  <Label>{isAmountMetric ? "Monto objetivo" : "Cantidad objetivo"}</Label>
+                                  <Input
+                                    type="number"
+                                    placeholder={isAmountMetric ? "ej. 500000" : "ej. 20"}
+                                    value={targetForm.amount}
+                                    onChange={e => setTargetForm(f => ({ ...f, amount: e.target.value }))}
+                                    autoFocus
+                                  />
+                                </div>
+                                {isAmountMetric && (
+                                  <div className="space-y-1.5">
+                                    <Label>Moneda</Label>
+                                    <Select value={targetForm.currency} onValueChange={v => setTargetForm(f => ({ ...f, currency: v }))}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="USD">USD</SelectItem>
+                                        <SelectItem value="ARS">ARS</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+                              </div>
+
+                              <Button
+                                className="w-full mt-2"
+                                disabled={savingTarget || !targetForm.amount}
+                                onClick={() => saveTarget(panelSp.id)}
+                              >
+                                {savingTarget ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                Guardar meta
+                              </Button>
+                            </div>
+                          );
+                        })()}
+                      </DialogContent>
+                    </Dialog>
                   </div>
 
                   {/* Progreso del año */}
