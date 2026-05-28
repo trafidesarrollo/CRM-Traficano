@@ -11,7 +11,6 @@ router.get("/", async (req, res) => {
     const users = await db.select({
       id: usersTable.id,
       username: usersTable.username,
-      email: usersTable.email,
       fullName: usersTable.fullName,
       role: usersTable.role,
       isActive: usersTable.isActive,
@@ -26,13 +25,13 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { username, email, password, fullName, role } = req.body;
+    const { username, password, fullName, role } = req.body;
     if (!username || !password || !fullName || !role) {
       res.status(400).json({ error: "Usuario, contraseña, nombre y rol son requeridos" });
       return;
     }
     const passwordHash = await bcrypt.hash(password, 10);
-    const [user] = await db.insert(usersTable).values({ username, email: email || null, passwordHash, fullName, role }).returning();
+    const [user] = await db.insert(usersTable).values({ username, passwordHash, fullName, role }).returning();
     const { passwordHash: _, ...safeUser } = user;
     await auditAction(req, "crear_usuario", "user", user.id, { username, role });
     res.status(201).json(safeUser);
@@ -61,7 +60,6 @@ router.get("/:id", async (req, res) => {
     const users = await db.select({
       id: usersTable.id,
       username: usersTable.username,
-      email: usersTable.email,
       fullName: usersTable.fullName,
       role: usersTable.role,
       isActive: usersTable.isActive,
@@ -111,12 +109,11 @@ router.put("/:id/permissions", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { email, fullName, role, isActive, password } = req.body;
+    const { fullName, role, isActive, password } = req.body;
     const existing = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
     if (!existing[0]) { res.status(404).json({ error: "Usuario no encontrado" }); return; }
     const updates: any = {};
     const changes: Record<string, any> = {};
-    if (email !== undefined) { updates.email = email; changes.email = { old: existing[0].email, new: email }; }
     if (fullName !== undefined) { updates.fullName = fullName; changes.fullName = { old: existing[0].fullName, new: fullName }; }
     if (role !== undefined) { updates.role = role; changes.role = { old: existing[0].role, new: role }; }
     if (isActive !== undefined) { updates.isActive = isActive; changes.isActive = { old: existing[0].isActive, new: isActive }; }

@@ -122,7 +122,7 @@ const GLOBAL_NAV_ITEMS = [
 
 const PRIVILEGED = ["admin", "gerente_comercial"];
 
-const emptyCreate = { username: "", password: "", fullName: "", email: "", role: "vendedor" };
+const emptyCreate = { username: "", password: "", fullName: "", role: "vendedor" };
 
 export default function Users() {
   const { toast } = useToast();
@@ -134,7 +134,7 @@ export default function Users() {
 
   const [editUser, setEditUser] = useState<any>(null);
   const [editTab, setEditTab] = useState<"info" | "rol" | "modulos">("info");
-  const [editForm, setEditForm] = useState({ fullName: "", email: "", isActive: true, password: "", role: "" });
+  const [editForm, setEditForm] = useState({ fullName: "", isActive: true, password: "", role: "" });
   const [editModules, setEditModules] = useState<string[]>([]);
   const [editModulesDefault, setEditModulesDefault] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -202,7 +202,7 @@ export default function Users() {
   async function openEdit(u: any) {
     setEditUser(u);
     setEditTab("info");
-    setEditForm({ fullName: u.fullName || "", email: u.email || "", isActive: u.isActive, password: "", role: u.role });
+    setEditForm({ fullName: u.fullName || "", isActive: u.isActive, password: "", role: u.role });
     const r = await fetch(`${API}/api/users/${u.id}/permissions`, { credentials: "include" });
     if (r.ok) {
       const data = await r.json();
@@ -221,7 +221,6 @@ export default function Users() {
     try {
       const patchBody: any = {
         fullName: editForm.fullName,
-        email: editForm.email || null,
         role: editForm.role,
         isActive: editForm.isActive,
       };
@@ -270,7 +269,6 @@ export default function Users() {
             <div className="space-y-4">
               <div><Label>Nombre completo</Label><Input value={createForm.fullName} onChange={e => setCreateForm({ ...createForm, fullName: e.target.value })} /></div>
               <div><Label>Usuario</Label><Input value={createForm.username} onChange={e => setCreateForm({ ...createForm, username: e.target.value })} /></div>
-              <div><Label>Email (opcional)</Label><Input type="email" value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} /></div>
               <div><Label>Contraseña</Label><Input type="password" value={createForm.password} onChange={e => setCreateForm({ ...createForm, password: e.target.value })} /></div>
               <div>
                 <Label>Rol</Label>
@@ -391,7 +389,6 @@ export default function Users() {
                     </Badge>
                     {!u.isActive && <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20 text-xs">Inactivo</Badge>}
                   </div>
-                  {u.email && <p className="text-xs text-muted-foreground mt-2 truncate">{u.email}</p>}
                 </CardContent>
               </Card>
             );
@@ -422,7 +419,6 @@ export default function Users() {
           {editTab === "info" && (
             <div className="space-y-4">
               <div><Label>Nombre completo</Label><Input value={editForm.fullName} onChange={e => setEditForm({ ...editForm, fullName: e.target.value })} /></div>
-              <div><Label>Email</Label><Input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></div>
               <div><Label>Nueva contraseña (dejar vacío para no cambiar)</Label><Input type="password" value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })} placeholder="••••••••" /></div>
               <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                 <div>

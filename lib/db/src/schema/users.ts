@@ -5,9 +5,6 @@ import { z } from "zod/v4";
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  // email pasa a ser opcional: el ERP de origen no lo trae.
-  // Se conserva la columna para futuras cargas, pero sin notNull ni unique.
-  email: text("email"),
   passwordHash: text("password_hash").notNull(),
   fullName: text("full_name").notNull(),
   role: text("role", { enum: ["admin", "gerente_comercial", "gerente", "vendedor", "operador"] }).notNull().default("vendedor"),
