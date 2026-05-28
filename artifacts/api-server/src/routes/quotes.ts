@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, quotesTable, quoteLinesTable, ordersTable, orderLinesTable, clientsTable, salespeopleTable, tasksTable, usersTable } from "@workspace/db";
+import { db, quotesTable, quoteLinesTable, ordersTable, orderLinesTable, clientsTable, salespeopleTable, tasksTable, usersTable, commercialTeamMembersTable } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 
 async function closeQuoteTasks(quoteId: number, tx: any = db) {
@@ -74,10 +74,37 @@ router.get("/quotes", async (req, res) => {
     const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
     const opportunityId = req.query.opportunityId ? parseInt(req.query.opportunityId as string) : undefined;
 
+    const callerRole = (req as any).userRole;
+    const callerId: number = (req as any).session?.userId;
+
     const conds: any[] = [];
     if (status) conds.push(eq(quotesTable.status, status as any));
     if (clientId) conds.push(eq(quotesTable.clientId, clientId));
     if (opportunityId) conds.push(eq(quotesTable.opportunityId, opportunityId));
+
+    // Vendedores only see quotes for clients assigned to their commercial team
+    if (callerRole === "vendedor" && callerId) {
+      const userTeams = await db
+        .select({ teamId: commercialTeamMembersTable.teamId })
+        .from(commercialTeamMembersTable)
+        .where(eq(commercialTeamMembersTable.userId, callerId));
+
+      if (userTeams.length > 0) {
+        const teamIds = userTeams.map((t) => t.teamId);
+        const teamClients = await db
+          .select({ id: clientsTable.id })
+          .from(clientsTable)
+          .where(inArray(clientsTable.assignedTeamId, teamIds));
+
+        if (teamClients.length > 0) {
+          conds.push(inArray(quotesTable.clientId, teamClients.map((c) => c.id)));
+        } else {
+          // User is in a team but no clients assigned → return empty
+          return res.json({ data: [], total: 0 });
+        }
+      }
+      // If not in any team, no restriction (show all their quotes)
+    }
 
     const where = conds.length ? and(...conds) : undefined;
 
