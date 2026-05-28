@@ -40,6 +40,10 @@ router.post("/auth/login", async (req, res) => {
     (req.session as any).userRole = user.role;
     (req.session as any).userFullName = user.fullName;
 
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => { if (err) reject(err); else resolve(); });
+    });
+
     await auditLogin(user.id, username, req);
 
     const { passwordHash: _, ...safeUser } = user;

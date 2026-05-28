@@ -540,8 +540,8 @@ router.post("/tasks/bulk", async (req, res) => {
 
 router.get("/tasks/stats/summary", async (req, res) => {
   try {
-    const userId = (req as any).session?.userId;
-    const userRole = (req as any).session?.userRole;
+    const userId = (req as any).userId;
+    const userRole = (req as any).userRole;
     const isManager = ["admin", "gerente", "gerente_comercial"].includes(userRole);
     const now = new Date();
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
