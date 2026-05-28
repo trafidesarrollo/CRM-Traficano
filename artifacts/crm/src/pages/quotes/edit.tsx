@@ -659,7 +659,6 @@ export default function QuoteEdit() {
   // Pre-fill salesperson when client is selected (new quote only)
   useEffect(() => {
     if (!isNew || !form.clientId) return;
-    if (form.salespersonId) return; // already set, don't override
     const client = clients.find((c: any) => String(c.id) === form.clientId);
     if (!client) return;
 
@@ -675,19 +674,23 @@ export default function QuoteEdit() {
       const team = commercialTeams.find((t: any) => Number(t.id) === Number(client.assignedTeamId));
       if (team?.members?.length > 0) {
         const teamUserIds = team.members.map((m: any) => Number(m.userId));
-        const vendedor = assignableUsers.find(
+        const vendedorUser = assignableUsers.find(
           (u: any) => teamUserIds.includes(Number(u.id)) && u.role === "vendedor"
         );
-        const match = vendedor ?? assignableUsers.find(
+        const matchUser = vendedorUser ?? assignableUsers.find(
           (u: any) => teamUserIds.includes(Number(u.id))
         );
-        if (match) {
-          setForm((prev: any) => ({ ...prev, salespersonId: String(match.id) }));
-          setSpFromTeam(true);
+        if (matchUser) {
+          // Use salesperson record ID (consistent with how quotes.salesperson_id is stored)
+          const matchSp = salespeople.find((s: any) => Number(s.userId) === Number(matchUser.id));
+          if (matchSp) {
+            setForm((prev: any) => ({ ...prev, salespersonId: String(matchSp.id) }));
+            setSpFromTeam(true);
+          }
         }
       }
     }
-  }, [isNew, form.clientId, clients, commercialTeams, assignableUsers]);
+  }, [isNew, form.clientId, clients, commercialTeams, assignableUsers, salespeople]);
 
   // When salesperson changes: find their commercial team and auto-assign to client if missing
   useEffect(() => {
@@ -1638,25 +1641,18 @@ export default function QuoteEdit() {
               </Label>
               <Select
                 value={form.salespersonId}
-                onValueChange={(v) => setForm({ ...form, salespersonId: v })}
+                onValueChange={(v) => { setForm({ ...form, salespersonId: v }); setSpFromTeam(false); }}
                 disabled={spFromTeam}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar responsable..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {assignableUsers.length > 0
-                    ? assignableUsers.map((u: any) => (
-                        <SelectItem key={u.id} value={String(u.id)}>
-                          {u.fullName || u.username}
-                        </SelectItem>
-                      ))
-                    : salespeople.map((s: any) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.name}
-                        </SelectItem>
-                      ))
-                  }
+                  {salespeople.map((s: any) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">Se le asignará una tarea de seguimiento automáticamente</p>
