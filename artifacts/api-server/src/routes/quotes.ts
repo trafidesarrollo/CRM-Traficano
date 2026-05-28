@@ -140,30 +140,52 @@ router.get("/quotes/followups", async (req, res) => {
     const to   = req.query.to   ? new Date(req.query.to   as string) : null;
     const salespersonId = req.query.salespersonId ? parseInt(req.query.salespersonId as string) : undefined;
 
+    const callerRole = (req as any).userRole;
+    const callerId: number = (req as any).session?.userId;
+
     // Only show quotes that still need follow-up (not finalized)
     const statusCond = sql`${quotesTable.status} in ('draft','sent','partial','expired')`;
     const spCond = salespersonId ? eq(quotesTable.salespersonId, salespersonId) : sql`1=1`;
 
     let dateCond: any;
     if (from && to) {
-      // Filter: followupDate in range, OR (no followupDate AND dueDate in range)
       dateCond = sql`(
         (${quotesTable.followupDate} >= ${from} AND ${quotesTable.followupDate} <= ${to})
         OR
         (${quotesTable.followupDate} IS NULL AND ${quotesTable.dueDate} >= ${from} AND ${quotesTable.dueDate} <= ${to})
       )`;
     } else if (to) {
-      // Overdue: followupDate <= to, OR dueDate <= to when no followupDate
       dateCond = sql`(
         (${quotesTable.followupDate} IS NOT NULL AND ${quotesTable.followupDate} <= ${to})
         OR
         (${quotesTable.followupDate} IS NULL AND ${quotesTable.dueDate} <= ${to})
       )`;
     }
-    // No date filter → show all active quotes
 
     const conds: any[] = [statusCond, spCond];
     if (dateCond) conds.push(dateCond);
+
+    // Vendedores only see followups for clients assigned to their commercial team
+    if (callerRole === "vendedor" && callerId) {
+      const userTeams = await db
+        .select({ teamId: commercialTeamMembersTable.teamId })
+        .from(commercialTeamMembersTable)
+        .where(eq(commercialTeamMembersTable.userId, callerId));
+
+      if (userTeams.length > 0) {
+        const teamIds = userTeams.map((t) => t.teamId);
+        const teamClients = await db
+          .select({ id: clientsTable.id })
+          .from(clientsTable)
+          .where(inArray(clientsTable.assignedTeamId, teamIds));
+
+        if (teamClients.length > 0) {
+          conds.push(inArray(quotesTable.clientId, teamClients.map((c) => c.id)));
+        } else {
+          return res.json([]);
+        }
+      }
+    }
 
     const data = await db.select({
       q: quotesTable,
