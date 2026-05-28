@@ -97,4 +97,57 @@ router.get("/reports/activities-by-type", async (req, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+router.get("/reports/new-clients", async (req, res) => {
+  try {
+    const days = Math.max(1, Math.min(365, parseInt(req.query.days as string) || 30));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await db.execute(sql`
+      SELECT c.id, c.company_name, c.status, c.created_at,
+             s.name AS salesperson_name
+      FROM clients c
+      LEFT JOIN salespeople s ON s.id = c.assigned_salesperson_id
+      WHERE c.created_at >= ${since.toISOString()}
+      ORDER BY c.created_at DESC
+      LIMIT 20
+    `);
+    res.json({ data: rows.rows });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get("/reports/dormant-clients", async (req, res) => {
+  try {
+    const days = Math.max(7, Math.min(365, parseInt(req.query.days as string) || 30));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await db.execute(sql`
+      SELECT c.id, c.company_name, c.status,
+             s.name AS salesperson_name,
+             MAX(GREATEST(
+               COALESCE(a.created_at, '1970-01-01'),
+               COALESCE(t.created_at, '1970-01-01'),
+               COALESCE(q.date, '1970-01-01')
+             )) AS last_touch
+      FROM clients c
+      LEFT JOIN salespeople s ON s.id = c.assigned_salesperson_id
+      LEFT JOIN activities a ON a.client_id = c.id
+      LEFT JOIN tasks t ON t.client_id = c.id
+      LEFT JOIN quotes q ON q.client_id = c.id
+      WHERE c.status NOT IN ('inactive')
+      GROUP BY c.id, c.company_name, c.status, s.name
+      HAVING MAX(GREATEST(
+               COALESCE(a.created_at, '1970-01-01'),
+               COALESCE(t.created_at, '1970-01-01'),
+               COALESCE(q.date, '1970-01-01')
+             )) < ${since.toISOString()}
+         OR MAX(GREATEST(
+               COALESCE(a.created_at, '1970-01-01'),
+               COALESCE(t.created_at, '1970-01-01'),
+               COALESCE(q.date, '1970-01-01')
+             )) = '1970-01-01'
+      ORDER BY last_touch ASC
+      LIMIT 20
+    `);
+    res.json({ data: rows.rows });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;

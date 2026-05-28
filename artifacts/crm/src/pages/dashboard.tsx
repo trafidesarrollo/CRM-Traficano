@@ -6,8 +6,10 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   LineChart, Line, CartesianGrid,
 } from "recharts";
-import { Users, TrendingUp, Target, ShoppingCart } from "lucide-react";
-import { format } from "date-fns";
+import { Users, TrendingUp, Target, ShoppingCart, UserPlus, AlertTriangle, Building2, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
+import { Badge } from "@/components/ui/badge";
+import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { getOppStatusLabel } from "@/lib/translations";
 
@@ -42,6 +44,9 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [period, setPeriod] = useState(90);
   const [loading, setLoading] = useState(true);
+  const [newClients, setNewClients] = useState<any[]>([]);
+  const [dormantClients, setDormantClients] = useState<any[]>([]);
+  const [dormantDays, setDormantDays] = useState(30);
 
   useEffect(() => {
     setLoading(true);
@@ -61,6 +66,16 @@ export default function Dashboard() {
       setLoading(false);
     });
   }, [period]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API}/api/reports/new-clients?days=30`, { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] })),
+      fetch(`${API}/api/reports/dormant-clients?days=${dormantDays}`, { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([nc, dc]) => {
+      setNewClients(nc.data || []);
+      setDormantClients(dc.data || []);
+    });
+  }, [dormantDays]);
 
   const oppFunnelData = metrics
     ? Object.entries(metrics.opportunitiesByStatus || {})
@@ -300,7 +315,7 @@ export default function Dashboard() {
 
       {/* Row 4: Actividad reciente */}
       {!loadingMetrics && metrics?.recentActivities && metrics.recentActivities.length > 0 && (
-        <Card className="bg-card/50 backdrop-blur-sm border-white/5">
+        <Card className="bg-card/50 backdrop-blur-sm border-white/5 mb-6">
           <CardHeader><CardTitle className="text-base">Actividad reciente</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -320,6 +335,133 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* Row 5: Clientes nuevos + Clientes sin actividad */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* ── Clientes nuevos (últimos 30 días) ── */}
+        <Card className="bg-card/50 backdrop-blur-sm border-white/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-emerald-400" />
+              Clientes nuevos
+              <span className="text-xs text-muted-foreground font-normal">— últimos 30 días</span>
+            </CardTitle>
+            <Link href="/clients">
+              <span className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer">
+                Ver todos <ArrowRight className="w-3 h-3" />
+              </span>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            {newClients.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground text-sm px-5">
+                No se agregaron clientes en los últimos 30 días
+              </div>
+            ) : (
+              <div className="divide-y divide-border/30">
+                {newClients.slice(0, 8).map((c: any) => (
+                  <Link key={c.id} href={`/clients/${c.id}`}>
+                    <div className="flex items-center gap-3 px-5 py-2.5 hover:bg-white/3 transition-colors cursor-pointer">
+                      <div className="w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                        <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{c.company_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {c.salesperson_name || "Sin vendedor asignado"}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs text-muted-foreground">
+                          {c.created_at
+                            ? formatDistanceToNow(new Date(c.created_at), { locale: es, addSuffix: true })
+                            : "—"}
+                        </p>
+                        <Badge className={`text-[10px] mt-0.5 ${
+                          c.status === "final" ? "bg-emerald-500/15 text-emerald-400" :
+                          c.status === "potential" ? "bg-amber-500/15 text-amber-400" :
+                          c.status === "prospect" ? "bg-blue-500/15 text-blue-400" :
+                          "bg-zinc-500/15 text-zinc-400"
+                        }`}>
+                          {c.status === "final" ? "Final" :
+                           c.status === "potential" ? "Potencial" :
+                           c.status === "prospect" ? "Prospecto" : c.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Clientes sin actividad ── */}
+        <Card className="bg-card/50 backdrop-blur-sm border-white/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+              Clientes sin actividad
+            </CardTitle>
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-0.5">
+              {[15, 30, 60].map(d => (
+                <button
+                  key={d}
+                  onClick={() => setDormantDays(d)}
+                  className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                    dormantDays === d
+                      ? "bg-amber-500/20 text-amber-300 font-medium"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {dormantClients.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground text-sm px-5">
+                ✓ Todos los clientes tienen actividad reciente
+              </div>
+            ) : (
+              <div className="divide-y divide-border/30">
+                {dormantClients.slice(0, 8).map((c: any) => {
+                  const lastTouchDate = c.last_touch && c.last_touch !== "1970-01-01T00:00:00.000Z"
+                    ? new Date(c.last_touch)
+                    : null;
+                  return (
+                    <Link key={c.id} href={`/clients/${c.id}`}>
+                      <div className="flex items-center gap-3 px-5 py-2.5 hover:bg-white/3 transition-colors cursor-pointer">
+                        <div className="w-7 h-7 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                          <Building2 className="w-3.5 h-3.5 text-amber-400/70" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{c.company_name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {c.salesperson_name || "Sin vendedor"}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {lastTouchDate ? (
+                            <p className="text-xs text-amber-400/80">
+                              Hace {formatDistanceToNow(lastTouchDate, { locale: es })}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-red-400/70">Sin contacto</p>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+      </div>
     </AppLayout>
   );
 }
