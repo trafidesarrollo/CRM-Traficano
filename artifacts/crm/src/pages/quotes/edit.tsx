@@ -49,7 +49,6 @@ import {
   ChevronsUpDown,
   ScrollText,
   Send,
-  Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -1635,27 +1634,6 @@ export default function QuoteEdit() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">Se le asignará una tarea de seguimiento automáticamente</p>
-              {(() => {
-                if (!form.salespersonId || commercialTeams.length === 0) return null;
-                let uid: number | null = null;
-                const mu = assignableUsers.find((u: any) => String(u.id) === String(form.salespersonId));
-                if (mu) uid = mu.id;
-                else {
-                  const ms = salespeople.find((s: any) => String(s.id) === String(form.salespersonId));
-                  if (ms?.userId) uid = ms.userId;
-                }
-                if (!uid) return null;
-                const team = commercialTeams.find((t: any) =>
-                  t.members?.some((m: any) => Number(m.userId) === Number(uid))
-                );
-                if (!team) return null;
-                return (
-                  <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
-                    <Users className="w-3 h-3 text-primary shrink-0" />
-                    <span>Equipo: <span className="font-medium text-foreground">{team.name}</span></span>
-                  </div>
-                );
-              })()}
             </div>
             <div>
               <Label>Tipo de orden <span className="text-destructive">*</span></Label>
