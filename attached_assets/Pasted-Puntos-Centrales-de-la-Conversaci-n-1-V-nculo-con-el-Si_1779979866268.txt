@@ -1,0 +1,61 @@
+Puntos Centrales de la Conversación:
+1. Vínculo con el Sistema de Pedidos (Producción):Es fundamental que el sistema de
+cotizaciones del CRM se conecte con el programa que procesa los pedidos para producción. El
+estado de "aprobada" en la cotización debe ser el disparador para el siguiente paso en
+producción.
+2. Campos Obligatorios y por Defecto en Cotizaciones:
+• Prioridad: Es bien asignada.
+• Tipo de Cotización: Debería tener un valor por defecto para agilizar el proceso y evitar errores.
+• Referencia al Cliente: Obligatorio.
+• Vendedor/Responsable de Seguimiento:Fundamental para el control.
+1. Filtrado y Carga Masiva de Tareas:
+• Se busca una herramienta para realizar una "carga masiva" de tareas, probablemente para
+organizar y procesar información proveniente del sistema anterior o de otras fuentes (ej. CSV).
+• La herramienta debe permitir asociar tareas a clientes y cotizaciones existentes.
+1. Cierre de Tareas y Novedades:
+• Se requiere funcionalidad para cerrar tareas. Al cerrar una tarea, debe registrarse en una
+"bitácora" y dar la opción de agendar un nuevo seguimiento.
+• Tipos de cierre de tareas:
+• Guardar Bitácora y Cerrar Tarea sin Agendar Seguimiento.
+• Guardar Bitácora y Cerrar Tarea agendando un Nuevo Seguimiento (con fecha).
+• Guardar Bitácora sin Cerrar Tarea (solo agregar un comentario).
+• El objetivo es que cada interacción quede registrada y se genere el próximo paso, si
+corresponde.
+1. Control y Seguimiento del Vendedor:
+• Visibilidad: Poder ver lo que cada vendedor tiene "abierto", "planificado" y "realizado" en un
+período.
+• Fechas Clave: Necesidad de fechas de "último contacto" y "próximo contacto planificado" para
+cada cliente para un control efectivo.
+• Consolidación de Datos: En la vista de clientes, además de la información básica, se busca
+ver la "escala en dólares" y el "consumo anual proyectado" para entender la importancia del
+cliente de un vistazo.
+• Filtros: Capacidad de filtrar por vendedor, prioridad, estado de la tarea (cerrada, abierta,
+planificada).
+1. Estandarización de Datos (Business Intelligence):Mariano enfatiza la necesidad de tener
+todo "mayormente normalizado" para poder hacer "Business Intelligence" de manera confiable.
+Evitar la inconsistencia en la asignación de responsabilidades y tipos de clientes/cotizaciones.
+26/05/2026
+Pagina 1
+Espacio de Trabajo Inteligente
+2. Asignación de Responsables (Vendedor Principal vs. Back Office):
+• Un Responsable Principal por Cliente: Un concepto fuerte en la discusión es tener un único
+responsable "dueño" del cliente, que rinda cuentas sobre él.
+• Rol de "Segundo Vendedor" / Back Office:Un segundo rol que pueda ver y operar sobre las
+cotizaciones y clientes, pero cuya responsabilidad principal no sea el seguimiento contable ante
+la dirección. Este rol colabora y se apoya en el principal.
+• Flexibilidad vs. Estructura: Tensión entre la necesidad de un sistema estricto para centralizar
+el control y la flexibilidad deseada por los vendedores para trabajar en equipo. Se concluye que
+al principio debe ser más restrictivo y luego se ajustará.
+• Asignación Automática vs. Manual:Se discutió la posibilidad de auto-asignación o
+asignación basada en reglas (zonas, tipos de producto, etc.). Se prefiere un inicio más manual
+o con reglas claras.
+1. Base de Clientes y Clientes Potenciales:
+• Los "prospectos" pueden ser cargados por cualquiera y completados.
+• Al pasar a "cliente potencial", el sistema debería exigir la asignación de un responsable y quizás
+otros datos relevantes. No debería permitir la autoasignación.
+• Reglas de Asignación por Industria/Zona: Se sugiere cargar industrias precargadas para
+luego poder aplicar reglas de asignación a vendedores específicos según su área (ej.
+"Petrolero", "Neumática").
+1. Desarrollo del Programa (Replit vs. Luis): Mariano está desarrollando esta herramienta en
+Replit (Chat Unlimited). Se menciona la posibilidad de "exportar" el programa de Replit si
+funciona bien y se vuelve crítico, debido a algunos "bugs" y la naturaleza de Replit
