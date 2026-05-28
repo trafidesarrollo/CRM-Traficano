@@ -1,8 +1,56 @@
 import { Router, type IRouter } from "express";
 import { db, goalsTable, salespeopleTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+router.get("/progress", async (req, res) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        g.id,
+        g.salesperson_id,
+        g.metric_type,
+        g.target_value,
+        CASE g.metric_type
+          WHEN 'quotes' THEN (
+            SELECT COUNT(*)::numeric
+            FROM quotes q
+            WHERE q.salesperson_id = g.salesperson_id
+              AND q.created_at::date >= g.start_date
+              AND q.created_at::date <= g.end_date
+          )
+          WHEN 'amount_usd' THEN (
+            SELECT COALESCE(SUM(q.net_amount::numeric), 0)
+            FROM quotes q
+            WHERE q.salesperson_id = g.salesperson_id
+              AND q.quote_status IN ('FINALIZADA', 'APROBADA')
+              AND q.created_at::date >= g.start_date
+              AND q.created_at::date <= g.end_date
+          )
+          WHEN 'new_clients' THEN (
+            SELECT COUNT(DISTINCT q.client_id)::numeric
+            FROM quotes q
+            WHERE q.salesperson_id = g.salesperson_id
+              AND q.created_at::date >= g.start_date
+              AND q.created_at::date <= g.end_date
+              AND NOT EXISTS (
+                SELECT 1 FROM quotes q2
+                WHERE q2.client_id = q.client_id
+                  AND q2.created_at::date < g.start_date
+              )
+          )
+          ELSE 0
+        END AS actual_value
+      FROM goals g
+    `);
+    res.json((result as any).rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al calcular progreso" });
+  }
+});
 
 router.get("/", async (req, res) => {
   try {

@@ -31,7 +31,7 @@ export default function Goals() {
   const { toast } = useToast();
   const [goals, setGoals] = useState<any[]>([]);
   const [salespeople, setSalespeople] = useState<any[]>([]);
-  const [cpData, setCpData] = useState<any>(null);
+  const [progressMap, setProgressMap] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
@@ -44,14 +44,18 @@ export default function Goals() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [goalsRes, spRes, cpRes] = await Promise.all([
+      const [goalsRes, spRes, progressRes] = await Promise.all([
         fetch(`${API_BASE}/api/goals`, { credentials: "include" }).then(r => r.json()),
         fetch(`${API_BASE}/api/salespeople`, { credentials: "include" }).then(r => r.json()),
-        fetch(`${API_BASE}/api/dashboard/commercial-plan`, { credentials: "include" }).then(r => r.json()),
+        fetch(`${API_BASE}/api/goals/progress`, { credentials: "include" }).then(r => r.json()),
       ]);
       setGoals(Array.isArray(goalsRes) ? goalsRes : []);
       setSalespeople(Array.isArray(spRes) ? spRes : []);
-      setCpData(cpRes);
+      const map: Record<number, number> = {};
+      if (Array.isArray(progressRes)) {
+        progressRes.forEach((p: any) => { map[p.id] = Number(p.actualValue ?? 0); });
+      }
+      setProgressMap(map);
     } catch {} finally { setLoading(false); }
   };
 
@@ -59,19 +63,6 @@ export default function Goals() {
 
   const getSpName = (id: number) => salespeople.find(s => s.id === id)?.name || "Desconocido";
   const getSp     = (id: number) => salespeople.find(s => s.id === id);
-
-  const getCurrentValue = (salespersonId: number, metricType: string): number => {
-    if (!cpData) return 0;
-    const allMetrics = [...(cpData.hunterMetrics || []), ...(cpData.farmerMetrics || []), ...(cpData.adminMetrics || [])];
-    const m = allMetrics.find((x: any) => x.salespersonId === salespersonId);
-    if (!m) return 0;
-    switch (metricType) {
-      case "quotes":      return m.quotesThisMonth || 0;
-      case "amount_usd":  return 0;
-      case "new_clients": return 0;
-      default:            return 0;
-    }
-  };
 
   const handleCreate = async () => {
     if (!form.salespersonId || form.salespersonId === "none" || !form.targetValue) {
@@ -150,10 +141,13 @@ export default function Goals() {
             </thead>
             <tbody>
               {goals.map((g: any) => {
-                const current = getCurrentValue(g.salespersonId, g.metricType);
+                const current = progressMap[g.id] ?? 0;
                 const target  = Number(g.targetValue);
                 const pct     = target > 0 ? Math.min((current / target) * 100, 100) : 0;
                 const sp      = getSp(g.salespersonId);
+                const isAmount = g.metricType === "amount_usd";
+                const fmt = (v: number) =>
+                  isAmount ? `$${v.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : String(Math.round(v));
                 return (
                   <tr key={g.id} className="border-b border-border/20 hover:bg-white/5 transition-colors">
                     <td className="py-3 px-3 font-medium">{getSpName(g.salespersonId)}</td>
@@ -164,11 +158,11 @@ export default function Goals() {
                     </td>
                     <td className="py-3 px-3">{PERIOD_LABELS[g.period] || g.period}</td>
                     <td className="py-3 px-3">{METRIC_LABELS[g.metricType] || g.metricType}</td>
-                    <td className="py-3 px-3 font-semibold">{target}</td>
+                    <td className="py-3 px-3 font-semibold">{fmt(target)}</td>
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2">
                         <Progress value={pct} className="flex-1" />
-                        <span className="text-xs font-medium w-16 text-right">{current} / {target}</span>
+                        <span className="text-xs font-medium w-24 text-right">{fmt(current)} / {fmt(target)}</span>
                       </div>
                     </td>
                     <td className="py-3 px-3">
