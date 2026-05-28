@@ -135,9 +135,27 @@ router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const currentUserId = (req as any).userId;
-    if (id === currentUserId) { res.status(400).json({ error: "No puede eliminar su propio usuario" }); return; }
+
+    if (id === currentUserId) {
+      res.status(400).json({ error: "No puede eliminar su propio usuario" });
+      return;
+    }
+
+    const target = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+    if (!target[0]) { res.status(404).json({ error: "Usuario no encontrado" }); return; }
+
+    if (target[0].role === "admin") {
+      const { count } = await import("drizzle-orm");
+      const result = await db.select({ total: count() }).from(usersTable).where(eq(usersTable.role, "admin"));
+      const adminCount = Number(result[0]?.total ?? 0);
+      if (adminCount <= 1) {
+        res.status(400).json({ error: "No se puede eliminar al único administrador del sistema. Debe existir al menos un admin." });
+        return;
+      }
+    }
+
     await db.delete(usersTable).where(eq(usersTable.id, id));
-    await auditAction(req, "eliminar_usuario", "user", id);
+    await auditAction(req, "eliminar_usuario", "user", id, { username: target[0].username, role: target[0].role });
     res.json({ message: "Usuario eliminado" });
   } catch (err) {
     req.log.error(err);
