@@ -57,6 +57,27 @@ router.post("/", async (req, res) => {
   }
 });
 
+// Per-user nav preferences (hidden sidebar items)
+router.put("/nav-prefs", async (req, res) => {
+  const userId = (req as any).session?.userId;
+  if (!userId) { res.status(401).json({ error: "No autenticado" }); return; }
+  try {
+    const { hidden } = req.body;
+    const key = `user_nav_hidden_${userId}`;
+    const value = JSON.stringify(Array.isArray(hidden) ? hidden : []);
+    const existing = await db.select().from(settingsTable).where(eq(settingsTable.key, key)).limit(1);
+    if (existing.length > 0) {
+      await db.update(settingsTable).set({ value, updatedAt: new Date() }).where(eq(settingsTable.key, key));
+    } else {
+      await db.insert(settingsTable).values({ key, value });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Error al guardar preferencias" });
+  }
+});
+
 router.get("/modules", async (req, res) => {
   try {
     const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "global_disabled_modules")).limit(1);

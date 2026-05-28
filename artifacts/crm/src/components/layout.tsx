@@ -9,6 +9,7 @@ import {
   FileUp, CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight, Eye, EyeOff, Pencil
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
+const API = import.meta.env.VITE_API_URL || "";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -401,16 +402,36 @@ export function AppLayout({ children }: { children: ReactNode }) {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
   });
   const [customizing, setCustomizing] = useState(false);
+
+  // Initialize from DB (via user object loaded on login) with localStorage as fallback/cache
   const [hiddenHrefs, setHiddenHrefs] = useState<string[]>(() => {
+    const fromDb: string[] | undefined = (user as any)?.hiddenNavItems;
+    if (Array.isArray(fromDb)) return fromDb;
     try {
       const key = `sidebar-hidden-${(user as any)?.id ?? "guest"}`;
       return JSON.parse(localStorage.getItem(key) || "[]");
     } catch { return []; }
   });
 
+  // Sync from user object when it loads (e.g. after page refresh with active session)
+  useEffect(() => {
+    const fromDb: string[] | undefined = (user as any)?.hiddenNavItems;
+    if (Array.isArray(fromDb)) {
+      setHiddenHrefs(fromDb);
+    }
+  }, [(user as any)?.id]);
+
   const toggleHidden = (href: string) => {
     setHiddenHrefs(prev => {
       const next = prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href];
+      // Persist to DB (source of truth)
+      fetch(`${API}/api/settings/nav-prefs`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ hidden: next }),
+      }).catch(() => {});
+      // Keep localStorage as local cache
       try {
         const key = `sidebar-hidden-${(user as any)?.id ?? "guest"}`;
         localStorage.setItem(key, JSON.stringify(next));

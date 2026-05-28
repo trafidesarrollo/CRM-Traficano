@@ -84,16 +84,18 @@ router.get("/auth/me", async (req, res) => {
     }
     const { passwordHash: _, ...safeUser } = user;
 
-    const [perms, globalRow] = await Promise.all([
+    const [perms, globalRow, navRow] = await Promise.all([
       db.select({ module: userModulePermissionsTable.module })
         .from(userModulePermissionsTable)
         .where(eq(userModulePermissionsTable.userId, userId)),
       db.select().from(settingsTable).where(eq(settingsTable.key, "global_disabled_modules")).limit(1),
+      db.select().from(settingsTable).where(eq(settingsTable.key, `user_nav_hidden_${userId}`)).limit(1),
     ]);
     const modulePermissions: string[] | null = perms.length > 0 ? perms.map(p => p.module) : null;
     const globalDisabledModules: string[] = globalRow[0] ? JSON.parse(globalRow[0].value) : [];
+    const hiddenNavItems: string[] = navRow[0] ? JSON.parse(navRow[0].value) : [];
 
-    res.json({ ...safeUser, modulePermissions, globalDisabledModules });
+    res.json({ ...safeUser, modulePermissions, globalDisabledModules, hiddenNavItems });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Error interno del servidor" });
