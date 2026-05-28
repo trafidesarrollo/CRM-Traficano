@@ -58,8 +58,8 @@ router.get("/clients", async (req, res) => {
         ? sql`AND c.assigned_team_id = ${parseInt(teamFilter)}`
         : sql``;
 
-    // Vendedores only see clients assigned to their commercial team
-    const vendedorTeamCond = callerRole === "vendedor" && callerId
+    // Non-admin users only see clients assigned to their commercial team
+    const vendedorTeamCond = !["admin", "gerente_comercial"].includes(callerRole) && callerId
       ? sql`AND c.assigned_team_id IN (
           SELECT team_id FROM commercial_team_members WHERE user_id = ${callerId}
         )`

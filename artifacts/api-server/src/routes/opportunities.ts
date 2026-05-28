@@ -26,8 +26,8 @@ router.get("/opportunities", async (req, res) => {
     if (hunterId) conditions.push(eq(opportunitiesTable.hunterId, hunterId));
     if (farmerId) conditions.push(eq(opportunitiesTable.farmerId, farmerId));
 
-    // Vendedores only see opportunities for clients assigned to their commercial team
-    if (callerRole === "vendedor" && callerId) {
+    // Non-admin users only see opportunities for clients assigned to their commercial team
+    if (!["admin", "gerente_comercial"].includes(callerRole) && callerId) {
       const userTeams = await db
         .select({ teamId: commercialTeamMembersTable.teamId })
         .from(commercialTeamMembersTable)

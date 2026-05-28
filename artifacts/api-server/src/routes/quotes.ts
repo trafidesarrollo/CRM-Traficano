@@ -82,8 +82,8 @@ router.get("/quotes", async (req, res) => {
     if (clientId) conds.push(eq(quotesTable.clientId, clientId));
     if (opportunityId) conds.push(eq(quotesTable.opportunityId, opportunityId));
 
-    // Vendedores only see quotes for clients assigned to their commercial team
-    if (callerRole === "vendedor" && callerId) {
+    // Non-admin users only see quotes for clients assigned to their commercial team
+    if (!["admin", "gerente_comercial"].includes(callerRole) && callerId) {
       const userTeams = await db
         .select({ teamId: commercialTeamMembersTable.teamId })
         .from(commercialTeamMembersTable)
@@ -165,8 +165,8 @@ router.get("/quotes/followups", async (req, res) => {
     const conds: any[] = [statusCond, spCond];
     if (dateCond) conds.push(dateCond);
 
-    // Vendedores only see followups for clients assigned to their commercial team
-    if (callerRole === "vendedor" && callerId) {
+    // Non-admin users only see followups for clients assigned to their commercial team
+    if (!["admin", "gerente_comercial"].includes(callerRole) && callerId) {
       const userTeams = await db
         .select({ teamId: commercialTeamMembersTable.teamId })
         .from(commercialTeamMembersTable)
