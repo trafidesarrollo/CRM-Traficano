@@ -20,6 +20,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { ClientDialog } from "@/components/client-dialog";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -73,7 +74,6 @@ export default function ClientDetail() {
   const id = params?.id;
   const { user } = useAuth();
   const role = (user as any)?.role;
-  const canEdit = role === "admin" || role === "gerente" || role === "gerente_comercial";
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
@@ -181,8 +181,6 @@ export default function ClientDetail() {
   }, [taskId]);
 
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState<any>({});
-  const [saving, setSaving] = useState(false);
 
   // ── Usuarios asignables ──
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
@@ -293,40 +291,6 @@ export default function ClientDetail() {
       .catch(() => {});
   }, []);
 
-  const openEdit = () => {
-    const c = data.client;
-    setEditForm({
-      companyName: c.company_name || c.companyName || "",
-      taxId: c.tax_id || c.taxId || "",
-      industry: c.industry || "",
-      phone: c.phone || "",
-      city: c.city || "",
-      status: c.status || "prospect",
-      notes: c.notes || "",
-      consumptionScale: c.consumption_scale != null ? String(c.consumption_scale) : (c.consumptionScale != null ? String(c.consumptionScale) : ""),
-    });
-    setEditOpen(true);
-  };
-
-  const saveEdit = async () => {
-    setSaving(true);
-    try {
-      const r = await fetch(`${API}/api/clients/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(editForm),
-      });
-      if (!r.ok) throw new Error("Error al guardar");
-      setEditOpen(false);
-      toast({ title: "Cliente actualizado" });
-      load();
-    } catch {
-      toast({ title: "Error al guardar", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const saveContact = async () => {
     if (!contactForm.firstName.trim()) return;
@@ -425,7 +389,7 @@ export default function ClientDetail() {
               </Link>
             )}
           </div>
-          <Button size="sm" variant="outline" onClick={openEdit}>
+          <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4 mr-1.5" />Editar cliente
           </Button>
         </div>
@@ -1195,86 +1159,12 @@ export default function ClientDetail() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-4 w-4" />Editar cliente
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label>Razón social <span className="text-destructive">*</span></Label>
-              <Input value={editForm.companyName || ""} onChange={e => setEditForm((f: any) => ({ ...f, companyName: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>CUIT <span className="text-destructive">*</span></Label>
-                <Input value={editForm.taxId || ""} onChange={e => setEditForm((f: any) => ({ ...f, taxId: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Industria <span className="text-destructive">*</span></Label>
-                <Input value={editForm.industry || ""} onChange={e => setEditForm((f: any) => ({ ...f, industry: e.target.value }))} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Teléfono <span className="text-destructive">*</span></Label>
-                <Input value={editForm.phone || ""} onChange={e => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Ciudad <span className="text-destructive">*</span></Label>
-                <Input value={editForm.city || ""} onChange={e => setEditForm((f: any) => ({ ...f, city: e.target.value }))} />
-              </div>
-            </div>
-
-            {/* Admin-only status override */}
-            {canEdit && (
-              <div className="space-y-1">
-                <Label>Estado (override manual)</Label>
-                <Select value={editForm.status || "prospect"} onValueChange={v => setEditForm((f: any) => ({ ...f, status: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="prospect">Prospecto</SelectItem>
-                    <SelectItem value="potential">Cliente Potencial</SelectItem>
-                    <SelectItem value="inactive">Inactivo</SelectItem>
-                    <SelectItem value="final">Cliente Final</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">El estado también se recalcula automáticamente según los campos completos y la Escala.</p>
-              </div>
-            )}
-
-            {/* Escala de consumo — visible siempre en edit */}
-            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
-              <Label className="flex items-center gap-1.5 text-amber-400 text-sm">
-                Escala de Consumo (USD/año proyectado)
-              </Label>
-              <Input
-                type="number" min="0" step="any"
-                value={editForm.consumptionScale || ""}
-                onChange={e => setEditForm((f: any) => ({ ...f, consumptionScale: e.target.value }))}
-                placeholder="Ej: 50000"
-                className="font-mono"
-              />
-              <p className="text-xs text-muted-foreground">0 = Inactivo · &gt;0 = Potencial · Solo OC convierte en Cliente Final</p>
-            </div>
-
-            <div className="space-y-1">
-              <Label>Notas internas</Label>
-              <Textarea rows={3} value={editForm.notes || ""} onChange={e => setEditForm((f: any) => ({ ...f, notes: e.target.value }))} />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="ghost" size="sm" onClick={() => setEditOpen(false)}>
-              <X className="h-4 w-4 mr-1" />Cancelar
-            </Button>
-            <Button size="sm" onClick={saveEdit} disabled={saving}>
-              <Save className="h-4 w-4 mr-1" />{saving ? "Guardando..." : "Guardar"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ClientDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        editClient={client}
+        onSaved={load}
+      />
 
       {/* ── Dialog: Nuevo Contacto ── */}
       <Dialog open={contactOpen} onOpenChange={setContactOpen}>
