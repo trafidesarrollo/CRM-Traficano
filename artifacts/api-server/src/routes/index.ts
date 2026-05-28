@@ -48,6 +48,7 @@ import quoteLogsRouter from "./quote-logs.js";
 import commercialTeamsRouter from "./commercial-teams.js";
 import industriesRouter from "./industries.js";
 import adminResetRouter from "./admin-reset.js";
+import salesTargetsRouter from "./sales-targets.js";
 import {
   requireAuth,
   requireRole,
@@ -270,6 +271,7 @@ router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);
 
 router.use("/goals", goalsRouter);
+router.use(requireMinRole("vendedor"), salesTargetsRouter);
 
 router.use("/settings", requireRole("admin", "gerente_comercial"), settingsRouter);
 

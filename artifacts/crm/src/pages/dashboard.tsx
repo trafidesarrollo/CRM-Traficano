@@ -47,6 +47,10 @@ export default function Dashboard() {
   const [newClients, setNewClients] = useState<any[]>([]);
   const [dormantClients, setDormantClients] = useState<any[]>([]);
   const [dormantDays, setDormantDays] = useState(30);
+  const [targetsProgress, setTargetsProgress] = useState<any[]>([]);
+  const [targetMonth] = useState(() => {
+    const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() + 1 };
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -71,11 +75,13 @@ export default function Dashboard() {
     Promise.all([
       fetch(`${API}/api/reports/new-clients?days=30`, { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] })),
       fetch(`${API}/api/reports/dormant-clients?days=${dormantDays}`, { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] })),
-    ]).then(([nc, dc]) => {
+      fetch(`${API}/api/sales-targets/progress?year=${targetMonth.year}&month=${targetMonth.month}`, { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([nc, dc, tp]) => {
       setNewClients(nc.data || []);
       setDormantClients(dc.data || []);
+      setTargetsProgress(tp.data || []);
     });
-  }, [dormantDays]);
+  }, [dormantDays, targetMonth.year, targetMonth.month]);
 
   const oppFunnelData = metrics
     ? Object.entries(metrics.opportunitiesByStatus || {})
@@ -248,41 +254,56 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <Card className="bg-card/50 backdrop-blur-sm border-white/5">
           <CardHeader>
-            <CardTitle className="text-base">Rendimiento por vendedor — {period}d</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">
+                Metas — {new Date(targetMonth.year, targetMonth.month - 1).toLocaleString("es-AR", { month: "long", year: "numeric" })}
+              </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="py-8 flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
-            ) : salespersonData.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground text-sm">Sin datos de vendedores</div>
+            {targetsProgress.length === 0 ? (
+              <div className="py-6 text-center text-muted-foreground text-sm">Sin metas configuradas para este mes</div>
             ) : (
               <div className="space-y-4">
-                {salespersonData.slice(0, 7).map((sp: any) => (
-                  <div key={sp.id} className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs shrink-0">
-                      {sp.name?.charAt(0)?.toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm truncate">{sp.name}</span>
-                        <span className="text-xs text-muted-foreground ml-2 shrink-0">
-                          {sp.orders} ped. · {sp.quotes} cot.
-                        </span>
+                {targetsProgress.map((sp: any) => {
+                  const actual  = Number(sp.actual_amount ?? 0);
+                  const target  = Number(sp.target_amount ?? 0);
+                  const pct     = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+                  const over    = target > 0 && actual > target;
+                  const cur     = sp.currency === "ARS" ? "$" : "u$s";
+                  const barCls  = over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-primary";
+                  return (
+                    <div key={sp.id}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs shrink-0">
+                            {sp.name?.charAt(0)?.toUpperCase()}
+                          </div>
+                          <span className="text-sm">{sp.name}</span>
+                        </div>
+                        {target > 0 ? (
+                          <span className={`text-xs font-semibold ${over ? "text-emerald-400" : pct >= 75 ? "text-green-400" : pct >= 40 ? "text-amber-400" : "text-muted-foreground"}`}>
+                            {over ? `🎯 ${((actual / target) * 100).toFixed(0)}%` : `${pct.toFixed(0)}%`}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Sin meta</span>
+                        )}
                       </div>
-                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full"
-                          style={{ width: `${maxSalesperson > 0 ? (sp.total / maxSalesperson) * 100 : 0}%` }}
-                        />
-                      </div>
-                      {sp.total > 0 && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          ${Number(sp.total).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
-                        </p>
+                      {target > 0 ? (
+                        <>
+                          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${Math.max(pct, actual > 0 ? 1 : 0)}%` }} />
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {cur} {Number(actual).toLocaleString("es-AR", { maximumFractionDigits: 0 })} / {cur} {Number(target).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
+                          </p>
+                        </>
+                      ) : (
+                        <div className="h-1.5 bg-white/5 rounded-full" />
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

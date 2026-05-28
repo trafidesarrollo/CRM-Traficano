@@ -7,10 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   FileText, Plus, Users, CalendarDays, Package, Clock,
-  CheckCircle2, Send, ListTodo, AlertCircle, Activity,
+  CheckCircle2, Send, ListTodo, AlertCircle, Activity, Target,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(n || 0);
+}
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -42,9 +46,13 @@ export default function DashboardVendedor() {
   const [taskStats, setTaskStats] = useState<any>({});
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [myTarget, setMyTarget] = useState<any>(null);
 
   useEffect(() => {
     if (!user?.id) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
 
     Promise.all([
       fetch(`${API}/api/quotes?limit=50`, { credentials: "include" })
@@ -53,10 +61,13 @@ export default function DashboardVendedor() {
         .then(r => r.json()).catch(() => ({})),
       fetch(`${API}/api/activities?limit=6`, { credentials: "include" })
         .then(r => r.json()).catch(() => []),
-    ]).then(([quotesData, stats, actsData]) => {
+      fetch(`${API}/api/sales-targets/my-progress?year=${year}&month=${month}`, { credentials: "include" })
+        .then(r => r.json()).catch(() => ({ data: null })),
+    ]).then(([quotesData, stats, actsData, targetData]) => {
       setQuotes(quotesData.data || []);
       setTaskStats(stats && typeof stats === "object" && !Array.isArray(stats) ? stats : {});
       setActivities(Array.isArray(actsData) ? actsData : (actsData.data || []));
+      setMyTarget(targetData.data || null);
       setLoading(false);
     });
   }, [user?.id]);
@@ -69,14 +80,62 @@ export default function DashboardVendedor() {
 
   const recentQuotes = quotes.slice(0, 8);
 
+  const now = new Date();
+  const mesLabel = format(now, "MMMM yyyy", { locale: es });
+
   return (
     <AppLayout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold">
-          Bienvenido, {user?.fullName?.split(" ")[0]}
-        </h1>
-        <p className="text-muted-foreground mt-1">Tu actividad comercial de hoy</p>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-3xl font-display font-bold">
+            Bienvenido, {user?.fullName?.split(" ")[0]}
+          </h1>
+          <p className="text-muted-foreground mt-1">Tu actividad comercial de hoy</p>
+        </div>
       </div>
+
+      {/* Mi meta del mes */}
+      {myTarget && (
+        (() => {
+          const actual  = Number(myTarget.actual_amount  ?? 0);
+          const target  = Number(myTarget.target_amount  ?? 0);
+          const pct     = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+          const over    = target > 0 && actual > target;
+          const cur     = myTarget.currency === "ARS" ? "$" : "u$s";
+          const color   = over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-primary";
+          return (
+            <Card className="bg-card/50 border-white/5 mb-6">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    Mi meta de {mesLabel}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-3 flex-wrap mb-3">
+                  <span className={`text-3xl font-bold font-mono ${over ? "text-emerald-400" : actual > 0 ? "text-green-300" : "text-muted-foreground"}`}>
+                    {cur} {fmt(actual)}
+                  </span>
+                  <span className="text-muted-foreground text-lg">/</span>
+                  <span className="text-xl font-mono text-amber-400">{cur} {fmt(target)}</span>
+                  <span className={`text-sm font-semibold ml-auto ${over ? "text-emerald-400" : pct >= 75 ? "text-green-400" : pct >= 40 ? "text-amber-400" : "text-muted-foreground"}`}>
+                    {over ? `🎯 ${((actual / target) * 100).toFixed(0)}% — ¡Meta superada!` : `${pct.toFixed(0)}% completado`}
+                  </span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${color}`}
+                    style={{ width: `${Math.max(pct, actual > 0 ? 2 : 0)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Cotizaciones FINALIZADAS/APROBADAS este mes
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })()
+      )}
 
       {/* Stat cards row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">

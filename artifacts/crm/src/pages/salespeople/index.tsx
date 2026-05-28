@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useGetSalespeople, useCreateSalesperson, useDeleteSalesperson, useUpdateSalesperson } from "@workspace/api-client-react";
-import { Plus, Search, Trash2, Mail, Phone, Eye, Activity, PhoneIncoming, PhoneOutgoing, Clock, CheckCircle, PhoneMissed, Pencil, Save, X, Users, UserPlus, Loader2 } from "lucide-react";
+import { Plus, Search, Trash2, Mail, Phone, Eye, Activity, PhoneIncoming, PhoneOutgoing, Clock, CheckCircle, PhoneMissed, Pencil, Save, X, Users, UserPlus, Loader2, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,13 @@ export default function Salespeople() {
   const [panelCalls, setPanelCalls] = useState<any[]>([]);
   const [panelStats, setPanelStats] = useState<any>(null);
   const [panelTab, setPanelTab] = useState("metrics");
+
+  // ── Metas ──
+  const [targetsData, setTargetsData] = useState<any[]>([]);
+  const [targetYear, setTargetYear] = useState(() => new Date().getFullYear());
+  const [targetMonth, setTargetMonth] = useState(() => new Date().getMonth() + 1);
+  const [savingTarget, setSavingTarget] = useState(false);
+  const [targetForm, setTargetForm] = useState({ amount: "", currency: "USD" });
 
   const { data: salespeople, isLoading, refetch } = useGetSalespeople();
   const createMut = useCreateSalesperson({
@@ -177,9 +184,48 @@ export default function Salespeople() {
     }
   }, [salespeople]);
 
+  const loadTargets = async (spId: number, year: number) => {
+    try {
+      const rows: any[] = [];
+      const fetches = Array.from({ length: 12 }, (_, i) =>
+        fetch(`${API_BASE}/api/sales-targets/progress?year=${year}&month=${i + 1}`, { credentials: "include" })
+          .then(r => r.json())
+          .then(d => {
+            const sp = (d.data || []).find((x: any) => x.id === spId);
+            if (sp) rows.push({ ...sp, month: i + 1, year });
+          })
+          .catch(() => {})
+      );
+      await Promise.all(fetches);
+      rows.sort((a, b) => a.month - b.month);
+      setTargetsData(rows);
+    } catch {}
+  };
+
+  const saveTarget = async (spId: number) => {
+    const amount = parseFloat(targetForm.amount);
+    if (!amount || isNaN(amount)) return;
+    setSavingTarget(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/sales-targets`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ salespersonId: spId, year: targetYear, month: targetMonth, targetAmount: amount, currency: targetForm.currency }),
+      });
+      if (!r.ok) throw new Error();
+      toast({ title: "Meta guardada" });
+      setTargetForm({ amount: "", currency: "USD" });
+      await loadTargets(spId, targetYear);
+    } catch { toast({ title: "Error al guardar meta", variant: "destructive" }); }
+    finally { setSavingTarget(false); }
+  };
+
   const openPanel = async (sp: any) => {
     setPanelSp(sp);
     setPanelTab("metrics");
+    const year = new Date().getFullYear();
+    setTargetYear(year);
+    setTargetMonth(new Date().getMonth() + 1);
     try {
       const [cpRes, actRes, oppsRes, profileRes] = await Promise.all([
         fetch(`${API_BASE}/api/dashboard/commercial-plan`, { credentials: "include" }).then(r => r.json()),
@@ -195,6 +241,7 @@ export default function Salespeople() {
       const allOpps = [...(oppsRes.data || []), ...(farmerOpps.data || [])];
       const uniqueOpps = Array.from(new Map(allOpps.map((o: any) => [o.id, o])).values());
       setPanelOpps(uniqueOpps.filter((o: any) => !["won", "lost", "closed"].includes(o.status)));
+      loadTargets(sp.id, year);
     } catch {}
   };
 
@@ -564,6 +611,7 @@ export default function Salespeople() {
                 <TabsTrigger value="calls">Llamadas</TabsTrigger>
                 <TabsTrigger value="activities">Actividades</TabsTrigger>
                 <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
+                <TabsTrigger value="targets"><Target className="w-3.5 h-3.5 mr-1" />Metas</TabsTrigger>
               </TabsList>
 
               <ScrollArea className="flex-1 px-6 pb-6">
@@ -768,6 +816,99 @@ export default function Salespeople() {
                       ))}
                     </div>
                   )}
+                </TabsContent>
+
+                {/* ── Metas de ventas ── */}
+                <TabsContent value="targets" className="mt-4 space-y-5">
+                  {/* Formulario nueva meta */}
+                  <div className="rounded-lg border border-white/10 bg-white/3 p-4 space-y-3">
+                    <p className="text-sm font-medium">Establecer meta mensual</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Año</Label>
+                        <Input
+                          type="number"
+                          value={targetYear}
+                          onChange={e => { setTargetYear(parseInt(e.target.value)); loadTargets(panelSp.id, parseInt(e.target.value)); }}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Mes</Label>
+                        <Select value={String(targetMonth)} onValueChange={v => setTargetMonth(parseInt(v))}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
+                              <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <Label className="text-xs text-muted-foreground mb-1 block">Monto objetivo</Label>
+                        <Input
+                          type="number"
+                          placeholder="ej. 500000"
+                          value={targetForm.amount}
+                          onChange={e => setTargetForm(f => ({ ...f, amount: e.target.value }))}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Moneda</Label>
+                        <Select value={targetForm.currency} onValueChange={v => setTargetForm(f => ({ ...f, currency: v }))}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="ARS">ARS</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm" className="w-full" disabled={savingTarget || !targetForm.amount}
+                      onClick={() => saveTarget(panelSp.id)}
+                    >
+                      {savingTarget ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+                      Guardar meta
+                    </Button>
+                  </div>
+
+                  {/* Progreso del año */}
+                  <div>
+                    <p className="text-sm font-medium mb-3">Progreso {targetYear}</p>
+                    {targetsData.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">Sin metas configuradas para {targetYear}</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {targetsData.map((row: any) => {
+                          const actual  = Number(row.actual_amount ?? 0);
+                          const target  = Number(row.target_amount ?? 0);
+                          const pct     = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+                          const over    = target > 0 && actual > target;
+                          const cur     = row.currency === "ARS" ? "$" : "u$s";
+                          const barCls  = over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-primary";
+                          const monthName = new Date(row.year, row.month - 1).toLocaleString("es-AR", { month: "short" });
+                          return (
+                            <div key={`${row.year}-${row.month}`}>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="font-medium capitalize">{monthName}</span>
+                                <span className={over ? "text-emerald-400" : "text-muted-foreground"}>
+                                  {cur} {Number(actual).toLocaleString("es-AR", { maximumFractionDigits: 0 })} / {cur} {Number(target).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
+                                  {" · "}<span className={over ? "text-emerald-400 font-semibold" : ""}>{over ? `${((actual/target)*100).toFixed(0)}% 🎯` : `${pct.toFixed(0)}%`}</span>
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(pct, actual > 0 ? 1 : 0)}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </TabsContent>
               </ScrollArea>
             </Tabs>
