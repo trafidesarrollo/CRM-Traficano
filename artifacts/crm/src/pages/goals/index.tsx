@@ -14,16 +14,17 @@ import { getFunctionalRoleLabel, getFunctionalRoleColor } from "@/lib/translatio
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
-const metricLabels: Record<string, string> = {
-  calls: "Llamadas",
-  meetings: "Reuniones",
-  quotes: "Cotizaciones",
-  close_rate: "Tasa de cierre (%)",
+const METRIC_LABELS: Record<string, string> = {
+  quotes:      "Cotizaciones",
+  amount_usd:  "Monto en USD",
+  new_clients: "Clientes nuevos",
 };
 
-const periodLabels: Record<string, string> = {
-  weekly: "Semanal",
-  monthly: "Mensual",
+const PERIOD_LABELS: Record<string, string> = {
+  monthly:    "Mensual",
+  quarterly:  "Trimestral",
+  semiannual: "Semestral",
+  annual:     "Anual",
 };
 
 export default function Goals() {
@@ -35,11 +36,9 @@ export default function Goals() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
     salespersonId: "",
-    period: "weekly",
-    metricType: "calls",
+    period: "monthly",
+    metricType: "quotes",
     targetValue: "",
-    startDate: "",
-    endDate: "",
   });
 
   const fetchData = async () => {
@@ -59,25 +58,23 @@ export default function Goals() {
   useEffect(() => { fetchData(); }, []);
 
   const getSpName = (id: number) => salespeople.find(s => s.id === id)?.name || "Desconocido";
-  const getSp = (id: number) => salespeople.find(s => s.id === id);
+  const getSp     = (id: number) => salespeople.find(s => s.id === id);
 
   const getCurrentValue = (salespersonId: number, metricType: string): number => {
     if (!cpData) return 0;
     const allMetrics = [...(cpData.hunterMetrics || []), ...(cpData.farmerMetrics || []), ...(cpData.adminMetrics || [])];
     const m = allMetrics.find((x: any) => x.salespersonId === salespersonId);
     if (!m) return 0;
-
     switch (metricType) {
-      case "calls": return m.callsThisWeek || 0;
-      case "meetings": return m.meetingsThisMonth || 0;
-      case "quotes": return m.quotesThisMonth || 0;
-      case "close_rate": return m.closeRate || 0;
-      default: return 0;
+      case "quotes":      return m.quotesThisMonth || 0;
+      case "amount_usd":  return 0;
+      case "new_clients": return 0;
+      default:            return 0;
     }
   };
 
   const handleCreate = async () => {
-    if (!form.salespersonId || form.salespersonId === "none" || !form.targetValue || !form.startDate || !form.endDate) {
+    if (!form.salespersonId || form.salespersonId === "none" || !form.targetValue) {
       toast({ title: "Completá todos los campos", variant: "destructive" });
       return;
     }
@@ -88,17 +85,15 @@ export default function Goals() {
         credentials: "include",
         body: JSON.stringify({
           salespersonId: parseInt(form.salespersonId),
-          period: form.period,
-          metricType: form.metricType,
+          period:      form.period,
+          metricType:  form.metricType,
           targetValue: form.targetValue,
-          startDate: form.startDate,
-          endDate: form.endDate,
         }),
       });
       if (!res.ok) throw new Error();
       toast({ title: "Meta creada" });
       setDialogOpen(false);
-      setForm({ salespersonId: "", period: "weekly", metricType: "calls", targetValue: "", startDate: "", endDate: "" });
+      setForm({ salespersonId: "", period: "monthly", metricType: "quotes", targetValue: "" });
       fetchData();
     } catch {
       toast({ title: "Error al crear meta", variant: "destructive" });
@@ -130,7 +125,9 @@ export default function Goals() {
       </div>
 
       {loading ? (
-        <div className="flex h-[30vh] items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
+        <div className="flex h-[30vh] items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
       ) : goals.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Target className="w-12 h-12 mx-auto mb-4 opacity-30" />
@@ -148,16 +145,15 @@ export default function Goals() {
                 <th className="py-3 px-3 font-medium">Métrica</th>
                 <th className="py-3 px-3 font-medium">Meta</th>
                 <th className="py-3 px-3 font-medium w-48">Progreso</th>
-                <th className="py-3 px-3 font-medium">Fechas</th>
                 <th className="py-3 px-3 font-medium"></th>
               </tr>
             </thead>
             <tbody>
               {goals.map((g: any) => {
                 const current = getCurrentValue(g.salespersonId, g.metricType);
-                const target = Number(g.targetValue);
-                const pct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
-                const sp = getSp(g.salespersonId);
+                const target  = Number(g.targetValue);
+                const pct     = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+                const sp      = getSp(g.salespersonId);
                 return (
                   <tr key={g.id} className="border-b border-border/20 hover:bg-white/5 transition-colors">
                     <td className="py-3 px-3 font-medium">{getSpName(g.salespersonId)}</td>
@@ -166,8 +162,8 @@ export default function Goals() {
                         {getFunctionalRoleLabel(sp?.functionalRole)}
                       </Badge>
                     </td>
-                    <td className="py-3 px-3">{periodLabels[g.period] || g.period}</td>
-                    <td className="py-3 px-3">{metricLabels[g.metricType] || g.metricType}</td>
+                    <td className="py-3 px-3">{PERIOD_LABELS[g.period] || g.period}</td>
+                    <td className="py-3 px-3">{METRIC_LABELS[g.metricType] || g.metricType}</td>
                     <td className="py-3 px-3 font-semibold">{target}</td>
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2">
@@ -175,9 +171,12 @@ export default function Goals() {
                         <span className="text-xs font-medium w-16 text-right">{current} / {target}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-muted-foreground text-xs">{g.startDate} a {g.endDate}</td>
                     <td className="py-3 px-3">
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(g.id)}>
+                      <Button
+                        variant="ghost" size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(g.id)}
+                      >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </td>
@@ -189,61 +188,73 @@ export default function Goals() {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Nueva Meta</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
+      {/* ── Modal nueva meta ── */}
+      <Dialog open={dialogOpen} onOpenChange={v => { setDialogOpen(v); if (!v) setForm({ salespersonId: "", period: "monthly", metricType: "quotes", targetValue: "" }); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nueva Meta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+
+            {/* Vendedor */}
+            <div className="space-y-1.5">
               <Label>Vendedor</Label>
               <Select value={form.salespersonId} onValueChange={v => setForm({ ...form, salespersonId: v })}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar vendedor..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Seleccionar...</SelectItem>
-                  {salespeople.filter(s => s.functionalRole).map(s => (
-                    <SelectItem key={s.id} value={s.id.toString()}>{s.name} ({getFunctionalRoleLabel(s.functionalRole)})</SelectItem>
+                  {salespeople.filter(s => s.isActive !== false).map(s => (
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.name}{s.functionalRole ? ` (${getFunctionalRoleLabel(s.functionalRole)})` : ""}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
+
+            {/* Período + Tipo de métrica */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
                 <Label>Período</Label>
                 <Select value={form.period} onValueChange={v => setForm({ ...form, period: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="weekly">Semanal</SelectItem>
                     <SelectItem value="monthly">Mensual</SelectItem>
+                    <SelectItem value="quarterly">Trimestral</SelectItem>
+                    <SelectItem value="semiannual">Semestral</SelectItem>
+                    <SelectItem value="annual">Anual</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label>Tipo de métrica</Label>
                 <Select value={form.metricType} onValueChange={v => setForm({ ...form, metricType: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="calls">Llamadas</SelectItem>
-                    <SelectItem value="meetings">Reuniones</SelectItem>
                     <SelectItem value="quotes">Cotizaciones</SelectItem>
-                    <SelectItem value="close_rate">Tasa de cierre</SelectItem>
+                    <SelectItem value="amount_usd">Monto en USD</SelectItem>
+                    <SelectItem value="new_clients">Clientes nuevos</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div>
+
+            {/* Valor objetivo */}
+            <div className="space-y-1.5">
               <Label>Valor objetivo</Label>
-              <Input type="number" value={form.targetValue} onChange={e => setForm({ ...form, targetValue: e.target.value })} placeholder="100" />
+              <Input
+                type="number"
+                value={form.targetValue}
+                onChange={e => setForm({ ...form, targetValue: e.target.value })}
+                placeholder={form.metricType === "amount_usd" ? "ej. 50000" : "ej. 20"}
+                autoFocus
+              />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Fecha inicio</Label>
-                <Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
-              </div>
-              <div>
-                <Label>Fecha fin</Label>
-                <Input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
-              </div>
-            </div>
-            <Button className="w-full" disabled={!form.salespersonId || !form.targetValue} onClick={handleCreate}>
+
+            <Button
+              className="w-full"
+              disabled={!form.salespersonId || !form.targetValue}
+              onClick={handleCreate}
+            >
               Crear Meta
             </Button>
           </div>

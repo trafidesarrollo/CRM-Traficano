@@ -24,9 +24,38 @@ router.get("/", async (req, res) => {
   }
 });
 
+function computeDates(period: string): { startDate: string; endDate: string } {
+  const now = new Date();
+  const y   = now.getFullYear();
+  const m   = now.getMonth(); // 0-indexed
+  const iso = (d: Date) => d.toISOString().split("T")[0];
+
+  switch (period) {
+    case "quarterly": {
+      const q = Math.floor(m / 3);
+      return { startDate: iso(new Date(y, q * 3, 1)), endDate: iso(new Date(y, q * 3 + 3, 0)) };
+    }
+    case "semiannual": {
+      const h = m < 6 ? 0 : 1;
+      return { startDate: iso(new Date(y, h * 6, 1)), endDate: iso(new Date(y, h * 6 + 6, 0)) };
+    }
+    case "annual":
+      return { startDate: `${y}-01-01`, endDate: `${y}-12-31` };
+    case "monthly":
+    default:
+      return { startDate: iso(new Date(y, m, 1)), endDate: iso(new Date(y, m + 1, 0)) };
+  }
+}
+
 router.post("/", async (req, res) => {
   try {
-    const [goal] = await db.insert(goalsTable).values(req.body).returning();
+    const body = { ...req.body };
+    if (!body.startDate || !body.endDate) {
+      const dates = computeDates(body.period || "monthly");
+      body.startDate = body.startDate || dates.startDate;
+      body.endDate   = body.endDate   || dates.endDate;
+    }
+    const [goal] = await db.insert(goalsTable).values(body).returning();
     res.status(201).json(goal);
   } catch (err) {
     req.log.error(err);
