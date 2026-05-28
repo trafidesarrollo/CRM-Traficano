@@ -39,9 +39,12 @@ export default function Salespeople() {
   // ── Metas ──
   const [targetsData, setTargetsData] = useState<any[]>([]);
   const [targetYear, setTargetYear] = useState(() => new Date().getFullYear());
-  const [targetMonth, setTargetMonth] = useState(() => new Date().getMonth() + 1);
   const [savingTarget, setSavingTarget] = useState(false);
-  const [targetForm, setTargetForm] = useState({ amount: "", currency: "USD" });
+  const [targetForm, setTargetForm] = useState({
+    amount: "", currency: "USD",
+    periodType: "monthly" as "monthly" | "quarterly" | "semiannual" | "annual",
+    period: new Date().getMonth() + 1,
+  });
 
   const { data: salespeople, isLoading, refetch } = useGetSalespeople();
   const createMut = useCreateSalesperson({
@@ -186,19 +189,9 @@ export default function Salespeople() {
 
   const loadTargets = async (spId: number, year: number) => {
     try {
-      const rows: any[] = [];
-      const fetches = Array.from({ length: 12 }, (_, i) =>
-        fetch(`${API_BASE}/api/sales-targets/progress?year=${year}&month=${i + 1}`, { credentials: "include" })
-          .then(r => r.json())
-          .then(d => {
-            const sp = (d.data || []).find((x: any) => x.id === spId);
-            if (sp) rows.push({ ...sp, month: i + 1, year });
-          })
-          .catch(() => {})
-      );
-      await Promise.all(fetches);
-      rows.sort((a, b) => a.month - b.month);
-      setTargetsData(rows);
+      const r = await fetch(`${API_BASE}/api/sales-targets/by-salesperson/${spId}?year=${year}`, { credentials: "include" });
+      const d = await r.json();
+      setTargetsData(Array.isArray(d.data) ? d.data : []);
     } catch {}
   };
 
@@ -210,11 +203,18 @@ export default function Salespeople() {
       const r = await fetch(`${API_BASE}/api/sales-targets`, {
         method: "PUT", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ salespersonId: spId, year: targetYear, month: targetMonth, targetAmount: amount, currency: targetForm.currency }),
+        body: JSON.stringify({
+          salespersonId: spId,
+          year: targetYear,
+          periodType: targetForm.periodType,
+          month: targetForm.period,
+          targetAmount: amount,
+          currency: targetForm.currency,
+        }),
       });
       if (!r.ok) throw new Error();
       toast({ title: "Meta guardada" });
-      setTargetForm({ amount: "", currency: "USD" });
+      setTargetForm(f => ({ ...f, amount: "" }));
       await loadTargets(spId, targetYear);
     } catch { toast({ title: "Error al guardar meta", variant: "destructive" }); }
     finally { setSavingTarget(false); }
@@ -225,7 +225,6 @@ export default function Salespeople() {
     setPanelTab("metrics");
     const year = new Date().getFullYear();
     setTargetYear(year);
-    setTargetMonth(new Date().getMonth() + 1);
     try {
       const [cpRes, actRes, oppsRes, profileRes] = await Promise.all([
         fetch(`${API_BASE}/api/dashboard/commercial-plan`, { credentials: "include" }).then(r => r.json()),
@@ -822,91 +821,164 @@ export default function Salespeople() {
                 <TabsContent value="targets" className="mt-4 space-y-5">
                   {/* Formulario nueva meta */}
                   <div className="rounded-lg border border-white/10 bg-white/3 p-4 space-y-3">
-                    <p className="text-sm font-medium">Establecer meta mensual</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs text-muted-foreground mb-1 block">Año</Label>
-                        <Input
-                          type="number"
-                          value={targetYear}
-                          onChange={e => { setTargetYear(parseInt(e.target.value)); loadTargets(panelSp.id, parseInt(e.target.value)); }}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground mb-1 block">Mes</Label>
-                        <Select value={String(targetMonth)} onValueChange={v => setTargetMonth(parseInt(v))}>
-                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
-                              <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="col-span-2">
-                        <Label className="text-xs text-muted-foreground mb-1 block">Monto objetivo</Label>
-                        <Input
-                          type="number"
-                          placeholder="ej. 500000"
-                          value={targetForm.amount}
-                          onChange={e => setTargetForm(f => ({ ...f, amount: e.target.value }))}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground mb-1 block">Moneda</Label>
-                        <Select value={targetForm.currency} onValueChange={v => setTargetForm(f => ({ ...f, currency: v }))}>
-                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="USD">USD</SelectItem>
-                            <SelectItem value="ARS">ARS</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm" className="w-full" disabled={savingTarget || !targetForm.amount}
-                      onClick={() => saveTarget(panelSp.id)}
-                    >
-                      {savingTarget ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-2" />}
-                      Guardar meta
-                    </Button>
+                    {(() => {
+                      const PERIOD_LABELS: Record<string, string> = {
+                        monthly: "Mensual", quarterly: "Trimestral",
+                        semiannual: "Semestral", annual: "Anual",
+                      };
+                      const periodOptions: Record<string, { label: string; value: number }[]> = {
+                        monthly: ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+                          .map((m, i) => ({ label: m, value: i + 1 })),
+                        quarterly: [
+                          { label: "Q1 — Ene-Mar", value: 1 }, { label: "Q2 — Abr-Jun", value: 2 },
+                          { label: "Q3 — Jul-Sep", value: 3 }, { label: "Q4 — Oct-Dic", value: 4 },
+                        ],
+                        semiannual: [
+                          { label: "S1 — Ene-Jun", value: 1 }, { label: "S2 — Jul-Dic", value: 2 },
+                        ],
+                        annual: [{ label: String(targetYear), value: 1 }],
+                      };
+                      const opts = periodOptions[targetForm.periodType] || [];
+                      return (
+                        <>
+                          <p className="text-sm font-medium">Establecer meta</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1 block">Año</Label>
+                              <Input
+                                type="number"
+                                value={targetYear}
+                                onChange={e => { const y = parseInt(e.target.value); setTargetYear(y); loadTargets(panelSp.id, y); }}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1 block">Tipo de período</Label>
+                              <Select
+                                value={targetForm.periodType}
+                                onValueChange={v => setTargetForm(f => ({
+                                  ...f,
+                                  periodType: v as any,
+                                  period: v === "annual" ? 1 : v === "semiannual" ? 1 : v === "quarterly" ? 1 : new Date().getMonth() + 1,
+                                }))}
+                              >
+                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(PERIOD_LABELS).map(([k, l]) => (
+                                    <SelectItem key={k} value={k}>{l}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {targetForm.periodType !== "annual" && (
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1 block">
+                                {targetForm.periodType === "monthly" ? "Mes" : targetForm.periodType === "quarterly" ? "Trimestre" : "Semestre"}
+                              </Label>
+                              <Select value={String(targetForm.period)} onValueChange={v => setTargetForm(f => ({ ...f, period: parseInt(v) }))}>
+                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {opts.map(o => <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="col-span-2">
+                              <Label className="text-xs text-muted-foreground mb-1 block">Monto objetivo</Label>
+                              <Input
+                                type="number"
+                                placeholder="ej. 500000"
+                                value={targetForm.amount}
+                                onChange={e => setTargetForm(f => ({ ...f, amount: e.target.value }))}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1 block">Moneda</Label>
+                              <Select value={targetForm.currency} onValueChange={v => setTargetForm(f => ({ ...f, currency: v }))}>
+                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="USD">USD</SelectItem>
+                                  <SelectItem value="ARS">ARS</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm" className="w-full" disabled={savingTarget || !targetForm.amount}
+                            onClick={() => saveTarget(panelSp.id)}
+                          >
+                            {savingTarget ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+                            Guardar meta
+                          </Button>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* Progreso del año */}
                   <div>
-                    <p className="text-sm font-medium mb-3">Progreso {targetYear}</p>
+                    <p className="text-sm font-medium mb-3">Metas de {targetYear}</p>
                     {targetsData.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">Sin metas configuradas para {targetYear}</p>
                     ) : (
-                      <div className="space-y-3">
-                        {targetsData.map((row: any) => {
-                          const actual  = Number(row.actual_amount ?? 0);
-                          const target  = Number(row.target_amount ?? 0);
-                          const pct     = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
-                          const over    = target > 0 && actual > target;
-                          const cur     = row.currency === "ARS" ? "$" : "u$s";
-                          const barCls  = over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-primary";
-                          const monthName = new Date(row.year, row.month - 1).toLocaleString("es-AR", { month: "short" });
-                          return (
-                            <div key={`${row.year}-${row.month}`}>
-                              <div className="flex justify-between text-xs mb-1">
-                                <span className="font-medium capitalize">{monthName}</span>
-                                <span className={over ? "text-emerald-400" : "text-muted-foreground"}>
-                                  {cur} {Number(actual).toLocaleString("es-AR", { maximumFractionDigits: 0 })} / {cur} {Number(target).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
-                                  {" · "}<span className={over ? "text-emerald-400 font-semibold" : ""}>{over ? `${((actual/target)*100).toFixed(0)}% 🎯` : `${pct.toFixed(0)}%`}</span>
-                                </span>
+                      (() => {
+                        const PTYPE_LABEL: Record<string, string> = {
+                          monthly: "Mensual", quarterly: "Trimestral",
+                          semiannual: "Semestral", annual: "Anual",
+                        };
+                        const PERIOD_NAME: Record<string, (month: number, year: number) => string> = {
+                          monthly: (m) => new Date(2000, m - 1).toLocaleString("es-AR", { month: "short" }),
+                          quarterly: (m) => `Q${m}`,
+                          semiannual: (m) => `S${m}`,
+                          annual: (_m, y) => String(y),
+                        };
+                        const grouped: Record<string, any[]> = {};
+                        for (const row of targetsData) {
+                          const pt = row.period_type || "monthly";
+                          if (!grouped[pt]) grouped[pt] = [];
+                          grouped[pt].push(row);
+                        }
+                        const ORDER = ["annual", "semiannual", "quarterly", "monthly"];
+                        return (
+                          <div className="space-y-5">
+                            {ORDER.filter(pt => grouped[pt]).map(pt => (
+                              <div key={pt}>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                                  {PTYPE_LABEL[pt]}
+                                </p>
+                                <div className="space-y-3">
+                                  {grouped[pt].map((row: any) => {
+                                    const actual = Number(row.actual_amount ?? 0);
+                                    const target = Number(row.target_amount ?? 0);
+                                    const pct    = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+                                    const over   = target > 0 && actual > target;
+                                    const cur    = row.currency === "ARS" ? "$" : "u$s";
+                                    const barCls = over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-primary";
+                                    const label  = PERIOD_NAME[pt]?.(row.month, row.year) ?? String(row.month);
+                                    return (
+                                      <div key={`${pt}-${row.month}`}>
+                                        <div className="flex justify-between text-xs mb-1">
+                                          <span className="font-medium capitalize">{label}</span>
+                                          <span className={over ? "text-emerald-400" : "text-muted-foreground"}>
+                                            {cur} {Number(actual).toLocaleString("es-AR", { maximumFractionDigits: 0 })} / {cur} {Number(target).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
+                                            {" · "}<span className={over ? "font-semibold" : ""}>{over ? `${((actual/target)*100).toFixed(0)}% 🎯` : `${pct.toFixed(0)}%`}</span>
+                                          </span>
+                                        </div>
+                                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                          <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(pct, actual > 0 ? 1 : 0)}%` }} />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(pct, actual > 0 ? 1 : 0)}%` }} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            ))}
+                          </div>
+                        );
+                      })()
                     )}
                   </div>
                 </TabsContent>
