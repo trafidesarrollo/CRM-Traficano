@@ -47,6 +47,7 @@ import productionRouter from "./production.js";
 import quoteLogsRouter from "./quote-logs.js";
 import commercialTeamsRouter from "./commercial-teams.js";
 import industriesRouter from "./industries.js";
+import adminResetRouter from "./admin-reset.js";
 import {
   requireAuth,
   requireRole,
@@ -275,5 +276,6 @@ router.use("/settings", requireRole("admin", "gerente_comercial"), settingsRoute
 router.use("/users", requireRole("admin", "gerente_comercial"), usersRouter);
 router.use("/prompts", requireRole("admin", "gerente_comercial", "gerente"), promptsRouter);
 router.use("/audit", requireRole("admin", "gerente_comercial", "gerente"), auditRouter);
+router.use(requireRole("admin"), adminResetRouter);
 
 export default router;

@@ -50,6 +50,7 @@ import ProductionList from "@/pages/production/index";
 import ProductionDetail from "@/pages/production/detail";
 import ProductionDashboard from "@/pages/production/dashboard";
 import IndustriesPage from "@/pages/industries/index";
+import ReinicioPage from "@/pages/reinicio/index";
 
 const queryClient = new QueryClient();
 
@@ -139,6 +140,7 @@ function Router() {
       <Route path="/custom-fields" component={() => <ProtectedRoute component={CustomFields} />} />
       <Route path="/carga-masiva" component={() => <ProtectedRoute component={CargaMasiva} />} />
       <Route path="/industries" component={() => <ProtectedRoute component={IndustriesPage} />} />
+      <Route path="/reinicio" component={() => <ProtectedRoute component={ReinicioPage} />} />
 
       <Route component={NotFound} />
     </Switch>

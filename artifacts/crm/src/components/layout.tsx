@@ -6,7 +6,7 @@ import {
   Package, UploadCloud, Mail, Bot, Settings, LogOut, Menu, Timer, 
   Target, Plus, PhoneCall, MessageSquare, FileText, ShoppingCart, Tag, ListTodo,
   CalendarDays, BarChart3, Workflow, Sliders, MailOpen, GitBranch, CalendarClock, ShieldCheck, Factory, Kanban, Upload,
-  FileUp, CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight, Eye, EyeOff, Pencil
+  FileUp, CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight, Eye, EyeOff, Pencil, RotateCcw
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 const API = import.meta.env.VITE_API_URL || "";
@@ -57,6 +57,7 @@ const navItems = [
   { href: "/production",       label: "Producción (MES)",      icon: Factory,         module: "produccion",        hiddenFromRoles: ["vendedor"] },
   { href: "/industries",       label: "Rubros / Industrias",   icon: Factory,         module: "industrias",        roles: ["admin", "gerente_comercial", "gerente"] },
   { href: "/users",            label: "Usuarios",              icon: Settings,        module: "usuarios",          roles: ["admin", "gerente_comercial"] },
+  { href: "/reinicio",         label: "Reinicio",              icon: RotateCcw,       module: "reinicio",          roles: ["admin"] },
 ];
 
 function BulkFollowupFAB() {
