@@ -592,7 +592,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </main>
 
-      <BulkFollowupFAB />
       <QuickActivityFAB />
     </div>
   );
