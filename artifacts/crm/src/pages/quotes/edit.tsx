@@ -668,13 +668,17 @@ export default function QuoteEdit() {
       return;
     }
 
-    // Priority 2: client has an assigned commercial team → use a team member
+    // Priority 2: client has an assigned commercial team → use the vendedor member
     if (client.assignedTeamId && commercialTeams.length > 0) {
       const team = commercialTeams.find((t: any) => Number(t.id) === Number(client.assignedTeamId));
       if (team?.members?.length > 0) {
-        // Find a team member who is in assignableUsers
-        const match = assignableUsers.find((u: any) =>
-          team.members.some((m: any) => Number(m.userId) === Number(u.id))
+        const teamUserIds = team.members.map((m: any) => Number(m.userId));
+        // Prefer a user with role "vendedor" from the team
+        const vendedor = assignableUsers.find(
+          (u: any) => teamUserIds.includes(Number(u.id)) && u.role === "vendedor"
+        );
+        const match = vendedor ?? assignableUsers.find(
+          (u: any) => teamUserIds.includes(Number(u.id))
         );
         if (match) {
           setForm((prev: any) => ({ ...prev, salespersonId: String(match.id) }));
