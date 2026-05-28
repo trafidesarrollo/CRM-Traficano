@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
 import { DuplicateWarning } from "@/components/duplicate-warning";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -41,8 +40,8 @@ export function statusBadge(status: string) {
 }
 
 const BLANK_FORM = {
-  companyName: "", taxId: "", industry: "", city: "", phone: "",
-  notes: "", consumptionScale: "", importance: "ninguna", statusOverride: "",
+  companyName: "", taxId: "", industry: "", city: "",
+  notes: "", consumptionScale: "", importance: "",
 };
 type ClientForm = typeof BLANK_FORM;
 
@@ -56,8 +55,6 @@ export interface ClientDialogProps {
 
 export function ClientDialog({ open, onOpenChange, editClient, onSaved }: ClientDialogProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.role === "admin" || (user as any)?.role === "gerente" || (user as any)?.role === "gerente_comercial";
 
   const [form, setForm] = useState<ClientForm>({ ...BLANK_FORM });
   const [saving, setSaving] = useState(false);
@@ -83,14 +80,12 @@ export function ClientDialog({ open, onOpenChange, editClient, onSaved }: Client
           taxId: c.tax_id || c.taxId || "",
           industry: c.industry || "",
           city: c.city || "",
-          phone: c.phone || "",
           notes: c.notes || "",
           consumptionScale:
             c.consumption_scale != null ? String(c.consumption_scale)
             : c.consumptionScale != null ? String(c.consumptionScale)
             : "",
-          importance: c.importance || "ninguna",
-          statusOverride: c.status || "prospect",
+          importance: c.importance || "",
         });
       } else {
         setForm({ ...BLANK_FORM });
@@ -103,7 +98,7 @@ export function ClientDialog({ open, onOpenChange, editClient, onSaved }: Client
   const ready = isReadyForPotential(form);
   const scale = parseFloat(form.consumptionScale);
   const previewStatus = editClient
-    ? (form.statusOverride || editClient.status || "prospect")
+    ? (editClient.status || "prospect")
     : ready ? (isNaN(scale) ? "potential" : scale === 0 ? "inactive" : "potential") : "prospect";
 
   const f = (key: keyof ClientForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -115,6 +110,10 @@ export function ClientDialog({ open, onOpenChange, editClient, onSaved }: Client
       toast({ title: "El nombre de empresa es obligatorio", variant: "destructive" });
       return;
     }
+    if (!form.importance) {
+      toast({ title: "Seleccioná la importancia del cliente", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const payload: any = {
@@ -122,15 +121,12 @@ export function ClientDialog({ open, onOpenChange, editClient, onSaved }: Client
         taxId: form.taxId.trim() || undefined,
         industry: form.industry.trim() || undefined,
         city: form.city.trim() || undefined,
-        phone: form.phone.trim() || undefined,
         notes: form.notes.trim() || undefined,
-        importance: form.importance || "ninguna",
+        importance: form.importance,
       };
       if (form.consumptionScale.trim() !== "") payload.consumptionScale = form.consumptionScale.trim();
       if (editClient) {
-        payload.status = isAdmin && form.statusOverride
-          ? form.statusOverride
-          : editClient.status || "prospect";
+        payload.status = editClient.status || "prospect";
       }
 
       let savedId: number;
@@ -257,15 +253,9 @@ export function ClientDialog({ open, onOpenChange, editClient, onSaved }: Client
 
           <DuplicateWarning entity="clients" params={{ taxId: form.taxId, companyName: form.companyName }} />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Ciudad <span className="text-destructive">*</span></Label>
-              <Input value={form.city} onChange={f("city")} placeholder="Buenos Aires" />
-            </div>
-            <div>
-              <Label>Teléfono</Label>
-              <Input value={form.phone} onChange={f("phone")} placeholder="+54 9 11 1234-5678" />
-            </div>
+          <div>
+            <Label>Ciudad <span className="text-destructive">*</span></Label>
+            <Input value={form.city} onChange={f("city")} placeholder="Buenos Aires" />
           </div>
 
           {/* ── Escala de consumo ── */}
@@ -292,30 +282,9 @@ export function ClientDialog({ open, onOpenChange, editClient, onSaved }: Client
             </div>
           )}
 
-          {/* ── Override de estado (solo admin/gerente en modo edición) ── */}
-          {isAdmin && editClient && (
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 space-y-2">
-              <Label className="text-sm text-muted-foreground">Estado (override manual)</Label>
-              <Select
-                value={form.statusOverride}
-                onValueChange={v => setForm(prev => ({ ...prev, statusOverride: v }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CLIENT_STATUS_CONFIG).map(([v, cfg]) => (
-                    <SelectItem key={v} value={v}>{cfg.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                El estado también se recalcula automáticamente según los campos completos y la Escala.
-              </p>
-            </div>
-          )}
-
           {/* ── Importancia ── */}
           <div>
-            <Label>Importancia del cliente</Label>
+            <Label>Importancia del cliente <span className="text-destructive">*</span></Label>
             <Select value={form.importance} onValueChange={v => setForm(prev => ({ ...prev, importance: v }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccioná importancia" />
