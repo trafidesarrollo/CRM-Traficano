@@ -44,6 +44,7 @@ export default function Salespeople() {
     amount: "", currency: "USD",
     periodType: "monthly" as "monthly" | "quarterly" | "semiannual" | "annual",
     period: new Date().getMonth() + 1,
+    metricType: "amount_approved" as "amount_approved" | "count_quotes" | "count_approved" | "count_orders" | "amount_orders",
   });
 
   const { data: salespeople, isLoading, refetch } = useGetSalespeople();
@@ -208,6 +209,7 @@ export default function Salespeople() {
           year: targetYear,
           periodType: targetForm.periodType,
           month: targetForm.period,
+          metricType: targetForm.metricType,
           targetAmount: amount,
           currency: targetForm.currency,
         }),
@@ -826,6 +828,14 @@ export default function Salespeople() {
                         monthly: "Mensual", quarterly: "Trimestral",
                         semiannual: "Semestral", annual: "Anual",
                       };
+                      const METRIC_LABELS: Record<string, string> = {
+                        amount_approved: "Monto aprobado (cot.)",
+                        count_quotes:    "Cotizaciones generadas",
+                        count_approved:  "Cotizaciones aprobadas",
+                        count_orders:    "Pedidos generados",
+                        amount_orders:   "Monto de pedidos",
+                      };
+                      const isAmountMetric = targetForm.metricType.startsWith("amount_");
                       const periodOptions: Record<string, { label: string; value: number }[]> = {
                         monthly: ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
                           .map((m, i) => ({ label: m, value: i + 1 })),
@@ -842,6 +852,23 @@ export default function Salespeople() {
                       return (
                         <>
                           <p className="text-sm font-medium">Establecer meta</p>
+
+                          {/* Tipo de métrica — full width */}
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Tipo de métrica</Label>
+                            <Select
+                              value={targetForm.metricType}
+                              onValueChange={v => setTargetForm(f => ({ ...f, metricType: v as any }))}
+                            >
+                              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(METRIC_LABELS).map(([k, l]) => (
+                                  <SelectItem key={k} value={k}>{l}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <Label className="text-xs text-muted-foreground mb-1 block">Año</Label>
@@ -859,7 +886,7 @@ export default function Salespeople() {
                                 onValueChange={v => setTargetForm(f => ({
                                   ...f,
                                   periodType: v as any,
-                                  period: v === "annual" ? 1 : v === "semiannual" ? 1 : v === "quarterly" ? 1 : new Date().getMonth() + 1,
+                                  period: v === "annual" ? 1 : 1,
                                 }))}
                               >
                                 <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
@@ -871,6 +898,7 @@ export default function Salespeople() {
                               </Select>
                             </div>
                           </div>
+
                           {targetForm.periodType !== "annual" && (
                             <div>
                               <Label className="text-xs text-muted-foreground mb-1 block">
@@ -884,28 +912,34 @@ export default function Salespeople() {
                               </Select>
                             </div>
                           )}
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="col-span-2">
-                              <Label className="text-xs text-muted-foreground mb-1 block">Monto objetivo</Label>
+
+                          <div className={`grid gap-2 ${isAmountMetric ? "grid-cols-3" : "grid-cols-1"}`}>
+                            <div className={isAmountMetric ? "col-span-2" : ""}>
+                              <Label className="text-xs text-muted-foreground mb-1 block">
+                                {isAmountMetric ? "Monto objetivo" : "Cantidad objetivo"}
+                              </Label>
                               <Input
                                 type="number"
-                                placeholder="ej. 500000"
+                                placeholder={isAmountMetric ? "ej. 500000" : "ej. 20"}
                                 value={targetForm.amount}
                                 onChange={e => setTargetForm(f => ({ ...f, amount: e.target.value }))}
                                 className="h-8 text-sm"
                               />
                             </div>
-                            <div>
-                              <Label className="text-xs text-muted-foreground mb-1 block">Moneda</Label>
-                              <Select value={targetForm.currency} onValueChange={v => setTargetForm(f => ({ ...f, currency: v }))}>
-                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="USD">USD</SelectItem>
-                                  <SelectItem value="ARS">ARS</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                            {isAmountMetric && (
+                              <div>
+                                <Label className="text-xs text-muted-foreground mb-1 block">Moneda</Label>
+                                <Select value={targetForm.currency} onValueChange={v => setTargetForm(f => ({ ...f, currency: v }))}>
+                                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="USD">USD</SelectItem>
+                                    <SelectItem value="ARS">ARS</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                           </div>
+
                           <Button
                             size="sm" className="w-full" disabled={savingTarget || !targetForm.amount}
                             onClick={() => saveTarget(panelSp.id)}
@@ -929,53 +963,77 @@ export default function Salespeople() {
                           monthly: "Mensual", quarterly: "Trimestral",
                           semiannual: "Semestral", annual: "Anual",
                         };
-                        const PERIOD_NAME: Record<string, (month: number, year: number) => string> = {
-                          monthly: (m) => new Date(2000, m - 1).toLocaleString("es-AR", { month: "short" }),
-                          quarterly: (m) => `Q${m}`,
-                          semiannual: (m) => `S${m}`,
-                          annual: (_m, y) => String(y),
+                        const METRIC_LABEL: Record<string, string> = {
+                          amount_approved: "Monto aprobado",
+                          count_quotes:    "Cotizaciones generadas",
+                          count_approved:  "Cotizaciones aprobadas",
+                          count_orders:    "Pedidos generados",
+                          amount_orders:   "Monto de pedidos",
                         };
+                        const PERIOD_NAME: Record<string, (m: number, y: number) => string> = {
+                          monthly:   (m) => new Date(2000, m - 1).toLocaleString("es-AR", { month: "short" }),
+                          quarterly: (m) => `Q${m}`,
+                          semiannual:(m) => `S${m}`,
+                          annual:    (_m, y) => String(y),
+                        };
+                        // group by "periodType|metricType"
                         const grouped: Record<string, any[]> = {};
                         for (const row of targetsData) {
-                          const pt = row.period_type || "monthly";
-                          if (!grouped[pt]) grouped[pt] = [];
-                          grouped[pt].push(row);
+                          const key = `${row.period_type || "monthly"}|${row.metric_type || "amount_approved"}`;
+                          if (!grouped[key]) grouped[key] = [];
+                          grouped[key].push(row);
                         }
-                        const ORDER = ["annual", "semiannual", "quarterly", "monthly"];
+                        const PERIOD_ORDER = ["annual","semiannual","quarterly","monthly"];
+                        const METRIC_ORDER = ["amount_approved","amount_orders","count_quotes","count_approved","count_orders"];
+                        const sortedKeys = Object.keys(grouped).sort((a, b) => {
+                          const [pa, ma] = a.split("|");
+                          const [pb, mb] = b.split("|");
+                          const pdiff = PERIOD_ORDER.indexOf(pa) - PERIOD_ORDER.indexOf(pb);
+                          return pdiff !== 0 ? pdiff : METRIC_ORDER.indexOf(ma) - METRIC_ORDER.indexOf(mb);
+                        });
                         return (
                           <div className="space-y-5">
-                            {ORDER.filter(pt => grouped[pt]).map(pt => (
-                              <div key={pt}>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                                  {PTYPE_LABEL[pt]}
-                                </p>
-                                <div className="space-y-3">
-                                  {grouped[pt].map((row: any) => {
-                                    const actual = Number(row.actual_amount ?? 0);
-                                    const target = Number(row.target_amount ?? 0);
-                                    const pct    = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
-                                    const over   = target > 0 && actual > target;
-                                    const cur    = row.currency === "ARS" ? "$" : "u$s";
-                                    const barCls = over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-primary";
-                                    const label  = PERIOD_NAME[pt]?.(row.month, row.year) ?? String(row.month);
-                                    return (
-                                      <div key={`${pt}-${row.month}`}>
-                                        <div className="flex justify-between text-xs mb-1">
-                                          <span className="font-medium capitalize">{label}</span>
-                                          <span className={over ? "text-emerald-400" : "text-muted-foreground"}>
-                                            {cur} {Number(actual).toLocaleString("es-AR", { maximumFractionDigits: 0 })} / {cur} {Number(target).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
-                                            {" · "}<span className={over ? "font-semibold" : ""}>{over ? `${((actual/target)*100).toFixed(0)}% 🎯` : `${pct.toFixed(0)}%`}</span>
-                                          </span>
+                            {sortedKeys.map(key => {
+                              const [pt, mt] = key.split("|");
+                              const isAmount = mt.startsWith("amount_");
+                              return (
+                                <div key={key}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                      {PTYPE_LABEL[pt]}
+                                    </p>
+                                    <span className="text-xs text-primary/80 font-medium">· {METRIC_LABEL[mt]}</span>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {grouped[key].map((row: any) => {
+                                      const actual  = Number(row.actual_amount ?? 0);
+                                      const target  = Number(row.target_amount ?? 0);
+                                      const pct     = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+                                      const over    = target > 0 && actual > target;
+                                      const barCls  = over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-primary";
+                                      const label   = PERIOD_NAME[pt]?.(row.month, row.year) ?? String(row.month);
+                                      const fmt = (n: number) => isAmount
+                                        ? `${row.currency === "ARS" ? "$" : "u$s"} ${n.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`
+                                        : n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
+                                      return (
+                                        <div key={`${pt}-${mt}-${row.month}`}>
+                                          <div className="flex justify-between text-xs mb-1">
+                                            <span className="font-medium capitalize">{label}</span>
+                                            <span className={over ? "text-emerald-400" : "text-muted-foreground"}>
+                                              {fmt(actual)} / {fmt(target)}
+                                              {" · "}<span className={over ? "font-semibold" : ""}>{over ? `${((actual/target)*100).toFixed(0)}% 🎯` : `${pct.toFixed(0)}%`}</span>
+                                            </span>
+                                          </div>
+                                          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                            <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(pct, actual > 0 ? 1 : 0)}%` }} />
+                                          </div>
                                         </div>
-                                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                          <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(pct, actual > 0 ? 1 : 0)}%` }} />
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         );
                       })()
