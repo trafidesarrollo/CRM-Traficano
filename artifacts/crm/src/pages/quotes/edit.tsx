@@ -655,14 +655,33 @@ export default function QuoteEdit() {
       .then((d) => setContacts(Array.isArray(d) ? d : d.data || []));
   }, [form.clientId]);
 
-  // Pre-fill salesperson from client's assigned salesperson when creating a new quote
+  // Pre-fill salesperson when client is selected (new quote only)
   useEffect(() => {
     if (!isNew || !form.clientId) return;
+    if (form.salespersonId) return; // already set, don't override
     const client = clients.find((c: any) => String(c.id) === form.clientId);
-    if (client?.assignedSalespersonId && !form.salespersonId) {
+    if (!client) return;
+
+    // Priority 1: client has a directly assigned salesperson
+    if (client.assignedSalespersonId) {
       setForm((prev: any) => ({ ...prev, salespersonId: String(client.assignedSalespersonId) }));
+      return;
     }
-  }, [isNew, form.clientId, clients]);
+
+    // Priority 2: client has an assigned commercial team → use a team member
+    if (client.assignedTeamId && commercialTeams.length > 0) {
+      const team = commercialTeams.find((t: any) => Number(t.id) === Number(client.assignedTeamId));
+      if (team?.members?.length > 0) {
+        // Find a team member who is in assignableUsers
+        const match = assignableUsers.find((u: any) =>
+          team.members.some((m: any) => Number(m.userId) === Number(u.id))
+        );
+        if (match) {
+          setForm((prev: any) => ({ ...prev, salespersonId: String(match.id) }));
+        }
+      }
+    }
+  }, [isNew, form.clientId, clients, commercialTeams, assignableUsers]);
 
   // When salesperson changes: find their commercial team and auto-assign to client if missing
   useEffect(() => {
