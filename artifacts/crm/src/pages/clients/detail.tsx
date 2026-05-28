@@ -919,17 +919,22 @@ export default function ClientDetail() {
                           </span>
                         </div>
                         {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
-                        {item.assignee_name && (
-                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
-                            {item.completed_at && (
-                              <span className="ml-2 text-green-400">
-                                · Cerrada el {new Date(item.completed_at).toLocaleDateString("es-AR")}
-                                {item.closed_by_name && <span className="font-semibold"> por {item.closed_by_name}</span>}
-                              </span>
-                            )}
-                          </p>
-                        )}
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                          {item.assignee_name && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
+                            </p>
+                          )}
+                          {isCompleted && (item.completed_at || item.completedAt) && (
+                            <p className="text-xs text-green-400 flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Cerrada el {new Date(item.completed_at || item.completedAt).toLocaleDateString("es-AR")}
+                              {(item.closed_by_name || item.closedByName) && (
+                                <span className="font-semibold"> por {item.closed_by_name || item.closedByName}</span>
+                              )}
+                            </p>
+                          )}
+                        </div>
                         <p className={`text-xs mt-0.5 flex items-center gap-1 ${taskQuoteId ? "text-primary/70" : "text-blue-400/60"}`}>
                           <ListTodo className="h-3 w-3" />
                           {taskQuoteId ? "Tarea — Ver cotización →" : "Clic para ver / editar"}

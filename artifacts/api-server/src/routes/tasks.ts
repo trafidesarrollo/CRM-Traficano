@@ -333,8 +333,8 @@ router.patch("/tasks/:id", async (req, res) => {
     for (const k of ["dueDate", "reminderAt", "completedAt"]) {
       if (data[k] && typeof data[k] === "string") data[k] = new Date(data[k]);
     }
-    if (data.status === "completed" && !data.completedAt) {
-      data.completedAt = new Date();
+    if (data.status === "completed") {
+      if (!data.completedAt) data.completedAt = new Date();
       if (userId) data.closedBy = userId;
     }
 
