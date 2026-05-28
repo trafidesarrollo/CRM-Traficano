@@ -43,6 +43,7 @@ const TABLE_ORDER = [
   "followups",
   "products",
   "salespeople",
+  "users",
 ];
 
 const TABLE_DESCRIPTIONS: Record<string, string> = {
@@ -55,7 +56,8 @@ const TABLE_DESCRIPTIONS: Record<string, string> = {
   activities: "Historial de llamadas, visitas y notas.",
   followups: "Seguimientos programados.",
   products: "Catálogo de productos.",
-  salespeople: "Vendedores registrados en el sistema.",
+  salespeople: "Perfiles de vendedores (tabla salespeople). Distinto de los usuarios del sistema.",
+  users: "Usuarios del sistema (gerentes, vendedores, operadores). Los administradores nunca se borran.",
 };
 
 type TableCounts = Record<string, { label: string; count: number }>;

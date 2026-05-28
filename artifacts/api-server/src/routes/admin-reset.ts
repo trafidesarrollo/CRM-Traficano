@@ -51,9 +51,14 @@ const ALLOWED_TABLES: Record<string, { label: string; truncateQuery: string; cou
     countQuery: "SELECT COUNT(*) as count FROM products",
   },
   salespeople: {
-    label: "Vendedores",
+    label: "Vendedores (perfiles)",
     truncateQuery: "TRUNCATE TABLE salespeople RESTART IDENTITY CASCADE",
     countQuery: "SELECT COUNT(*) as count FROM salespeople",
+  },
+  users: {
+    label: "Usuarios",
+    truncateQuery: "DELETE FROM users WHERE role != 'admin'",
+    countQuery: "SELECT COUNT(*) as count FROM users WHERE role != 'admin'",
   },
 };
 
