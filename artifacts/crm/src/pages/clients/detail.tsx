@@ -15,7 +15,7 @@ import {
   Phone, Mail, Globe, MapPin, DollarSign, Percent, Pencil, Save, X,
   CheckCircle2, Circle, Clock, ListTodo, UserSquare, Users, UserCheck, User, Loader2,
   CalendarClock, GitBranch, History, ChevronDown, ChevronUp, ArrowRight,
-  RefreshCw, Bell, Trash2, AlertCircle,
+  RefreshCw, Bell, Trash2, AlertCircle, MessageSquare,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
@@ -98,12 +98,40 @@ export default function ClientDetail() {
   const [taskFollowupTitle, setTaskFollowupTitle] = useState("");
   const [taskFollowupDesc, setTaskFollowupDesc] = useState("");
   const [taskFollowupAssigneeId, setTaskFollowupAssigneeId] = useState<number | null>(null);
+  const [taskShowComment, setTaskShowComment] = useState(false);
+  const [taskComment, setTaskComment] = useState("");
+
+  const addNoteWithoutClosing = async () => {
+    if (!taskModalData || !taskComment.trim()) return;
+    setTaskSaving(true);
+    try {
+      const res = await fetch(`${API}/api/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type: "note",
+          title: `Nota — ${taskModalData.title}`,
+          description: taskComment.trim(),
+          clientId: taskModalData.clientId ?? taskModalData.client_id ?? (id ? parseInt(id) : undefined),
+          completedAt: new Date().toISOString(),
+        }),
+      });
+      if (!res.ok) { toast({ title: "Error al guardar nota", variant: "destructive" }); return; }
+      toast({ title: "Nota guardada en bitácora" });
+      setTaskComment("");
+      setTaskShowComment(false);
+      load();
+    } finally { setTaskSaving(false); }
+  };
 
   const openTaskModal = async (task: any) => {
     // Show immediately with the clicked task while we fetch the full chain
     setTaskModalData({ ...task });
     setTaskModalOpen(true);
     setTaskShowFollowup(false);
+    setTaskShowComment(false);
+    setTaskComment("");
     setTaskFollowupDate((() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })());
     setTaskFollowupTitle(data?.client?.companyName || data?.client?.company_name || task.title || "");
     setTaskFollowupDesc("");
@@ -1100,24 +1128,63 @@ export default function ClientDetail() {
                 {/* Acciones de cierre */}
                 {taskModalData.status !== "completed" && (
                   <div className="border-t border-border/40 pt-3 space-y-3">
-                    {!taskShowFollowup ? (
-                      <div className="flex gap-2">
+                    {!taskShowFollowup && !taskShowComment ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => closeTaskWithFollowup(false)}
+                            disabled={taskSaving}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-green-400" />
+                            {taskSaving ? "Cerrando…" : "Cerrar sin seguimiento"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-violet-600 hover:bg-violet-500"
+                            onClick={() => setTaskShowFollowup(true)}
+                          >
+                            <CalendarClock className="w-3.5 h-3.5 mr-1.5" />Cerrar y agendar
+                          </Button>
+                        </div>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="flex-1"
-                          onClick={() => closeTaskWithFollowup(false)}
-                          disabled={taskSaving}
+                          className="w-full border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                          onClick={() => setTaskShowComment(true)}
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-green-400" />
-                          {taskSaving ? "Cerrando…" : "Cerrar sin seguimiento"}
+                          <MessageSquare className="w-3.5 h-3.5 mr-1.5" />Agregar nota sin cerrar
                         </Button>
+                      </div>
+                    ) : taskShowComment ? (
+                      <div className="space-y-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4 text-amber-400" />
+                            Agregar nota a bitácora
+                          </p>
+                          <button onClick={() => { setTaskShowComment(false); setTaskComment(""); }}>
+                            <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                          </button>
+                        </div>
+                        <Textarea
+                          rows={3}
+                          className="text-sm resize-none"
+                          placeholder="Escribí lo que pasó o lo que se acordó…"
+                          value={taskComment}
+                          onChange={e => setTaskComment(e.target.value)}
+                          autoFocus
+                        />
                         <Button
+                          className="w-full bg-amber-600 hover:bg-amber-500 text-white"
                           size="sm"
-                          className="flex-1 bg-violet-600 hover:bg-violet-500"
-                          onClick={() => setTaskShowFollowup(true)}
+                          disabled={!taskComment.trim() || taskSaving}
+                          onClick={addNoteWithoutClosing}
                         >
-                          <CalendarClock className="w-3.5 h-3.5 mr-1.5" />Cerrar y agendar
+                          <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                          {taskSaving ? "Guardando…" : "Guardar en bitácora"}
                         </Button>
                       </div>
                     ) : (
