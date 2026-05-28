@@ -224,9 +224,11 @@ router.get("/clients/:id/overview", async (req, res) => {
       db.select().from(contactsTable).where(eq(contactsTable.clientId, id)).orderBy(desc(contactsTable.isPrimary)),
       db.select().from(activitiesTable).where(eq(activitiesTable.clientId, id)).orderBy(desc(activitiesTable.createdAt)).limit(50),
       db.execute(sql`
-        SELECT t.*, u.full_name AS assignee_name
+        SELECT t.*, u.full_name AS assignee_name,
+          cb.full_name AS closed_by_name
         FROM tasks t
         LEFT JOIN users u ON u.id = t.assigned_to
+        LEFT JOIN users cb ON cb.id = t.closed_by
         WHERE t.client_id = ${id}
         ORDER BY t.created_at DESC
         LIMIT 50

@@ -901,7 +901,12 @@ export default function ClientDetail() {
                         {item.assignee_name && (
                           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                             <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
-                            {item.completed_at && <span className="ml-2 text-green-400">· Cerrada el {new Date(item.completed_at).toLocaleDateString("es-AR")}</span>}
+                            {item.completed_at && (
+                              <span className="ml-2 text-green-400">
+                                · Cerrada el {new Date(item.completed_at).toLocaleDateString("es-AR")}
+                                {item.closed_by_name && <span className="font-semibold"> por {item.closed_by_name}</span>}
+                              </span>
+                            )}
                           </p>
                         )}
                         <p className={`text-xs mt-0.5 flex items-center gap-1 ${taskQuoteId ? "text-primary/70" : "text-blue-400/60"}`}>
@@ -975,6 +980,9 @@ export default function ClientDetail() {
                     <div className="flex items-center gap-2 text-green-400 col-span-2">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                       Cerrada el {new Date(taskModalData.completedAt || taskModalData.completed_at).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })}
+                      {(taskModalData.closedByName || taskModalData.closed_by_name) && (
+                        <span className="font-semibold">por {taskModalData.closedByName || taskModalData.closed_by_name}</span>
+                      )}
                     </div>
                   )}
                 </div>
