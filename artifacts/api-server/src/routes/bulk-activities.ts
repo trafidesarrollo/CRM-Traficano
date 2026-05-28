@@ -184,7 +184,10 @@ router.post("/bulk-activities/process", async (req, res) => {
           row.clientId, row.clientName, row.titulo,
           row.novedad, row.fechaSeguimiento, row.urgencia, userId
         );
-        if (t) createdTasks++;
+        if (t) {
+          await assignTaskToClientTeam(t.id, row.clientId, userId);
+          createdTasks++;
+        }
       } else {
         // No date — don't save yet, surface to frontend for date assignment before saving
         sinFechaRows.push({
@@ -324,7 +327,10 @@ router.post("/bulk-activities/resolve", async (req, res) => {
             row.clientId, row.clientName, row.titulo || null,
             baseDescription, row.fechaSeguimiento, row.urgencia || null, userId
           );
-          if (t) createdTasks++;
+          if (t) {
+            await assignTaskToClientTeam(t.id, row.clientId, userId);
+            createdTasks++;
+          }
         }
       } else {
         // No task being created → activity note is the sole bitácora record
