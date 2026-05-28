@@ -49,7 +49,7 @@ const navItems = [
   { href: "/imports",          label: "Importar CSV",          icon: UploadCloud,     module: "importaciones",     hiddenFromRoles: ["vendedor"] },
   { href: "/csv",              label: "Import/Export CSV",     icon: UploadCloud,     module: "csv",               roles: ["admin", "gerente", "gerente_comercial"] },
   { href: "/followups",        label: "Seguimientos",          icon: Timer,           module: "seguimientos",      hiddenFromRoles: ["vendedor"] },
-  { href: "/goals",            label: "Metas",                 icon: Target,          module: "metas",             roles: ["admin", "gerente", "gerente_comercial"] },
+  { href: "/goals",            label: "Metas",                 icon: Target,          module: "metas" },
   { href: "/gmail",            label: "Gmail Sync",            icon: Mail,            module: "gmail",             hiddenFromRoles: ["vendedor"] },
   { href: "/anura",            label: "Anura Llamadas",        icon: PhoneCall,       module: "anura",             hiddenFromRoles: ["vendedor"] },
   { href: "/prompts",          label: "Prompts IA",            icon: Bot,             module: "prompts",           hiddenFromRoles: ["vendedor"] },

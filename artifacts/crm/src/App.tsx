@@ -54,7 +54,7 @@ import ReinicioPage from "@/pages/reinicio/index";
 
 const queryClient = new QueryClient();
 
-const VENDEDOR_ALLOWED_PATHS = ["/dashboard", "/quotes", "/calendar", "/clients", "/products", "/tasks", "/contacts", "/orders", "/carga-masiva"];
+const VENDEDOR_ALLOWED_PATHS = ["/dashboard", "/quotes", "/calendar", "/clients", "/products", "/tasks", "/contacts", "/orders", "/carga-masiva", "/goals"];
 
 function ProtectedRoute({ component: Component }: { component: any }) {
   const { user, isLoading } = useAuth();
