@@ -72,6 +72,7 @@ export default function Tasks() {
   const [filterStatus, setFilterStatus] = useState<"all" | "programadas" | "atrasadas" | "cerradas">("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
+  const [filterTeam, setFilterTeam] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [newOpen, setNewOpen] = useState(false);
@@ -185,7 +186,7 @@ export default function Tasks() {
     } catch { setFollowups([]); }
   };
 
-  useEffect(() => { if (user !== undefined) load(); }, [quickFilter, filterPriority, filterAssignee, dateFrom, dateTo, user]);
+  useEffect(() => { if (user !== undefined) load(); }, [quickFilter, filterPriority, filterAssignee, filterTeam, dateFrom, dateTo, user]);
   useEffect(() => { if (user !== undefined) loadFollowups(); }, [quickFilter, user, salespersonId]);
 
   useEffect(() => {
@@ -646,8 +647,10 @@ export default function Tasks() {
         <div className="flex items-center gap-1.5 mb-2 text-xs text-muted-foreground">
           <User className="w-3 h-3" />
           {filterAssignee !== "all"
-            ? <span>Total de <strong className="text-foreground">{users.find((u: any) => String(u.id) === filterAssignee)?.fullName ?? "vendedor"}</strong></span>
-            : <span>Totales de todos los vendedores</span>
+            ? <span>Total de <strong className="text-foreground">{users.find((u: any) => String(u.id) === filterAssignee)?.fullName ?? "usuario"}</strong></span>
+            : filterTeam !== "all"
+              ? <span>Total del equipo <strong className="text-foreground">{teams.find((t: any) => String(t.id) === filterTeam)?.name ?? ""}</strong></span>
+              : <span>Totales de todos los vendedores</span>
           }
         </div>
       )}
@@ -703,22 +706,53 @@ export default function Tasks() {
             onClick={() => setQuickFilter("today")}
           >Hoy</Button>
         </div>
-        {/* Vendedor — solo visible para no-vendedores */}
-        {!isVendedor && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Vendedor:</span>
-            <Select value={filterAssignee} onValueChange={v => setFilterAssignee(v)}>
-              <SelectTrigger className="h-8 text-xs w-40">
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {users.map((u: any) => (
-                  <SelectItem key={u.id} value={String(u.id)}>{u.fullName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Equipo + Usuario — solo para admin/gerente */}
+        {isAdmin && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Equipo:</span>
+              <Select
+                value={filterTeam}
+                onValueChange={v => { setFilterTeam(v); setFilterAssignee("all"); }}
+              >
+                <SelectTrigger className="h-8 text-xs w-40">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los equipos</SelectItem>
+                  {teams.map((t: any) => (
+                    <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Usuario:</span>
+              <Select
+                value={filterAssignee}
+                onValueChange={v => setFilterAssignee(v)}
+                disabled={filterTeam === "all"}
+              >
+                <SelectTrigger className="h-8 text-xs w-40">
+                  <SelectValue placeholder={filterTeam === "all" ? "Elegí un equipo" : "Todos"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {filterTeam !== "all" && (
+                    teams
+                      .find((t: any) => String(t.id) === filterTeam)
+                      ?.members
+                      ?.filter((m: any) => m.userId != null)
+                      ?.map((m: any) => (
+                        <SelectItem key={m.userId} value={String(m.userId)}>
+                          {m.fullName || m.username}
+                        </SelectItem>
+                      )) ?? []
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
         )}
         {/* Estado */}
         <div className="flex items-center gap-1.5">
@@ -771,12 +805,12 @@ export default function Tasks() {
           />
         </div>
         {/* Clear date filters */}
-        {(dateFrom || dateTo || filterPriority !== "all" || filterAssignee !== "all" || filterStatus !== "all") && (
+        {(dateFrom || dateTo || filterPriority !== "all" || filterAssignee !== "all" || filterTeam !== "all" || filterStatus !== "all") && (
           <Button
             size="sm"
             variant="ghost"
             className="h-8 text-xs text-muted-foreground hover:text-foreground px-2"
-            onClick={() => { setDateFrom(""); setDateTo(""); setFilterPriority("all"); setFilterAssignee("all"); setFilterStatus("all"); }}
+            onClick={() => { setDateFrom(""); setDateTo(""); setFilterPriority("all"); setFilterAssignee("all"); setFilterTeam("all"); setFilterStatus("all"); }}
           >
             <X className="w-3 h-3 mr-1" />Limpiar
           </Button>
@@ -786,12 +820,26 @@ export default function Tasks() {
       {/* ── Task list ── */}
       {(() => {
         const now = new Date();
+        // Team member IDs for client-side team filter
+        const teamMemberIds: Set<number> = filterTeam !== "all"
+          ? new Set(
+              (teams.find((t: any) => String(t.id) === filterTeam)?.members ?? [])
+                .filter((m: any) => m.userId != null)
+                .map((m: any) => m.userId as number)
+            )
+          : new Set();
+
         const visibleItems = items.filter(t => {
           const done = t.status === "completed" || t.status === "cancelled";
           const overdue = !done && t.dueDate && new Date(t.dueDate) < now;
           if (filterStatus === "cerradas")   return done;
           if (filterStatus === "atrasadas")  return !!overdue;
           if (filterStatus === "programadas") return !done && !overdue;
+          // Team filter (client-side, only when team selected and no specific user)
+          if (filterTeam !== "all" && filterAssignee === "all") {
+            const ids: number[] = Array.isArray(t.assigneeIds) ? t.assigneeIds : (t.assignedTo ? [t.assignedTo] : []);
+            return ids.some(id => teamMemberIds.has(id));
+          }
           return true;
         });
 
