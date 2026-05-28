@@ -452,6 +452,84 @@ router.get("/tasks/:id/chain", async (req, res) => {
   }
 });
 
+// GET /api/tasks/:id/chain-full — full chain (root→leaf) for any task in the thread
+router.get("/tasks/:id/chain-full", async (req, res) => {
+  try {
+    const startId = parseInt(req.params.id);
+    if (isNaN(startId)) { res.status(400).json({ error: "Invalid task id" }); return; }
+
+    const rows = await db.execute(sql`
+      WITH RECURSIVE
+      -- Walk UP to find root ancestor
+      ancestors AS (
+        SELECT t.*, 0 AS up_depth
+        FROM tasks t WHERE t.id = ${startId}
+        UNION ALL
+        SELECT p.*, a.up_depth + 1
+        FROM tasks p
+        JOIN ancestors a ON p.id = a.parent_task_id
+        WHERE a.up_depth < 50
+      ),
+      root AS (
+        SELECT id FROM ancestors ORDER BY up_depth DESC LIMIT 1
+      ),
+      -- Walk DOWN from root to get full descendant tree
+      full_chain AS (
+        SELECT t.*, 0 AS chain_depth
+        FROM tasks t WHERE t.id = (SELECT id FROM root)
+        UNION ALL
+        SELECT c.*, f.chain_depth + 1
+        FROM tasks c
+        JOIN full_chain f ON c.parent_task_id = f.id
+        WHERE f.chain_depth < 50
+      )
+      SELECT
+        full_chain.*,
+        (SELECT co.company_name FROM clients co WHERE co.id = full_chain.client_id) AS client_name,
+        (SELECT string_agg(u2.full_name, ', ' ORDER BY u2.full_name)
+         FROM task_assignees ta2 JOIN users u2 ON u2.id = ta2.user_id
+         WHERE ta2.task_id = full_chain.id) AS assignee_names,
+        (SELECT string_agg(ta2.user_id::text, ',' ORDER BY ta2.user_id)
+         FROM task_assignees ta2 WHERE ta2.task_id = full_chain.id) AS assignee_ids,
+        (SELECT u3.full_name FROM users u3 WHERE u3.id = full_chain.closed_by) AS closed_by_name,
+        (SELECT u4.full_name FROM users u4 WHERE u4.id = full_chain.assigned_to) AS assignee_name
+      FROM full_chain
+      ORDER BY full_chain.chain_depth ASC
+    `);
+
+    const chain = (rows.rows ?? rows as any[]).map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      type: r.type,
+      priority: r.priority,
+      status: r.status,
+      dueDate: r.due_date,
+      completedAt: r.completed_at,
+      parentTaskId: r.parent_task_id,
+      clientId: r.client_id,
+      quoteId: r.quote_id,
+      createdAt: r.created_at,
+      assignedTo: r.assigned_to,
+      closedBy: r.closed_by,
+      deferCount: r.defer_count,
+      clientName: r.client_name ?? null,
+      assigneeName: r.assignee_name ?? null,
+      assigneeNames: r.assignee_names ? r.assignee_names.split(", ") : [],
+      assigneeIds: r.assignee_ids ? r.assignee_ids.split(",").map(Number) : [],
+      closedByName: r.closed_by_name ?? null,
+    }));
+
+    // Leaf = last task in chain (deepest depth, prefer pending/in_progress over completed)
+    const pending = chain.filter(t => t.status !== "completed" && t.status !== "cancelled");
+    const leaf = pending.length > 0 ? pending[pending.length - 1] : chain[chain.length - 1];
+
+    res.json({ chain, leafId: leaf?.id ?? startId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/tasks/defer-overdue", async (req, res) => {
   try {
     const userId = (req as any).session?.userId;

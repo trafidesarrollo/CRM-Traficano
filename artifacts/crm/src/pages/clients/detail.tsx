@@ -100,35 +100,39 @@ export default function ClientDetail() {
   const [taskFollowupAssigneeId, setTaskFollowupAssigneeId] = useState<number | null>(null);
 
   const openTaskModal = async (task: any) => {
+    // Show immediately with the clicked task while we fetch the full chain
     setTaskModalData({ ...task });
     setTaskModalOpen(true);
     setTaskShowFollowup(false);
     setTaskFollowupDate((() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })());
     setTaskFollowupTitle(data?.client?.companyName || data?.client?.company_name || task.title || "");
     setTaskFollowupDesc("");
-    // Default: assign followup to same person as current task, or first team member
     const members = data?.teamInfo?.members ?? [];
-    const currentAssignee = members.find((m: any) => m.userId === (task.assigned_to ?? task.assignedTo));
-    setTaskFollowupAssigneeId(currentAssignee?.userId ?? members[0]?.userId ?? null);
     setTaskThread(null);
+
     if (task.id) {
       setTaskThreadLoading(true);
       try {
-        // Fetch ancestors (chain) and direct children in parallel
-        const [chainRes, childrenRes] = await Promise.all([
-          fetch(`${API}/api/tasks/${task.id}/chain`, { credentials: "include" }),
-          fetch(`${API}/api/tasks?parentTaskId=${task.id}&limit=50`, { credentials: "include" }),
-        ]);
-        const chain: any[] = chainRes.ok ? await chainRes.json() : [];
-        const childrenData = childrenRes.ok ? await childrenRes.json() : [];
-        const children: any[] = Array.isArray(childrenData) ? childrenData : (childrenData.tasks || []);
-        // chain = [...ancestors, currentTask]; combine with children (exclude current from children if duplicated)
-        const allItems = [
-          ...chain,
-          ...children.filter(c => c.id !== task.id),
-        ];
-        setTaskThread({ items: allItems, currentId: task.id });
-      } catch {} finally { setTaskThreadLoading(false); }
+        // Fetch full chain (root→leaf) in one call
+        const res = await fetch(`${API}/api/tasks/${task.id}/chain-full`, { credentials: "include" });
+        if (!res.ok) throw new Error("chain-full failed");
+        const { chain, leafId }: { chain: any[]; leafId: number } = await res.json();
+
+        // Open the leaf (last/active task) instead of the clicked one
+        const leaf = chain.find(t => t.id === leafId) ?? task;
+        setTaskModalData({ ...leaf });
+
+        // Default assignee: same as leaf task's assignee, or first team member
+        const currentAssignee = members.find((m: any) => m.userId === (leaf.assigned_to ?? leaf.assignedTo));
+        setTaskFollowupAssigneeId(currentAssignee?.userId ?? members[0]?.userId ?? null);
+        setTaskFollowupTitle(data?.client?.companyName || data?.client?.company_name || leaf.title || "");
+
+        setTaskThread({ items: chain, currentId: leafId });
+      } catch {
+        // Fallback: use clicked task as-is
+        const currentAssignee = members.find((m: any) => m.userId === (task.assigned_to ?? task.assignedTo));
+        setTaskFollowupAssigneeId(currentAssignee?.userId ?? members[0]?.userId ?? null);
+      } finally { setTaskThreadLoading(false); }
     }
   };
 
