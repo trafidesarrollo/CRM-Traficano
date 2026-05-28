@@ -98,31 +98,33 @@ export default function ClientDetail() {
   const [taskFollowupTitle, setTaskFollowupTitle] = useState("");
   const [taskFollowupDesc, setTaskFollowupDesc] = useState("");
   const [taskFollowupAssigneeId, setTaskFollowupAssigneeId] = useState<number | null>(null);
-  const [taskShowComment, setTaskShowComment] = useState(false);
-  const [taskComment, setTaskComment] = useState("");
+  const [novedadTaskId, setNovedadTaskId] = useState<number | null>(null);
+  const [novedadText, setNovedadText] = useState("");
+  const [novedadSaving, setNovedadSaving] = useState(false);
 
-  const addNoteWithoutClosing = async () => {
-    if (!taskModalData || !taskComment.trim()) return;
-    setTaskSaving(true);
+  const submitNovedad = async (task: any) => {
+    if (!novedadText.trim()) return;
+    setNovedadSaving(true);
     try {
+      const clientId = task.clientId ?? task.client_id ?? (id ? parseInt(id) : undefined);
       const res = await fetch(`${API}/api/activities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           type: "note",
-          title: `Nota — ${taskModalData.title}`,
-          description: taskComment.trim(),
-          clientId: taskModalData.clientId ?? taskModalData.client_id ?? (id ? parseInt(id) : undefined),
+          title: `Novedad — ${task.title}`,
+          description: novedadText.trim(),
+          clientId,
           completedAt: new Date().toISOString(),
         }),
       });
-      if (!res.ok) { toast({ title: "Error al guardar nota", variant: "destructive" }); return; }
-      toast({ title: "Nota guardada en bitácora" });
-      setTaskComment("");
-      setTaskShowComment(false);
+      if (!res.ok) { toast({ title: "Error al guardar novedad", variant: "destructive" }); return; }
+      toast({ title: "Novedad guardada en bitácora" });
+      setNovedadTaskId(null);
+      setNovedadText("");
       load();
-    } finally { setTaskSaving(false); }
+    } finally { setNovedadSaving(false); }
   };
 
   const openTaskModal = async (task: any) => {
@@ -130,8 +132,6 @@ export default function ClientDetail() {
     setTaskModalData({ ...task });
     setTaskModalOpen(true);
     setTaskShowFollowup(false);
-    setTaskShowComment(false);
-    setTaskComment("");
     setTaskFollowupDate((() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })());
     setTaskFollowupTitle(data?.client?.companyName || data?.client?.company_name || task.title || "");
     setTaskFollowupDesc("");
@@ -925,51 +925,105 @@ export default function ClientDetail() {
                 // Task item
                 const isCompleted = item.status === "completed";
                 const taskQuoteId = item.quoteId ?? item.quote_id ?? null;
+                const isNovedadOpen = novedadTaskId === item.id;
                 return (
-                  <Card
-                    key={`task-${item.id}`}
-                    className={`cursor-pointer transition-colors hover:border-primary/40 ${isCompleted ? "border-green-500/20" : "border-orange-500/20"}`}
-                    onClick={() => openTaskModal(item)}
-                  >
-                    <CardContent className="p-3 flex items-start gap-3">
-                      <span className="text-xl mt-0.5">{isCompleted ? "✅" : (TASK_TYPE_ICONS[item.type] || "📋")}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <p className="font-medium text-sm truncate">{item.title}</p>
-                            <Badge className={`text-xs shrink-0 ${isCompleted ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
-                              {TASK_STATUS_LABELS[item.status] || item.status}
-                            </Badge>
-                            {item.parent_task_id && <GitBranch className="w-3 h-3 text-violet-400 shrink-0" />}
+                  <div key={`task-${item.id}`} className="space-y-1">
+                    <Card
+                      className={`cursor-pointer transition-colors hover:border-primary/40 ${isCompleted ? "border-green-500/20" : "border-orange-500/20"}`}
+                      onClick={() => openTaskModal(item)}
+                    >
+                      <CardContent className="p-3 flex items-start gap-3">
+                        <span className="text-xl mt-0.5">{isCompleted ? "✅" : (TASK_TYPE_ICONS[item.type] || "📋")}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="font-medium text-sm truncate">{item.title}</p>
+                              <Badge className={`text-xs shrink-0 ${isCompleted ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
+                                {TASK_STATUS_LABELS[item.status] || item.status}
+                              </Badge>
+                              {item.parent_task_id && <GitBranch className="w-3 h-3 text-violet-400 shrink-0" />}
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {item._date ? new Date(item._date).toLocaleDateString("es-AR") : "—"}
+                            </span>
                           </div>
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {item._date ? new Date(item._date).toLocaleDateString("es-AR") : "—"}
-                          </span>
-                        </div>
-                        {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                          {item.assignee_name && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
+                          {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                            {item.assignee_name && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" />Asignada a: {item.assignee_name}
+                              </p>
+                            )}
+                            {isCompleted && (item.completed_at || item.completedAt) && (
+                              <p className="text-xs text-green-400 flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Cerrada el {new Date(item.completed_at || item.completedAt).toLocaleDateString("es-AR")}
+                                {(item.closed_by_name || item.closedByName) && (
+                                  <span className="font-semibold"> por {item.closed_by_name || item.closedByName}</span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <p className={`text-xs flex items-center gap-1 ${taskQuoteId ? "text-primary/70" : "text-blue-400/60"}`}>
+                              <ListTodo className="h-3 w-3" />
+                              {taskQuoteId ? "Tarea — Ver cotización →" : "Clic para ver / editar"}
                             </p>
-                          )}
-                          {isCompleted && (item.completed_at || item.completedAt) && (
-                            <p className="text-xs text-green-400 flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Cerrada el {new Date(item.completed_at || item.completedAt).toLocaleDateString("es-AR")}
-                              {(item.closed_by_name || item.closedByName) && (
-                                <span className="font-semibold"> por {item.closed_by_name || item.closedByName}</span>
-                              )}
-                            </p>
-                          )}
+                            {!isCompleted && (
+                              <button
+                                className="text-xs flex items-center gap-1 text-amber-400 hover:text-amber-300 border border-amber-500/30 hover:border-amber-400/50 rounded px-2 py-0.5 transition-colors"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  if (isNovedadOpen) {
+                                    setNovedadTaskId(null);
+                                    setNovedadText("");
+                                  } else {
+                                    setNovedadTaskId(item.id);
+                                    setNovedadText("");
+                                  }
+                                }}
+                              >
+                                <MessageSquare className="h-3 w-3" />
+                                Cargar novedad
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <p className={`text-xs mt-0.5 flex items-center gap-1 ${taskQuoteId ? "text-primary/70" : "text-blue-400/60"}`}>
-                          <ListTodo className="h-3 w-3" />
-                          {taskQuoteId ? "Tarea — Ver cotización →" : "Clic para ver / editar"}
-                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Inline novedad form */}
+                    {isNovedadOpen && (
+                      <div className="ml-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 space-y-2">
+                        <Textarea
+                          rows={3}
+                          className="text-sm resize-none"
+                          placeholder="Escribí lo que pasó o lo que se acordó…"
+                          value={novedadText}
+                          onChange={e => setNovedadText(e.target.value)}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-amber-600 hover:bg-amber-500 text-white"
+                            disabled={!novedadText.trim() || novedadSaving}
+                            onClick={() => submitNovedad(item)}
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                            {novedadSaving ? "Guardando…" : "Guardar en bitácora"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { setNovedadTaskId(null); setNovedadText(""); }}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
                 );
               })}
               {filteredTimeline.length === 0 && (
@@ -1128,63 +1182,24 @@ export default function ClientDetail() {
                 {/* Acciones de cierre */}
                 {taskModalData.status !== "completed" && (
                   <div className="border-t border-border/40 pt-3 space-y-3">
-                    {!taskShowFollowup && !taskShowComment ? (
-                      <div className="flex flex-col gap-2">
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => closeTaskWithFollowup(false)}
-                            disabled={taskSaving}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-green-400" />
-                            {taskSaving ? "Cerrando…" : "Cerrar sin seguimiento"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="flex-1 bg-violet-600 hover:bg-violet-500"
-                            onClick={() => setTaskShowFollowup(true)}
-                          >
-                            <CalendarClock className="w-3.5 h-3.5 mr-1.5" />Cerrar y agendar
-                          </Button>
-                        </div>
+                    {!taskShowFollowup ? (
+                      <div className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="w-full border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
-                          onClick={() => setTaskShowComment(true)}
+                          className="flex-1"
+                          onClick={() => closeTaskWithFollowup(false)}
+                          disabled={taskSaving}
                         >
-                          <MessageSquare className="w-3.5 h-3.5 mr-1.5" />Agregar nota sin cerrar
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-green-400" />
+                          {taskSaving ? "Cerrando…" : "Cerrar sin seguimiento"}
                         </Button>
-                      </div>
-                    ) : taskShowComment ? (
-                      <div className="space-y-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium flex items-center gap-2">
-                            <MessageSquare className="w-4 h-4 text-amber-400" />
-                            Agregar nota a bitácora
-                          </p>
-                          <button onClick={() => { setTaskShowComment(false); setTaskComment(""); }}>
-                            <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                          </button>
-                        </div>
-                        <Textarea
-                          rows={3}
-                          className="text-sm resize-none"
-                          placeholder="Escribí lo que pasó o lo que se acordó…"
-                          value={taskComment}
-                          onChange={e => setTaskComment(e.target.value)}
-                          autoFocus
-                        />
                         <Button
-                          className="w-full bg-amber-600 hover:bg-amber-500 text-white"
                           size="sm"
-                          disabled={!taskComment.trim() || taskSaving}
-                          onClick={addNoteWithoutClosing}
+                          className="flex-1 bg-violet-600 hover:bg-violet-500"
+                          onClick={() => setTaskShowFollowup(true)}
                         >
-                          <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                          {taskSaving ? "Guardando…" : "Guardar en bitácora"}
+                          <CalendarClock className="w-3.5 h-3.5 mr-1.5" />Cerrar y agendar
                         </Button>
                       </div>
                     ) : (
