@@ -42,8 +42,8 @@ const ALLOWED_TABLES: Record<string, { label: string; truncateQuery: string; cou
   },
   followups: {
     label: "Seguimientos",
-    truncateQuery: "TRUNCATE TABLE followups RESTART IDENTITY CASCADE",
-    countQuery: "SELECT COUNT(*) as count FROM followups",
+    truncateQuery: "TRUNCATE TABLE scheduled_followups RESTART IDENTITY CASCADE",
+    countQuery: "SELECT COUNT(*) as count FROM scheduled_followups",
   },
   products: {
     label: "Productos",
