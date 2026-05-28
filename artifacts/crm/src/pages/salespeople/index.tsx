@@ -63,6 +63,7 @@ export default function Salespeople() {
   const [teamForm, setTeamForm] = useState({ name: "", description: "" });
   const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
   const [editTeamName, setEditTeamName] = useState("");
+  const [editTeamDescription, setEditTeamDescription] = useState("");
   const [addingMemberToTeam, setAddingMemberToTeam] = useState<number | null>(null);
   const [newMemberUserId, setNewMemberUserId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState("vendedor");
@@ -106,7 +107,7 @@ export default function Salespeople() {
       await fetch(`${API_BASE}/api/commercial-teams/${id}`, {
         method: "PUT", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editTeamName }),
+        body: JSON.stringify({ name: editTeamName, description: editTeamDescription || null }),
       });
       toast({ title: "Equipo actualizado" });
       setEditingTeamId(null);
@@ -429,10 +430,13 @@ export default function Salespeople() {
                   <CardContent className="p-5 space-y-4">
                     {/* Team header */}
                     {editingTeamId === team.id ? (
-                      <div className="flex gap-2">
-                        <Input value={editTeamName} onChange={(e) => setEditTeamName(e.target.value)} className="h-8 text-sm" autoFocus />
-                        <Button size="sm" variant="ghost" onClick={() => setEditingTeamId(null)}><X className="w-4 h-4" /></Button>
-                        <Button size="sm" onClick={() => saveTeamEdit(team.id)} disabled={!editTeamName.trim()}><Save className="w-4 h-4" /></Button>
+                      <div className="space-y-2">
+                        <Input value={editTeamName} onChange={(e) => setEditTeamName(e.target.value)} className="h-8 text-sm" placeholder="Nombre del equipo" autoFocus />
+                        <Input value={editTeamDescription} onChange={(e) => setEditTeamDescription(e.target.value)} className="h-8 text-sm" placeholder="Descripción (opcional)" />
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="ghost" onClick={() => setEditingTeamId(null)}><X className="w-4 h-4 mr-1" />Cancelar</Button>
+                          <Button size="sm" onClick={() => saveTeamEdit(team.id)} disabled={!editTeamName.trim()}><Save className="w-4 h-4 mr-1" />Guardar</Button>
+                        </div>
                       </div>
                     ) : (
                       <div className="flex items-start justify-between gap-2">
@@ -442,7 +446,7 @@ export default function Salespeople() {
                           <p className="text-xs text-muted-foreground mt-1">{team.members?.length || 0} miembros</p>
                         </div>
                         <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => { setEditingTeamId(team.id); setEditTeamName(team.name); }}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => { setEditingTeamId(team.id); setEditTeamName(team.name); setEditTeamDescription(team.description || ""); }}>
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteTeam(team.id)}>
