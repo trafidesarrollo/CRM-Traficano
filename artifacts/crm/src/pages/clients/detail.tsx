@@ -302,6 +302,8 @@ export default function ClientDetail() {
   // ── Filtro de actividades por vendedor ──
   const [activitySpFilter, setActivitySpFilter] = useState<number | "all">("all");
   const [salespeople, setSalespeople] = useState<any[]>([]);
+  // ── Filtro por tipo en timeline ──
+  const [timelineTypeFilter, setTimelineTypeFilter] = useState<"all" | "activity" | "task" | "quote">("all");
 
   const BLANK_CONTACT = { firstName: "", lastName: "", position: "", email: "", phone: "", isPrimary: false };
   const [contactOpen, setContactOpen] = useState(false);
@@ -393,6 +395,7 @@ export default function ClientDetail() {
   const mergedTimeline = [
     ...activities.map((a: any) => ({ ...a, _kind: "activity" as const, _date: a.createdAt })),
     ...tasks.map((t: any) => ({ ...t, _kind: "task" as const, _date: t.created_at || t.createdAt })),
+    ...quotes.map((q: any) => ({ ...q, _kind: "quote" as const, _date: q.date || q.createdAt })),
   ].sort((a, b) => new Date(b._date || 0).getTime() - new Date(a._date || 0).getTime());
 
   // Vendedores que tienen actividades en este cliente
@@ -401,12 +404,15 @@ export default function ClientDetail() {
   )];
   const spWithActivity = salespeople.filter((s: any) => spIdsWithActivity.includes(s.id));
 
-  const filteredTimeline = activitySpFilter === "all"
-    ? mergedTimeline
-    : mergedTimeline.filter((item: any) => {
-        if (item._kind === "task") return false; // tasks have no salesperson — hide when filtering
-        return (item.salesperson_id ?? item.salespersonId) === activitySpFilter;
-      });
+  const filteredTimeline = mergedTimeline.filter((item: any) => {
+    if (timelineTypeFilter !== "all" && item._kind !== timelineTypeFilter) return false;
+    if (activitySpFilter !== "all") {
+      if (item._kind === "task") return false;
+      if (item._kind === "quote") return (item.salesperson_id ?? item.salespersonId) === activitySpFilter;
+      return (item.salesperson_id ?? item.salespersonId) === activitySpFilter;
+    }
+    return true;
+  });
   const cs = CLIENT_STATUS[client.status] || { label: client.status, color: "bg-gray-500/20 text-gray-300" };
 
   return (
@@ -690,7 +696,7 @@ export default function ClientDetail() {
             <TabsTrigger value="quotes"><FileText className="h-4 w-4 mr-1.5" />Cotizaciones ({quotes.length})</TabsTrigger>
             <TabsTrigger value="orders"><ShoppingCart className="h-4 w-4 mr-1.5" />Pedidos ({orders.length})</TabsTrigger>
             <TabsTrigger value="contacts"><Contact2 className="h-4 w-4 mr-1.5" />Contactos ({contacts.length})</TabsTrigger>
-            <TabsTrigger value="activities"><Activity className="h-4 w-4 mr-1.5" />Actividades ({mergedTimeline.length})</TabsTrigger>
+            <TabsTrigger value="activities"><History className="h-4 w-4 mr-1.5" />Timeline ({mergedTimeline.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="quotes" className="mt-4">
@@ -860,32 +866,55 @@ export default function ClientDetail() {
           </TabsContent>
 
           <TabsContent value="activities" className="mt-4">
-            {/* ── Filtro por vendedor ── */}
-            {spWithActivity.length > 1 && (
-              <div className="flex items-center gap-2 flex-wrap mb-4 p-3 bg-card/60 border border-border/40 rounded-xl">
-                <UserSquare className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground font-medium">Filtrar por vendedor:</span>
-                <button
-                  onClick={() => setActivitySpFilter("all")}
-                  className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${activitySpFilter === "all" ? "bg-primary/20 border-primary/50 text-primary" : "border-border/40 text-muted-foreground hover:border-border/70"}`}
-                >
-                  Todos ({activities.length})
-                </button>
-                {spWithActivity.map((sp: any) => {
-                  const count = activities.filter((a: any) => (a.salesperson_id ?? a.salespersonId) === sp.id).length;
-                  const active = activitySpFilter === sp.id;
-                  return (
-                    <button
-                      key={sp.id}
-                      onClick={() => setActivitySpFilter(sp.id)}
-                      className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${active ? "bg-primary/20 border-primary/50 text-primary" : "border-border/40 text-muted-foreground hover:border-border/70"}`}
-                    >
-                      {sp.name} ({count})
-                    </button>
-                  );
-                })}
+            {/* ── Filtros de tipo + vendedor ── */}
+            <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-card/60 border border-border/40 rounded-xl">
+              {/* Tipo */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(
+                  [
+                    { value: "all",      label: `Todo (${mergedTimeline.length})` },
+                    { value: "activity", label: `Actividades (${activities.length})` },
+                    { value: "task",     label: `Tareas (${tasks.length})` },
+                    { value: "quote",    label: `Cotizaciones (${quotes.length})` },
+                  ] as const
+                ).map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setTimelineTypeFilter(opt.value)}
+                    className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${timelineTypeFilter === opt.value ? "bg-primary/20 border-primary/50 text-primary" : "border-border/40 text-muted-foreground hover:border-border/70"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
-            )}
+
+              {/* Vendedor — solo cuando hay más de uno y se muestran actividades */}
+              {spWithActivity.length > 1 && (timelineTypeFilter === "all" || timelineTypeFilter === "activity") && (
+                <>
+                  <div className="w-px h-4 bg-border/50 mx-1" />
+                  <UserSquare className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <button
+                    onClick={() => setActivitySpFilter("all")}
+                    className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${activitySpFilter === "all" ? "bg-violet-500/20 border-violet-500/50 text-violet-300" : "border-border/40 text-muted-foreground hover:border-border/70"}`}
+                  >
+                    Todos
+                  </button>
+                  {spWithActivity.map((sp: any) => {
+                    const count = activities.filter((a: any) => (a.salesperson_id ?? a.salespersonId) === sp.id).length;
+                    const active = activitySpFilter === sp.id;
+                    return (
+                      <button
+                        key={sp.id}
+                        onClick={() => setActivitySpFilter(sp.id)}
+                        className={`px-2.5 py-1 rounded-full text-xs border transition-all font-medium ${active ? "bg-violet-500/20 border-violet-500/50 text-violet-300" : "border-border/40 text-muted-foreground hover:border-border/70"}`}
+                      >
+                        {sp.name} ({count})
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
 
             <div className="space-y-2">
               {filteredTimeline.map((item: any) => {
@@ -918,6 +947,46 @@ export default function ClientDetail() {
                             )}
                           </p>
                         </div>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                // Quote item
+                if (item._kind === "quote") {
+                  const qs = getQuoteStatusBadge(item);
+                  const amt = Number(item.net_amount || item.total || 0);
+                  return (
+                    <Card
+                      key={`quote-${item.id}`}
+                      className="cursor-pointer hover:border-primary/40 transition-colors border-blue-500/15"
+                      onClick={() => navigate(`/quotes/${item.id}`)}
+                    >
+                      <CardContent className="p-3 flex items-start gap-3">
+                        <span className="text-xl mt-0.5">📄</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="font-medium text-sm font-mono text-primary/90">{item.number || `#${item.id}`}</p>
+                              <Badge className={`text-xs shrink-0 ${qs.color}`}>{qs.label}</Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {item._date ? new Date(item._date).toLocaleDateString("es-AR") : "—"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 mt-1 flex-wrap">
+                            {amt > 0 && (
+                              <p className="text-xs text-muted-foreground font-mono">
+                                {item.currency === "ARS" ? "$" : "u$s"} {fmt(amt)}
+                              </p>
+                            )}
+                            {item.salesperson_name && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <UserSquare className="h-3 w-3" />{item.salesperson_name}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 mt-1 shrink-0" />
                       </CardContent>
                     </Card>
                   );
