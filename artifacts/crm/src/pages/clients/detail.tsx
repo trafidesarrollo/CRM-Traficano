@@ -97,6 +97,7 @@ export default function ClientDetail() {
   const [taskFollowupDate, setTaskFollowupDate] = useState("");
   const [taskFollowupTitle, setTaskFollowupTitle] = useState("");
   const [taskFollowupDesc, setTaskFollowupDesc] = useState("");
+  const [taskFollowupAssigneeId, setTaskFollowupAssigneeId] = useState<number | null>(null);
 
   const openTaskModal = async (task: any) => {
     setTaskModalData({ ...task });
@@ -105,6 +106,10 @@ export default function ClientDetail() {
     setTaskFollowupDate((() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })());
     setTaskFollowupTitle(data?.client?.companyName || data?.client?.company_name || task.title || "");
     setTaskFollowupDesc("");
+    // Default: assign followup to same person as current task, or first team member
+    const members = data?.teamInfo?.members ?? [];
+    const currentAssignee = members.find((m: any) => m.userId === (task.assigned_to ?? task.assignedTo));
+    setTaskFollowupAssigneeId(currentAssignee?.userId ?? members[0]?.userId ?? null);
     setTaskThread(null);
     if (task.id) {
       setTaskThreadLoading(true);
@@ -143,7 +148,7 @@ export default function ClientDetail() {
       }
 
       if (createFollowup && taskFollowupDate && taskFollowupTitle.trim() && id) {
-        const memberIds = data?.teamInfo?.members?.map((m: any) => m.userId).filter(Boolean) || [];
+        const assigneeId = taskFollowupAssigneeId;
         await fetch(`${API}/api/tasks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -157,7 +162,7 @@ export default function ClientDetail() {
             dueDate: new Date(taskFollowupDate + "T12:00:00").toISOString(),
             clientId: parseInt(id),
             parentTaskId: taskModalData.id,
-            assigneeIds: memberIds.length ? memberIds : undefined,
+            assigneeIds: assigneeId ? [assigneeId] : undefined,
           }),
         });
         toast({ title: "Tarea cerrada y seguimiento agendado" });
@@ -1135,13 +1140,27 @@ export default function ClientDetail() {
                           />
                         </div>
                         {data?.teamInfo?.members?.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            <span className="text-[11px] text-muted-foreground w-full mb-0.5">Se asignará a:</span>
-                            {data.teamInfo.members.map((m: any) => (
-                              <span key={m.id} className="text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 rounded-full px-2 py-0.5">
-                                {m.fullName || m.username}
-                              </span>
-                            ))}
+                          <div>
+                            <span className="text-[11px] text-muted-foreground block mb-1.5">Asignar seguimiento a:</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {data.teamInfo.members.map((m: any) => {
+                                const selected = taskFollowupAssigneeId === m.userId;
+                                return (
+                                  <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={() => setTaskFollowupAssigneeId(m.userId)}
+                                    className={`text-xs rounded-full px-3 py-1 border transition-all ${
+                                      selected
+                                        ? "bg-violet-600 border-violet-500 text-white font-semibold"
+                                        : "bg-white/5 border-border/40 text-muted-foreground hover:border-violet-500/50 hover:text-foreground"
+                                    }`}
+                                  >
+                                    {m.fullName || m.username}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                         <Button
