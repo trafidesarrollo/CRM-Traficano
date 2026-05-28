@@ -892,7 +892,7 @@ export default function ClientDetail() {
                     onClick={() => openTaskModal(item)}
                   >
                     <CardContent className="p-3 flex items-start gap-3">
-                      <span className="text-xl mt-0.5">{TASK_TYPE_ICONS[item.type] || "📋"}</span>
+                      <span className="text-xl mt-0.5">{isCompleted ? "✅" : (TASK_TYPE_ICONS[item.type] || "📋")}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-2 min-w-0">
