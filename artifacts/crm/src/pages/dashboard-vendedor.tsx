@@ -47,6 +47,7 @@ export default function DashboardVendedor() {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [myTarget, setMyTarget] = useState<any>(null);
+  const [myGoals, setMyGoals] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -63,11 +64,14 @@ export default function DashboardVendedor() {
         .then(r => r.json()).catch(() => []),
       fetch(`${API}/api/sales-targets/my-progress?year=${year}&month=${month}`, { credentials: "include" })
         .then(r => r.json()).catch(() => ({ data: null })),
-    ]).then(([quotesData, stats, actsData, targetData]) => {
+      fetch(`${API}/api/goals/mine`, { credentials: "include" })
+        .then(r => r.json()).catch(() => []),
+    ]).then(([quotesData, stats, actsData, targetData, goalsData]) => {
       setQuotes(quotesData.data || []);
       setTaskStats(stats && typeof stats === "object" && !Array.isArray(stats) ? stats : {});
       setActivities(Array.isArray(actsData) ? actsData : (actsData.data || []));
       setMyTarget(targetData.data || null);
+      setMyGoals(Array.isArray(goalsData) ? goalsData : []);
       setLoading(false);
     });
   }, [user?.id]);
@@ -135,6 +139,63 @@ export default function DashboardVendedor() {
             </Card>
           );
         })()
+      )}
+
+      {/* Mis Metas */}
+      {myGoals.length > 0 && (
+        <Card className="bg-card/50 border-white/5 mb-6">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Mis Metas</span>
+            </div>
+            <div className="space-y-4">
+              {myGoals.map((g: any) => {
+                const actual  = Number(g.actual_value ?? 0);
+                const target  = Number(g.target_value ?? 0);
+                const pct     = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+                const over    = target > 0 && actual >= target;
+                const isAmt   = g.metric_type === "amount_usd";
+                const fmtVal  = (v: number) => isAmt
+                  ? `u$s ${fmt(v)}`
+                  : String(Math.round(v));
+                const barColor = over ? "bg-emerald-400" : pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-amber-400" : "bg-primary";
+                const METRIC_LABELS: Record<string, string> = {
+                  quotes: "Cotizaciones", amount_usd: "Monto en USD", new_clients: "Clientes nuevos",
+                };
+                const PERIOD_LABELS: Record<string, string> = {
+                  monthly: "Mensual", quarterly: "Trimestral", semiannual: "Semestral", annual: "Anual",
+                };
+                return (
+                  <div key={g.id}>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-sm font-medium">
+                        {METRIC_LABELS[g.metric_type] || g.metric_type}
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({PERIOD_LABELS[g.period] || g.period})
+                        </span>
+                      </span>
+                      <span className={`text-xs font-semibold ${over ? "text-emerald-400" : pct >= 75 ? "text-green-400" : pct >= 40 ? "text-amber-400" : "text-muted-foreground"}`}>
+                        {fmtVal(actual)} / {fmtVal(target)}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+                        style={{ width: `${Math.max(pct, actual > 0 ? 2 : 0)}%` }}
+                      />
+                    </div>
+                    {over && (
+                      <p className="text-xs text-emerald-400 mt-1">
+                        🎯 {((actual / target) * 100).toFixed(0)}% — ¡Meta superada!
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Stat cards row */}

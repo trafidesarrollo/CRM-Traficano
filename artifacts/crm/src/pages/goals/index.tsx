@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { getFunctionalRoleLabel, getFunctionalRoleColor } from "@/lib/translations";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -29,6 +30,8 @@ const PERIOD_LABELS: Record<string, string> = {
 
 export default function Goals() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isVendedor = user?.role === "vendedor";
   const [goals, setGoals] = useState<any[]>([]);
   const [salespeople, setSalespeople] = useState<any[]>([]);
   const [progressMap, setProgressMap] = useState<Record<number, number>>({});
@@ -44,22 +47,37 @@ export default function Goals() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [goalsRes, spRes, progressRes] = await Promise.all([
-        fetch(`${API_BASE}/api/goals`, { credentials: "include" }).then(r => r.json()),
-        fetch(`${API_BASE}/api/salespeople`, { credentials: "include" }).then(r => r.json()),
-        fetch(`${API_BASE}/api/goals/progress`, { credentials: "include" }).then(r => r.json()),
-      ]);
-      setGoals(Array.isArray(goalsRes) ? goalsRes : []);
-      setSalespeople(Array.isArray(spRes) ? spRes : []);
-      const map: Record<number, number> = {};
-      if (Array.isArray(progressRes)) {
-        progressRes.forEach((p: any) => { map[p.id] = Number(p.actualValue ?? 0); });
+      if (isVendedor) {
+        const mineRes = await fetch(`${API_BASE}/api/goals/mine`, { credentials: "include" }).then(r => r.json());
+        const normalized = Array.isArray(mineRes) ? mineRes.map((g: any) => ({
+          id: g.id,
+          salespersonId: g.salesperson_id,
+          period: g.period,
+          metricType: g.metric_type,
+          targetValue: g.target_value,
+        })) : [];
+        setGoals(normalized);
+        const map: Record<number, number> = {};
+        if (Array.isArray(mineRes)) mineRes.forEach((g: any) => { map[g.id] = Number(g.actual_value ?? 0); });
+        setProgressMap(map);
+      } else {
+        const [goalsRes, spRes, progressRes] = await Promise.all([
+          fetch(`${API_BASE}/api/goals`, { credentials: "include" }).then(r => r.json()),
+          fetch(`${API_BASE}/api/salespeople`, { credentials: "include" }).then(r => r.json()),
+          fetch(`${API_BASE}/api/goals/progress`, { credentials: "include" }).then(r => r.json()),
+        ]);
+        setGoals(Array.isArray(goalsRes) ? goalsRes : []);
+        setSalespeople(Array.isArray(spRes) ? spRes : []);
+        const map: Record<number, number> = {};
+        if (Array.isArray(progressRes)) {
+          progressRes.forEach((p: any) => { map[p.id] = Number(p.actual_value ?? p.actualValue ?? 0); });
+        }
+        setProgressMap(map);
       }
-      setProgressMap(map);
     } catch {} finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (user !== undefined) fetchData(); }, [user?.role]);
 
   const getSpName = (id: number) => salespeople.find(s => s.id === id)?.name || "Desconocido";
   const getSp     = (id: number) => salespeople.find(s => s.id === id);
@@ -110,9 +128,11 @@ export default function Goals() {
           </h1>
           <p className="text-muted-foreground mt-1">Configuración de objetivos por vendedor</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />Nueva Meta
-        </Button>
+        {!isVendedor && (
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />Nueva Meta
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -165,15 +185,17 @@ export default function Goals() {
                         <span className="text-xs font-medium w-24 text-right">{fmt(current)} / {fmt(target)}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-3">
-                      <Button
-                        variant="ghost" size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(g.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </td>
+                    {!isVendedor && (
+                      <td className="py-3 px-3">
+                        <Button
+                          variant="ghost" size="icon"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDelete(g.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
