@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, opportunitiesTable, salespeopleTable, quotesTable, clientsTable } from "@workspace/db";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { db, opportunitiesTable, salespeopleTable, quotesTable, clientsTable, commercialTeamMembersTable } from "@workspace/db";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { notifyTeam } from "../lib/notify-team.js";
 
 const router: IRouter = Router();
@@ -16,12 +16,37 @@ router.get("/opportunities", async (req, res) => {
     const hunterId = req.query.hunterId ? parseInt(req.query.hunterId as string) : undefined;
     const farmerId = req.query.farmerId ? parseInt(req.query.farmerId as string) : undefined;
 
+    const callerRole = (req as any).userRole;
+    const callerId: number = (req as any).session?.userId;
+
     let conditions: any[] = [];
     if (status) conditions.push(eq(opportunitiesTable.status, status as any));
     if (assignedTo) conditions.push(eq(opportunitiesTable.salespersonId, assignedTo));
     if (clientId) conditions.push(eq(opportunitiesTable.clientId, clientId));
     if (hunterId) conditions.push(eq(opportunitiesTable.hunterId, hunterId));
     if (farmerId) conditions.push(eq(opportunitiesTable.farmerId, farmerId));
+
+    // Vendedores only see opportunities for clients assigned to their commercial team
+    if (callerRole === "vendedor" && callerId) {
+      const userTeams = await db
+        .select({ teamId: commercialTeamMembersTable.teamId })
+        .from(commercialTeamMembersTable)
+        .where(eq(commercialTeamMembersTable.userId, callerId));
+
+      if (userTeams.length > 0) {
+        const teamIds = userTeams.map((t) => t.teamId);
+        const teamClients = await db
+          .select({ id: clientsTable.id })
+          .from(clientsTable)
+          .where(inArray(clientsTable.assignedTeamId, teamIds));
+
+        if (teamClients.length > 0) {
+          conditions.push(inArray(opportunitiesTable.clientId, teamClients.map((c) => c.id)));
+        } else {
+          return res.json({ data: [], total: 0, page, limit });
+        }
+      }
+    }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

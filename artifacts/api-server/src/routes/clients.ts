@@ -39,6 +39,9 @@ router.get("/clients", async (req, res) => {
     const teamFilter       = (req.query.teamId as string) || "";
     const offset  = (page - 1) * limit;
 
+    const callerRole = (req as any).userRole;
+    const callerId: number = (req as any).session?.userId;
+
     // Build dynamic WHERE fragments (Drizzle sql-tagged for safe parameterisation)
     const searchCond = search
       ? sql`AND c.company_name ILIKE ${"%" + search + "%"}`
@@ -54,6 +57,13 @@ router.get("/clients", async (req, res) => {
       : teamFilter && teamFilter !== "all"
         ? sql`AND c.assigned_team_id = ${parseInt(teamFilter)}`
         : sql``;
+
+    // Vendedores only see clients assigned to their commercial team
+    const vendedorTeamCond = callerRole === "vendedor" && callerId
+      ? sql`AND c.assigned_team_id IN (
+          SELECT team_id FROM commercial_team_members WHERE user_id = ${callerId}
+        )`
+      : sql``;
 
     const [dataRes, countRes] = await Promise.all([
       db.execute(sql`
@@ -96,6 +106,7 @@ router.get("/clients", async (req, res) => {
           ${statusCond}
           ${importanceCond}
           ${teamCond}
+          ${vendedorTeamCond}
         ORDER BY c.id DESC
         LIMIT ${limit} OFFSET ${offset}
       `),
@@ -107,6 +118,7 @@ router.get("/clients", async (req, res) => {
           ${statusCond}
           ${importanceCond}
           ${teamCond}
+          ${vendedorTeamCond}
       `),
     ]);
 
