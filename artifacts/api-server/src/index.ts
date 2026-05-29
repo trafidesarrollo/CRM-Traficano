@@ -1,7 +1,9 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { db, settingsTable } from "@workspace/db";
+import { db, settingsTable, usersTable } from "@workspace/db";
 import { startExchangeRateScheduler } from "./lib/exchange-rate.js";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 async function loadSettingsFromDb() {
   try {
@@ -19,6 +21,25 @@ async function loadSettingsFromDb() {
   }
 }
 
+async function bootstrapAdminUser() {
+  try {
+    const admin = await db.select().from(usersTable).where(eq(usersTable.username, "admin")).limit(1);
+    if (admin.length === 0) {
+      const passwordHash = await bcrypt.hash("admin123", 10);
+      await db.insert(usersTable).values({
+        username: "admin",
+        passwordHash,
+        fullName: "Administrador",
+        role: "admin",
+        isActive: true,
+      });
+      logger.info("Admin user created automatically.");
+    }
+  } catch (err) {
+    logger.warn("Could not check/create admin user (table may not exist yet)");
+  }
+}
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
@@ -33,7 +54,9 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-loadSettingsFromDb().then(() => {
+loadSettingsFromDb()
+  .then(bootstrapAdminUser)
+  .then(() => {
   app.listen(port, (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");

@@ -98,10 +98,24 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    proxy: {
+      "/api": {
+        target: "http://api-server:5000",
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   preview: {
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: {
+      "/api": {
+        target: "http://api-server:5000",
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
 });

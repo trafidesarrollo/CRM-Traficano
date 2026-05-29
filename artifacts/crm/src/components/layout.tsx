@@ -530,7 +530,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {!collapsed && (
             <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-xl bg-white/5">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold flex-shrink-0">
-                {user?.fullName.charAt(0)}
+                {user?.fullName?.charAt(0) || "U"}
               </div>
               <div className="flex-1 overflow-hidden">
                 <p className="text-sm font-medium truncate">{user?.fullName}</p>
@@ -541,7 +541,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {collapsed && (
             <div className="flex justify-center py-2">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm" title={user?.fullName}>
-                {user?.fullName.charAt(0)}
+                {user?.fullName?.charAt(0) || "U"}
               </div>
             </div>
           )}
