@@ -22,6 +22,10 @@ import { es } from "date-fns/locale";
 
 const API = import.meta.env.VITE_API_URL || "";
 
+// A quote is "terminal" (closed for any reason) when its status is "approved"
+const isQuoteTerminal = (linkedQuoteStatus: string | null | undefined) =>
+  linkedQuoteStatus === "approved";
+
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: "bg-red-500/20 text-red-300 border-red-500/30",
   high:   "bg-orange-500/20 text-orange-300 border-orange-500/30",
@@ -859,7 +863,14 @@ export default function Tasks() {
               return (
                 <Card key={t.id} className={`transition-all cursor-pointer hover:bg-white/5 border-l-2 ${flag.left} ${done ? "opacity-70" : ""} ${(t.deferCount ?? 0) > 0 ? "border-orange-500/20" : ""}`} onClick={() => openDetail(t)}>
                   <CardContent className="p-4 flex items-center gap-3">
-                    <div onClick={e => { e.stopPropagation(); patch(t.id, { status: done ? "pending" : "completed" }).then(load); }}>
+                    <div onClick={e => {
+                      e.stopPropagation();
+                      if (!done && t.quoteId && !isQuoteTerminal(t.linkedQuoteStatus)) {
+                        toast({ title: "Cotización pendiente", description: `Esta tarea está vinculada a la cotización ${t.linkedQuoteNumber || `#${t.quoteId}`}. Solo podés cerrarla cuando la cotización esté finalizada.`, variant: "destructive" });
+                        return;
+                      }
+                      patch(t.id, { status: done ? "pending" : "completed" }).then(load);
+                    }}>
                       {done
                         ? <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
                         : <Circle className="w-5 h-5 text-muted-foreground hover:text-primary shrink-0 transition-colors" />}
@@ -1251,9 +1262,26 @@ export default function Tasks() {
                 ) : (
                   <div className="flex flex-col gap-2">
                     {selected.status !== "completed" ? (
-                      <Button className="w-full bg-green-600 hover:bg-green-700" onClick={closeTask} disabled={saving}>
-                        <CheckCircle2 className="w-4 h-4 mr-2" />Marcar como cerrada
-                      </Button>
+                      selected.quoteId && !isQuoteTerminal(selected.linkedQuoteStatus) ? (
+                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                          <p className="text-xs font-medium text-amber-400 flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            No se puede cerrar esta tarea
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Está vinculada a la cotización <strong className="text-foreground">{selected.linkedQuoteNumber || `#${selected.quoteId}`}</strong>, que aún no fue cerrada. Cerrá primero la cotización (finalizada, perdida o desistida).
+                          </p>
+                          <Link href={`/quotes/${selected.quoteId}`}>
+                            <Button size="sm" variant="outline" className="w-full text-amber-400 border-amber-500/30 hover:bg-amber-500/10 text-xs">
+                              <ExternalLink className="w-3 h-3 mr-1.5" />Ver cotización
+                            </Button>
+                          </Link>
+                        </div>
+                      ) : (
+                        <Button className="w-full bg-green-600 hover:bg-green-700" onClick={closeTask} disabled={saving}>
+                          <CheckCircle2 className="w-4 h-4 mr-2" />Marcar como cerrada
+                        </Button>
+                      )
                     ) : (
                       <Button variant="outline" className="w-full" onClick={reopenTask} disabled={saving}>
                         <Circle className="w-4 h-4 mr-2" />Reabrir tarea

@@ -140,6 +140,12 @@ router.get("/tasks", async (req, res) => {
       closedByName: sql<string | null>`(
         SELECT u3.full_name FROM users u3 WHERE u3.id = ${tasksTable.closedBy}
       )`,
+      linkedQuoteStatus: sql<string | null>`(
+        SELECT q.status FROM quotes q WHERE q.id = ${tasksTable.quoteId}
+      )`,
+      linkedQuoteNumber: sql<string | null>`(
+        SELECT q.quote_number FROM quotes q WHERE q.id = ${tasksTable.quoteId}
+      )`,
     }).from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
       .leftJoin(clientsTable, eq(tasksTable.clientId, clientsTable.id))
@@ -156,6 +162,8 @@ router.get("/tasks", async (req, res) => {
       clientName: r.clientName,
       childrenCount: Number(r.childrenCount),
       closedByName: r.closedByName ?? null,
+      linkedQuoteStatus: r.linkedQuoteStatus ?? null,
+      linkedQuoteNumber: r.linkedQuoteNumber ?? null,
     })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -239,6 +247,12 @@ router.get("/tasks/:id", async (req, res) => {
         closedByName: sql<string | null>`(
           SELECT u3.full_name FROM users u3 WHERE u3.id = ${tasksTable.closedBy}
         )`,
+        linkedQuoteStatus: sql<string | null>`(
+          SELECT q.status FROM quotes q WHERE q.id = ${tasksTable.quoteId}
+        )`,
+        linkedQuoteNumber: sql<string | null>`(
+          SELECT q.quote_number FROM quotes q WHERE q.id = ${tasksTable.quoteId}
+        )`,
       })
       .from(tasksTable)
       .leftJoin(usersTable, eq(tasksTable.assignedTo, usersTable.id))
@@ -254,6 +268,8 @@ router.get("/tasks/:id", async (req, res) => {
       childrenCount: Number(row.childrenCount),
       parentTitle: row.parentTitle ?? null,
       closedByName: row.closedByName ?? null,
+      linkedQuoteStatus: row.linkedQuoteStatus ?? null,
+      linkedQuoteNumber: row.linkedQuoteNumber ?? null,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -340,6 +356,22 @@ router.patch("/tasks/:id", async (req, res) => {
 
     const [prev] = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
     if (!prev) { res.status(404).json({ error: "No encontrada" }); return; }
+
+    // If closing a task linked to a quote, the quote must be in terminal state ("approved")
+    if (data.status === "completed" && prev.quoteId) {
+      const [quote] = await db
+        .select({ status: quotesTable.status, quoteNumber: quotesTable.quoteNumber })
+        .from(quotesTable)
+        .where(eq(quotesTable.id, prev.quoteId));
+      if (quote && quote.status !== "approved") {
+        res.status(422).json({
+          error: "Esta tarea está vinculada a una cotización que aún no fue cerrada. Solo podés cerrarla cuando la cotización se marque como finalizada, perdida o desistida.",
+          quoteId: prev.quoteId,
+          quoteNumber: quote.quoteNumber,
+        });
+        return;
+      }
+    }
 
     // Update assignees if provided
     if (Array.isArray(rawAssigneeIds) && rawAssigneeIds.length > 0) {
