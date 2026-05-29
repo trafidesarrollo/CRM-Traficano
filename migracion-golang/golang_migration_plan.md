@@ -388,6 +388,3 @@ Aprovechando la migración a Golang y su altísimo rendimiento concurrente, se p
 ### E. Daemon de Sincronización Asíncrona Bidireccional con el ERP Traficaño
 *   **Detalle:** Servicio en segundo plano (*Go Daemon*) que consulta la API o base de datos del ERP cada 10 minutos y actualiza el CRM automáticamente.
 *   **En Go:** Emplea colas locales en memoria con reintento exponencial (*exponential backoff*) ante caídas de conexión, asegurando tolerancia a fallos absoluta.
-
-
-
