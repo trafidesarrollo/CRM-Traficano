@@ -50,8 +50,8 @@ Este documento es tu **Plan de Vuelo cronológico** para este fin de semana. Est
   /api-server-go/internal/repository/postgres
   /api-server-go/internal/delivery/http/dto
   ```
-- [ ] Configurar **sqlc** (`sqlc.yaml`) e inicializar las migraciones en SQL puro con el diseño de **Class Table Inheritance** para caños y accesorios (Section 5.F) y la unificación de metas y actividades.
-- [ ] Escribir los modelos de dominio base en `/internal/domain/` (`client.go`, `product.go`, `quote.go`, `activity.go`).
+- [ ] Configurar **sqlc** (`sqlc.yaml`) e inicializar las migraciones en SQL puro con el diseño de **Class Table Inheritance** para caños y accesorios (Section 5.F), la unificación de metas y actividades, y la tabla de feriados (`holidays`).
+- [ ] Escribir los modelos de dominio base en `/internal/domain/` (`client.go`, `product.go`, `quote.go`, `activity.go`, `holiday.go`).
 
 ---
 
@@ -71,6 +71,7 @@ Este documento es tu **Plan de Vuelo cronológico** para este fin de semana. Est
 ### 📋 Checklist del Agente 4 (Casos de Uso Core):
 - [ ] **Módulo Clientes:** Crear el repositorio y casos de uso para clientes y contactos (deduplicando por CUIT).
 - [ ] **Módulo Productos:** Implementar la lectura unificada del catálogo uniendo la tabla padre `products` con sus tablas débiles hijas mediante `JOINs` limpios en SQL.
+- [ ] **Módulo Feriados & Validación de Calendario:** Crear el repositorio de feriados (`holidays`) con un semillero automático inicial de feriados nacionales. Implementar la validación en el agendado de interacciones: si un vendedor intenta agendar una reunión o tarea en una fecha registrada en `holidays`, retornar una advertencia amigable ("Che, este día no se labura: [nombre_feriado]").
 - [ ] **Módulo Cotizaciones y Conversión a Pedido:**
   - Bloquear cotizaciones si el cliente es Prospecto (`prospect`).
   - Calcular automáticamente totales netos, totales en kg y precio promedio por kg.

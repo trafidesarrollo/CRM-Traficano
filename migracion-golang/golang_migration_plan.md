@@ -40,6 +40,7 @@ El backend del CRM se compone de **13 módulos clave** que deben reescribirse en
 
 ### 6. Calendario y Sincronización (`/gcal` & `/tasks`)
 *   **Integración con Google Calendar:** Sincronización bidireccional de tareas y reuniones. Almacena en la tabla de tareas los campos `google_event_id`, `google_calendar_id` y `google_synced_at` para control de cambios.
+*   **Control de Días Feriados / No Laborables:** Validación cruzada antes de registrar tareas o reuniones comerciales. Si un vendedor intenta agendar para un día feriado registrado en la tabla `holidays`, el backend emite una alerta preventiva en la API (ej: *"Che, este día no se labura"*). Soporta semillado automático conectándose a APIs públicas de feriados.
 
 ### 7. Clientes (`/clients`)
 *   **Ciclo de Vida:** Control de transiciones de estados: `prospect` (sin OC) $\rightarrow$ `potential` (alto potencial comercial) $\rightarrow$ `final` (con al menos una OC autorizada) $\rightarrow$ `inactive` (inactivo).
@@ -200,6 +201,15 @@ erDiagram
 | `is_active` | `BOOLEAN` | `DEFAULT TRUE` | Activo / Suspendido. |
 | `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | Alta. |
 | `updated_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | Modificación. |
+
+#### Tabla: `holidays`
+| Campo | Tipo PostgreSQL | Restricción | Descripción |
+| :--- | :--- | :--- | :--- |
+| `id` | `SERIAL` | `PRIMARY KEY` | Identificador único del feriado. |
+| `date` | `DATE` | `NOT NULL UNIQUE` | Fecha del día no laborable (ej: `'2026-05-25'`). |
+| `name` | `VARCHAR(255)` | `NOT NULL` | Nombre o descripción del feriado (ej: `'Revolución de Mayo'`). |
+| `is_national` | `BOOLEAN` | `DEFAULT TRUE` | Indica si aplica a nivel nacional. |
+| `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | Fecha de registro. |
 
 ---
 
