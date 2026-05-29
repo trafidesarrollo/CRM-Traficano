@@ -1,0 +1,9 @@
+node_modules
+.git
+.pnpm-store
+.replit
+.cache
+dist
+build
+.env
+.DS_Store
