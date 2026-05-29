@@ -1,8 +1,10 @@
 import { Router, type IRouter } from "express";
 import { db, automationRulesTable, automationLogsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
+router.use(requireMinRole("gerente"));
 
 router.get("/automation/rules", async (req, res) => {
   const rows = await db.select().from(automationRulesTable).orderBy(desc(automationRulesTable.createdAt));
