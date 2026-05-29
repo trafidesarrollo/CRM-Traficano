@@ -170,11 +170,13 @@ export default function Goals() {
                   isAmount ? `$${v.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : String(Math.round(v));
                 return (
                   <tr key={g.id} className="border-b border-border/20 hover:bg-white/5 transition-colors">
-                    <td className="py-3 px-3 font-medium">{getSpName(g.salespersonId)}</td>
+                    <td className="py-3 px-3 font-medium">{isVendedor ? "Yo" : getSpName(g.salespersonId)}</td>
                     <td className="py-3 px-3">
-                      <Badge variant="outline" className={getFunctionalRoleColor(sp?.functionalRole)}>
-                        {getFunctionalRoleLabel(sp?.functionalRole)}
-                      </Badge>
+                      {!isVendedor && (
+                        <Badge variant="outline" className={getFunctionalRoleColor(sp?.functionalRole)}>
+                          {getFunctionalRoleLabel(sp?.functionalRole)}
+                        </Badge>
+                      )}
                     </td>
                     <td className="py-3 px-3">{PERIOD_LABELS[g.period] || g.period}</td>
                     <td className="py-3 px-3">{METRIC_LABELS[g.metricType] || g.metricType}</td>
