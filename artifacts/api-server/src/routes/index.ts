@@ -248,8 +248,14 @@ router.use(notificationsRouter);
 router.use(requireMinRole("vendedor"), emailTemplatesRouter);
 router.use(documentsRouter);
 router.use(storageRouter);
-router.use(automationRouter);
-router.use(customFieldsRouter);
+
+// Mount goals and salesTargets BEFORE any path-prefix-less gerente/admin guards
+// so vendedores can reach them without being blocked by downstream middleware.
+router.use("/goals", goalsRouter);
+router.use(requireMinRole("vendedor"), salesTargetsRouter);
+
+router.use(requireMinRole("gerente"), automationRouter);
+router.use(requireMinRole("gerente"), customFieldsRouter);
 router.use(requireMinRole("vendedor"), reportsRouter);
 router.use(pipelinesRouter);
 router.use((req, res, next) => {
@@ -264,14 +270,11 @@ router.use(requireMinRole("vendedor"), reportsExportRouter);
 router.use(gcalRouter);
 router.use(csvRouter);
 router.use(requireMinRole("vendedor"), searchRouter);
-router.use(bulkRouter);
+router.use(requireMinRole("gerente"), bulkRouter);
 router.use(requireMinRole("vendedor"), duplicatesRouter);
 router.use(requireMinRole("vendedor"), productionRouter);
 router.use("/extractions", extractionsRouter);
 router.use("/followups", requireMinRole("vendedor"), followupsRouter);
-
-router.use("/goals", goalsRouter);
-router.use(requireMinRole("vendedor"), salesTargetsRouter);
 
 router.use("/settings", requireRole("admin", "gerente_comercial"), settingsRouter);
 

@@ -1,10 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, clientsTable, contactsTable, productsTable, opportunitiesTable, tasksTable } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
-import { requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
-router.use(requireMinRole("gerente"));
 
 const TABLES: Record<string, any> = {
   clients: clientsTable,

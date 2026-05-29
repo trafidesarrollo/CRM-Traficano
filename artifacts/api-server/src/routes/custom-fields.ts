@@ -1,10 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, customFieldDefsTable, customFieldValuesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { requireMinRole } from "../middleware/auth.js";
 
 const router: IRouter = Router();
-router.use(requireMinRole("gerente"));
 
 router.get("/custom-fields/defs", async (req, res) => {
   const { entityType } = req.query as any;
