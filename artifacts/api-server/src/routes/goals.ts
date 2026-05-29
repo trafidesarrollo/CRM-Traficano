@@ -46,7 +46,7 @@ router.get("/mine", async (req, res) => {
         END AS actual_value
       FROM goals g
       INNER JOIN salespeople sp ON sp.id = g.salesperson_id
-      WHERE sp.user_id = ${userId}
+      WHERE sp.user_id = ${userId} OR sp.support_user_id = ${userId}
     `);
     res.json((result as any).rows);
   } catch (err) {
